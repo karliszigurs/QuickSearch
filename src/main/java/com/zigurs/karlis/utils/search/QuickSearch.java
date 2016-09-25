@@ -19,120 +19,163 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * A simple, lightweight in-memory quick-search provider.
+ * Simple and lightweight in-memory quick search provider.
  * <p>
- * Fit for low latency querying small to medium sized datasets (limited by memory) to enable users
- * immediately see the top hits for their partially entered search string. Based on field use
+ * Fit for low latency querying of small to medium sized datasets (limited by memory) to enable users
+ * immediately see the top hits for their partially entered search string. Based on production experience
  * this approach is well perceived by users and their ability to see the top hits immediately allows
  * them to adjust their queries on the fly getting to the desired result faster.
  * <p>
  * By implementing this functionality directly in the app or corresponding backend the overall complexity of the
- * project can be significantly reduced - you don't need to care about maintaining search infrastructure, server,
- * software, API, but instead focus on cheaply repopulating the dataset on reset, every hour, or so.
+ * project can be significantly reduced - there is no need to care about maintaining search infrastructure, servers,
+ * software or APIs.
  * <p>
  * Example uses can include:
- * - Selecting from a list of existing contacts
- * - Looking for a particular city (associating it with known aliases, landmarks, state, etc).
- * - Searching for an item in an online (book) shop
- * - Used in background to highlight items that match the (partial) keywords entered. A.la. OSX System Preferences search
- * - Navigating large navigation trees, in example all sporting events for a year
+ * <ul>
+ * <li>Selecting from a list of existing contacts</li>
+ * <li>Looking for a particular city (associating it with known aliases, landmarks, state, etc)</li>
+ * <li>Searching for an item in an online (book) shop</li>
+ * <li>Used in background to highlight items that match the (partial) keywords entered. A.la. OSX System Preferences search</li>
+ * <li>Navigating large navigation trees, in example all sporting events for a year</li>
+ * </ul>
  * <p>
  * Typical use case would be including it in ether application or a web server, maintaining the
  * data set (ether via provided add and remove methods or by clearing and repopulating the search contents
  * completely) and exposing an API to user that accepts a free-form input and returns corresponding matching items.
  * <p>
- * Each entry is associated with a number of keywords that are not exposed to user, therefore a possibility to use
- * aliases or item class descriptions in keywords. Same applies to letting users discover items by unique identifiers
+ * Each entry is associated with a number of keywords that are not exposed to user, therefore it is possible to add
+ * name aliases or item class descriptions to keywords. Same applies to letting users discover items by unique identifiers
  * or alternate spellings.
  * <p>
  * An example contacts list is provided as example (entry followed by assigned keywords):
- * - "Jane Doe, 1234", "Jane Doe Marketing Manager SEO Community MySpace 1234"
- * - "Alice Stuggard, 9473", "Alice Stuggard Tech Cryptography Manager RSA 9473"
- * - "Robert Howard, 6866", "Robert Bob Howard Tech Necromancy Summoning Undead Cryptography BOFH RSA DOD Laundry 6866"
- * - "Eve Moneypenny, 9223", "Eve Moneypenny Accounting Manager Q OSA 9223"
+ * <table summary="">
+ * <tr><th>Item</th><th>Supplied keywords</th></tr>
+ * <tr><td>"Jane Doe, 1234"</td><td>"Jane Doe Marketing Manager SEO Community MySpace 1234"</td></tr>
+ * <tr><td>"Alice Stuggard, 9473"</td><td>"Alice Stuggard Tech Cryptography Manager RSA 9473"</td></tr>
+ * <tr><td>"Robert Howard, 6866"</td><td>"Robert Bob Howard Tech Necromancy Summoning Undead Cryptography BOFH RSA DOD Laundry 6866"</td></tr>
+ * <tr><td>"Eve Moneypenny, 9223"</td><td>"Eve Moneypenny Accounting Manager Q OSA 9223"</td></tr>
+ * </table>
  * <p>
- * In the above example if the user enters "Mana" he will be served a list of Jane, Alice and Eve as three
- * matches as their keywords "Manager" is matched by "Mana". By now user should realise that he already has all
- * managers covered in his result set and can tailor his search further by continuing to type "Mana a" - which
- * will lead to Alice and Eve being promoted to top of results. Alice because of her name match and Eve because
- * of department. Continuing to type "mana acc" reduces the results to Eve as she is only one in the search
- * set that can match both *mana* and *acc*.
+ * In the example above if the user enters <code><strong>"Mana"</strong></code> he will be served a list of Jane,
+ * Alice and Eve as their keyword <code><strong>"Manager"</strong></code> is matched by
+ * <code><strong>"Mana"</strong></code>. Now user should see that the result set is sufficiently narrow and
+ * can tailor his search further by continuing on to type <code><strong>"Mana a"</strong></code> - which will lead
+ * to Alice and Eve being promoted to top of results. Alice because of her name match and Eve because of her department.
+ * <code><strong>"Mana acc"</strong></code> will narrow the results to Eve only as she is only one in the search set
+ * that can match both <code><strong>*mana*</strong></code> and <code><strong>*acc*</strong></code>.
  * <p>
- * Or, in example if you have a complaint, you can start typing "nec" or "dea" and immediately
- * be presented with Bob Howard as your suggested point of contact.
+ * Example use:
  * <p>
- * Performance:
- * The implementation focuses on speed of queries with a bit of consideration for retaining a maintainable code.
- * A typical server should be able to handle well in excess of a million queries per second on a single core
- * against a modestly sized dataset (e.g. couple of thousand entries).
+ * <code>QuickSearch&lt;String&gt; qs = new QuickSearch&lt;&gt;();
+ * qs.addItem("Villain", "Roy Batty Lord Voldemort Colonel Kurtz");
+ * qs.addItem("Hero", "Walt Kowalksi Jake Blues Shaun");
+ * qs.findItem("walk"); // finds "Hero"</code>
  * <p>
- * This class is thread safe.
- * <p>
- * If you want to re-implement or use this code in a project, free or commercial, or different programming language
- * you are welcome to, but I'll appreciate a small credit.
+ * Concurrency - This class is thread safe (public functions are synchronised). Implementation is completely passive
+ * and can be deployed horizontally as identical datasets will produce identical search results.
  *
- * @param <T> Items contained within this search instance
+ * @author Karlis Zigurs, 2016
  */
 public class QuickSearch<T> {
 
     /**
-     * Interface to normalize search keywords (both supplied when adding items and when preparing
-     * search input for search iteration). Rationale is to allow slightly relaxed free-form text input
-     * (e.g. phone devices automatically capitalising entered keywords) and possibility to remap
-     * special characters to their latin alphabet equivalent, if desired.
+     * Interface to 'clean up' supplied keyword and user input strings. We assume that the input is
+     * going to be ether free form or malformed, therefore this allows to apply required actions to generate
+     * a 'clean' set of keywords from the input string.
+     */
+    public interface KeywordsExtractor {
+
+        /**
+         * Convert the input string into a list of keywords to be used internally.
+         *
+         * @param inputString supplied keywords or search input string
+         * @return Set of extracted keywords, can be empty if no viable keywords could be extracted.
+         */
+        Set<String> extract(String inputString);
+    }
+
+    /**
+     * Default raw input keywords extractor. Replaces all non-word characters with whitespace and
+     * splits the resulting string on whitespace boundaries.
      * <p>
-     * Can convert supplied strings into simplest possible representation, e.g. by ensuring consistent case,
-     * replacing special characters with their simplified form, and so on.
+     * In example both "one two,three-four" and "one$two%three^four" as inputs will produce
+     * set of 4 strings [one,two,three,four] on the output.
+     */
+    public static final KeywordsExtractor DEFAULT_KEYWORDS_EXTRACTOR = (s) -> new HashSet<>(Arrays.asList(s.replaceAll("[^\\w]+", " ").split("[\\s]+")));
+
+    /**
+     * Interface to sanitize search keywords before using them internally. Applied to both keywords
+     * supplied with items and to user input before performing search.
      * <p>
-     * The normalized representation is not limited in any form or way, this is just a convenience method.
-     * Simply returning the supplied string will mean that the search results contain only exact (and case sensitive) matches.
+     * Rationale is to allow somewhat relaxed free-form text input (e.g. phone devices automatically capitalising
+     * entered keywords) and extra capability to remap special characters to their latin alphabet equivalents.
+     * <p>
+     * The normalized representation has no specific requirements, this is just a convenience method.
+     * Simply returning the supplied string will mean that the search results contain only exact (and case
+     * sensitive) matches. It is also possible to return empty strings here, in which case the supplied
+     * keyword will be ignored.
      * <p>
      * Example transformations:
-     * New York -> new york                               //remove upper case
-     * Pythøn   -> python                                 //replace special characters
-     * HERMSGERVØRDENBRØTBØRDA -> hermsgervordenbrotborda //both of the above
-     * Россия   -> rossiya                                //map cyrilic alphabet to latin
+     * <table summary="">
+     * <tr><th>Original</th><th>Transformed</th><th>Reason</th></tr>
+     * <tr><td><code>"New York"</code></td><td><code>"new york"</code></td><td>remove upper case</td></tr>
+     * <tr><td><code>"Pythøn"</code></td><td><code>"python"</code></td><td>replace special characters</td></tr>
+     * <tr><td><code>"HERMSGERVØRDENBRØTBØRDA"</code></td><td><code>"hermsgervordenbrotborda"</code></td><td>it could happen...</td></tr>
+     * <tr><td><code>"Россия"</code></td><td><code>"rossiya"</code></td><td>translate cyrilic alphabet to latin</td></tr>
+     * </table>
      * <p>
      * Default implementation assumes that String::toLowerCase() is sufficient.
      */
     public interface KeywordNormalizer {
+
+        /**
+         * Called to request a final representation for the supplied keyword to be used internally.
+         *
+         * @param keyword original keyword
+         * @return form to use internally or empty string if this keyword is to be ignored
+         */
         String normalize(String keyword);
     }
 
     public static final KeywordNormalizer DEFAULT_KEYWORD_NORMALIZER = String::toLowerCase;
 
     /**
-     * Interface to score how well a supplied (sub)string matches against matching keyword,
-     * e.g. "swe" against "sweater".
+     * Interface providing scoring of user supplied input against corresponding keywords associated with search items.
      * <p>
-     * See DEFAULT_MATCH_SCORER for example implementation.
+     * An example invocations might request to compare <code><strong>"swe"</strong></code> against
+     * <code><strong>"sweater"</strong></code> or <code><strong>"count"</strong></code> aganst
+     * <code><strong>"accounting"</strong></code>.
      */
     public interface KeywordMatchScorer {
         /**
-         * Score how well (possibly incomplete) user input scores against identified matching item keyword.
+         * Score how well (likely incomplete) user input scores against identified matching item keyword.
          * <p>
          * Called multiple times for all user supplied strings against their matching keywords
          * associated with item and summed up to determine final item rank.
          *
-         * @param keywordSubstring user supplied (partial) match
-         * @param matchingKeyword  full matching keyword associated with the item
-         * @return arbitrary number scoring the match
+         * @param keywordSubstring user supplied (partial) match as recognized internally
+         * @param itemKeyword      full matching keyword associated with the item
+         * @return arbitrary number scoring the match. Higher means closer match.
          */
-        double score(String keywordSubstring, String matchingKeyword);
+        double score(String keywordSubstring, String itemKeyword);
     }
 
     /**
-     * Default match scorer implementation. Returns the ratio between search term and keyword
-     * lengths with additional bonus boost if the search term matches beginning of the keyword.
+     * Default keyword match score implementation.
+     * <p>
+     * Returns the ratio between search term and keyword lengths with additional boost
+     * if the search term matches beginning of the keyword.
      * <p>
      * In example, while matching user input against known keyword "password", the following will be calculated:
-     * Input "pa" -> low match (0.25), but boosted (+1) due to matching start of the keyword.
-     * Input "ass" -> low match (0.37), not boosted
-     * Input "assword" -> high match (0.87), not boosted
-     * Input "password" -> high match (1), also boosted by matching the beginning of the line (+1)
+     * <ul>
+     * <li>Input "pa" -&gt; low match (0.25), but boosted (+1) due to matching start of the keyword.</li>
+     * <li>Input "swo" -&gt; low match (0.37), not boosted</li>
+     * <li>Input "assword" -&gt; high match (0.87), not boosted</li>
+     * <li>Input "password" -&gt; high match (1), also boosted by matching the beginning of the line (+1)</li>
+     * </ul>
      * <p>
-     * All keywords supplied by user are scored against all partially matching keywords associated
-     * with a searchable item. Items rank in the results is determined by the sum of all score results.
+     * All keywords supplied by user are scored against all matching keywords associated with a searchable item.
+     * Items rank in the results is determined by the sum of all score results.
      */
     public static final KeywordMatchScorer DEFAULT_MATCH_SCORER = (keywordMatch, keyword) -> {
         double matchScore = (double) keywordMatch.length() / (double) keyword.length(); // reaches maximum if lengths match (both are identical)
@@ -143,23 +186,6 @@ public class QuickSearch<T> {
 
         return matchScore;
     };
-
-    /**
-     * Interface to 'clean' up raw search strings passed in. See DEFAULT_KEYWORDS_EXTRACTOR for explanation.
-     */
-    public interface KeywordsExtractor {
-        Set<String> extract(String rawSearchString);
-    }
-
-    /**
-     * Default raw input keywords extractor. Replaces all non-word characters with whitespace and
-     * splits the resulting string on whitespace boundaries.
-     * <p>
-     * In example the following strings will result in identical keywords list [one,two,three,four]:
-     * "one two,three-four"
-     * "one$two%three^four"
-     */
-    public static final KeywordsExtractor DEFAULT_KEYWORDS_EXTRACTOR = (s) -> new HashSet<>(Arrays.asList(s.replaceAll("[^\\w]+", " ").split("[\\s]+")));
 
     private class ItemAndScoreWrapper implements Comparable<ItemAndScoreWrapper> {
 
@@ -197,7 +223,11 @@ public class QuickSearch<T> {
     private final KeywordNormalizer keywordNormalizer;
     private final KeywordsExtractor keywordsExtractor;
 
-    private static final int DEFAULT_MINIMUM_KEYWORD_LENGTH = 2;
+    /**
+     * Default for minimum keyword length. Any keywords shorter than this will be ignored internally, therefore,
+     * a user supplied string <code><strong>"New y"</strong></code> will be treated the same as <code><strong>"new"</strong></code>.
+     */
+    public static final int DEFAULT_MINIMUM_KEYWORD_LENGTH = 2;
     private final int minimumKeywordLength;
 
     private final Map<String, List<T>> keywordsToItemsMap = new HashMap<>();
@@ -208,15 +238,28 @@ public class QuickSearch<T> {
      * Constructors
      */
 
+    /**
+     * Constructs a QuickSearch instance using defaults for keywords extractor, normaliser, match scorer and
+     * minimum keyword length.
+     */
     public QuickSearch() {
-        this(DEFAULT_KEYWORDS_EXTRACTOR, DEFAULT_KEYWORD_NORMALIZER, DEFAULT_MINIMUM_KEYWORD_LENGTH, DEFAULT_MATCH_SCORER);
+        this(DEFAULT_KEYWORDS_EXTRACTOR, DEFAULT_KEYWORD_NORMALIZER, DEFAULT_MATCH_SCORER, DEFAULT_MINIMUM_KEYWORD_LENGTH);
     }
 
-    public QuickSearch(KeywordsExtractor filter, KeywordNormalizer keywordNormalizer, int minimumKeywordLength, KeywordMatchScorer keywordMatchScorer) {
-        this.keywordsExtractor = filter;
+    /**
+     * Constructs a QuickSearch instance with the provided keyword processing implementations and specified minimum
+     * keyword length.
+     *
+     * @param keywordsExtractor    Extractor. {@link  KeywordsExtractor}
+     * @param keywordNormalizer    Normalizer. {@link  KeywordNormalizer}
+     * @param keywordMatchScorer   Scorer. {@link  KeywordMatchScorer}
+     * @param minimumKeywordLength Minimum length for keywords internally. Any keywords shorter than specified will be ignored.
+     */
+    public QuickSearch(KeywordsExtractor keywordsExtractor, KeywordNormalizer keywordNormalizer, KeywordMatchScorer keywordMatchScorer, int minimumKeywordLength) {
+        this.keywordsExtractor = keywordsExtractor;
+        this.keywordNormalizer = keywordNormalizer;
         this.keywordMatchScorer = keywordMatchScorer;
         this.minimumKeywordLength = minimumKeywordLength;
-        this.keywordNormalizer = keywordNormalizer;
     }
 
     /*
@@ -224,26 +267,25 @@ public class QuickSearch<T> {
      */
 
     /**
-     * Add (or expand - see below) an item with corresponding keywords,
-     * e.g. an online store item Shoe with keywords "Shoe Red 10 Converse cheap free" ...
+     * Add an item with corresponding keywords, e.g. an online store item Shoe with
+     * keywords <code><strong>"Shoe Red 10 Converse cheap free"</strong></code>.
      * <p>
-     * You can expand the current keywords stored against an item by adding it again with extra (or different)
-     * keywords. If the item is already in the database any new keywords will be added to it.
+     * You can expand the keywords stored against an item by adding it again with extra keywords.
+     * If the item is already in the database any new keywords will be mapped to it.
      *
-     * @param item     item to return for search results
-     * @param keywords arbitrary list of keywords separated by space, comma, special characters, freeform text...
-     * @return true if the item was added, false if no keywords to map against the item were found (item not added)
+     * @param item     Item to return for search results
+     * @param keywords Arbitrary list of keywords separated by space, comma, special characters, freeform text...
+     * @return True if the item was added, false if no keywords to map against the item were found (therefore item was not added)
      */
     public synchronized boolean addItem(T item, String keywords) {
         return addItemImpl(item, prepareKeywords(keywords, true));
     }
 
     /**
-     * Remove previously added item. Calling this method removes the item and its mapping
-     * of keywords from the database.
+     * Remove previously added item. Calling this method removes the item and its mapping of keywords from the database.
      *
-     * @param item to remove
-     * @return true if the item was removed, false if no such item was found
+     * @param item Item to remove
+     * @return True if the item was removed, false if no such item was found
      */
     public synchronized boolean removeItem(T item) {
         return removeItemImpl(item);
@@ -252,10 +294,10 @@ public class QuickSearch<T> {
     /**
      * Find top matching item for the supplied search string
      *
-     * @param searchString raw search string
-     * @return top scoring item or null if none found
+     * @param searchString Raw search string
+     * @return Top scoring item or null if no match was found
      */
-    public synchronized T findTopItem(String searchString) {
+    public synchronized T findItem(String searchString) {
         List<T> foundItems = findItems(searchString, 1);
 
         if (foundItems.size() > 0) {
@@ -266,10 +308,12 @@ public class QuickSearch<T> {
     }
 
     /**
-     * Find top n items matching supplied search string
+     * Find top n items matching the supplied search string. Supplied string will be processed by
+     * {@link KeywordsExtractor} and {@link KeywordNormalizer} before used for search, and any
+     * extracted search keywords shorten than the specified minimum keyword length will be ignored.
      *
-     * @param searchString     raw search string, e.g. "new york pizza"
-     * @param numberOfTopItems number of items the returned result should be limited to
+     * @param searchString     Raw search string, e.g. "new york pizza"
+     * @param numberOfTopItems Number of items the returned result should be limited to
      * @return List of 0 to numberOfTopItems elements
      */
     public synchronized List<T> findItems(String searchString, int numberOfTopItems) {
@@ -297,7 +341,7 @@ public class QuickSearch<T> {
             return Collections.emptyList(); //No viable keywords found
 
         // search itself
-        Map<T, ItemAndScoreWrapper> unsortedResults = coreSearchImpl(providedKeywords);
+        Map<T, ItemAndScoreWrapper> unsortedResults = findAndScoreImpl(providedKeywords);
 
         /*
          * Choose best results sorting approach based on how large a portion
@@ -353,7 +397,7 @@ public class QuickSearch<T> {
                 .collect(Collectors.toList());
     }
 
-    private Map<T, ItemAndScoreWrapper> coreSearchImpl(Set<String> suppliedSearchKeywords) {
+    private Map<T, ItemAndScoreWrapper> findAndScoreImpl(Set<String> suppliedSearchKeywords) {
         // temp array to contain found matching items
         Map<T, ItemAndScoreWrapper> matchingItems = new HashMap<>();
 
@@ -415,12 +459,14 @@ public class QuickSearch<T> {
     }
 
     private boolean removeItemImpl(T item) {
+        if (!itemKeywordsMap.containsKey(item))
+            return false;
+
         //  all known keywords for the item
         List<String> knownKeywords = itemKeywordsMap.get(item);
 
-        if (knownKeywords == null) {
-            return false; // No such item found
-        }
+        if (knownKeywords == null)
+            return false; // No such item found?
 
         // remove search term mappings
         for (String keyword : knownKeywords) {
@@ -512,7 +558,7 @@ public class QuickSearch<T> {
     private Set<String> prepareKeywordsList(Set<String> keywords, boolean filterShorts) {
         return keywords.stream()
                 .filter(kw -> kw != null && !kw.isEmpty())                          // prune empty and null keywords
-                .map(keywordNormalizer::normalize           )                       // cleanup each keyword
+                .map(keywordNormalizer::normalize)                                  // cleanup each keyword
                 .map(String::trim)                                                  // also trim any whitespace
                 .filter(s -> !filterShorts || s.length() >= minimumKeywordLength)   // filter out keywords that are too short
                 .collect(Collectors.toSet());

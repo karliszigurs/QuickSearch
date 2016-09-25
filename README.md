@@ -3,8 +3,8 @@
 Simple and lightweight in-memory search library for Java 8 web and desktop applications.
 No external dependencies. Single 10KB jar.
 
-QuickSearch enables near-instant incremental search over arbitrary items and keywords preloaded in-memory.
-This is achieved by adding items to search index and precalculating corresponding matching keywords and their
+QuickSearch provides near-instant incremental search over arbitrary items and keywords preloaded in-memory.
+This is achieved by adding items to search index and pre-calculating corresponding matching keywords and their
 fragments that are then matched against users input during search.
 
 It is well suited for small to medium datasets (e.g. up to a few tens of thousands items) that can fit into memory, e.g.
@@ -46,7 +46,7 @@ quickSearchInstance.clear();
 
 ## Caveats
 
-As all the data is precalculated and stored in memory the following should be taken into account:
+As all internal data structures are pre-calculated and reside in memory the following should be taken into account:
 
   * Searchable items should be relatively lightweight as they will be long lived.
     If you want to search over heavyweight items (e.g. pictures or ORM) it is best
@@ -61,5 +61,7 @@ As all the data is precalculated and stored in memory the following should be ta
   * [ ] .js version
   * [ ] web service and quick search API
   * [ ] fuzzy text matching
+
+## Credits
 
 Karlis Zigurs, 2016
