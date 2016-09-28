@@ -171,6 +171,57 @@ public class QuickSearchTest {
     }
 
     @org.junit.Test
+    public void testDirectMatching() throws Exception {
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test", "keyword"));
+
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test", "keyboard"));
+
+
+        List<String> result = searchInstance.findItems("keyword", 10);
+
+        assertTrue("Unexpected result size",
+                result.size() == 1);
+
+        assertEquals("test", result.get(0));
+    }
+
+    @org.junit.Test
+    public void testBacktrackMatchingStops() throws Exception {
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("keyword", "keyword"));
+
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("keyboard", "keyboard"));
+
+
+        List<String> result = searchInstance.findItems("keywZ", 10);
+
+        assertTrue("Unexpected result size",
+                result.size() == 1);
+
+        assertEquals("keyword", result.get(0));
+    }
+
+    @org.junit.Test
+    public void testBacktrackMatchingContinues() throws Exception {
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("keyword", "keyword one"));
+
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("keyboard", "keyboard"));
+
+        List<String> result = searchInstance.findItems("keyZZ", 10);
+
+        assertTrue("Unexpected result size",
+                result.size() == 2);
+
+        assertEquals("keyword", result.get(0));
+        assertEquals("keyboard", result.get(1));
+    }
+
+    @org.junit.Test
     public void testRemove() throws Exception {
         assertTrue("Failed to add search item",
                 searchInstance.addItem("test1", "onex two three"));

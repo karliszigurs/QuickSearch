@@ -187,6 +187,18 @@ public class QuickSearch<T> {
         return matchScore;
     };
 
+    /**
+     * Alternative match scorer which strongly prefers longer matches between the candidate and target.
+     */
+    public static final KeywordMatchScorer LENGTH_MATCH_SCORER = ((keywordSubstring, itemKeyword) -> {
+        int score = keywordSubstring.length();
+
+        if (itemKeyword.startsWith(keywordSubstring))
+            score *= 2;
+
+        return score;
+    });
+
     private class ItemAndScoreWrapper implements Comparable<ItemAndScoreWrapper> {
 
         private final T item;
@@ -231,7 +243,7 @@ public class QuickSearch<T> {
     private final int minimumKeywordLength;
 
     private final Map<String, List<T>> keywordsToItemsMap = new HashMap<>();
-    private final Map<String, List<String>> substringsToKeywordsMap = new HashMap<>();
+    private final Map<String, Set<String>> substringsToKeywordsMap = new HashMap<>();
     private final Map<T, List<String>> itemKeywordsMap = new HashMap<>();
 
     /*
@@ -329,19 +341,32 @@ public class QuickSearch<T> {
         itemKeywordsMap.clear();
     }
 
+    /**
+     * Returns human-readable statistics string of current in-memory arrays.
+     *
+     * @return example output: "10 items; 100 keywords; 10000 fragments"
+     */
+    public synchronized String getStats() {
+        return String.format("%d items; %d keywords; %d fragments",
+                itemKeywordsMap.size(),
+                keywordsToItemsMap.size(),
+                substringsToKeywordsMap.size()
+        );
+    }
+
     /*
      * Implementation methods
      */
 
     private List<T> findItemsImpl(String searchString, int maxItemsToList) {
-        Set<String> providedKeywords = prepareKeywords(searchString, false);
+        Set<String> searchKeywords = prepareKeywords(searchString, false);
 
         // empty list if no matches found
-        if (providedKeywords.isEmpty())
+        if (searchKeywords.isEmpty())
             return Collections.emptyList(); //No viable keywords found
 
         // search itself
-        Map<T, ItemAndScoreWrapper> unsortedResults = findAndScoreImpl(providedKeywords);
+        Map<T, ItemAndScoreWrapper> unsortedResults = findAndScoreImpl(searchKeywords);
 
         /*
          * Choose best results sorting approach based on how large a portion
@@ -397,36 +422,64 @@ public class QuickSearch<T> {
                 .collect(Collectors.toList());
     }
 
-    private Map<T, ItemAndScoreWrapper> findAndScoreImpl(Set<String> suppliedSearchKeywords) {
+    private Map<T, ItemAndScoreWrapper> findAndScoreImpl(Set<String> suppliedFragments) {
         // temp array to contain found matching items
-        Map<T, ItemAndScoreWrapper> matchingItems = new HashMap<>();
+        Map<T, ItemAndScoreWrapper> matchingItems = null;
 
         /*
          * Scoring happens here. Basic implementation that weights the
          * length of search term against matching keyword length and adds
          * a small bonus if the found keyword begins with the search term.
          */
-        for (String keywordMatch : suppliedSearchKeywords) {
-            List<String> matchingKeywords = substringsToKeywordsMap.get(keywordMatch);
-            if (matchingKeywords == null) continue;
+        for (String suppliedFragment : suppliedFragments) {
+            boolean firstRun = (matchingItems == null);
 
-            for (String keyword : matchingKeywords) {
+            Map<T, ItemAndScoreWrapper> fragmentIteration = new HashMap<T, ItemAndScoreWrapper>();
+            matchSingleFragment(fragmentIteration, matchingItems, suppliedFragment);
+            matchingItems = fragmentIteration;
+        }
+
+        return matchingItems;
+    }
+
+    private void matchSingleFragment(Map<T, ItemAndScoreWrapper> foundItems, Map<T, ItemAndScoreWrapper> prevIterMap, String candidateFragment) {
+        Set<String> candidateKeywords = substringsToKeywordsMap.get(candidateFragment);
+
+        if (candidateKeywords == null) {
+            /*
+             * Being smart here, if we have a supplied keyword we don't have a match
+             * for, immediately try to shorten it by a char to see if that yields a result.
+             *
+             * As a result we should be able to match 'termite' against 'terminator'
+             * after two backtracking iterations.
+             */
+            if (candidateFragment.length() > 1) {
+                matchSingleFragment(foundItems, prevIterMap, candidateFragment.substring(0, candidateFragment.length() - 1));
+            }
+        } else {
+            /*
+             * Otherwise proceed with normal 1:1 matching.
+             */
+            for (String keyword : candidateKeywords) {
                 List<T> items = keywordsToItemsMap.get(keyword);
-                double score = keywordMatchScorer.score(keywordMatch, keyword);
 
                 for (T item : items) {
-                    ItemAndScoreWrapper itemAndScoreWrapper = matchingItems.get(item);
-
-                    if (itemAndScoreWrapper == null) {
-                        matchingItems.put(item, new ItemAndScoreWrapper(item, score));
+                    if (prevIterMap == null) {
+                        foundItems.put(item,
+                                new ItemAndScoreWrapper(item, keywordMatchScorer.score(candidateFragment, keyword))
+                        );
                     } else {
-                        itemAndScoreWrapper.incrementScoreBy(score);
+                        ItemAndScoreWrapper wrapper = prevIterMap.get(item);
+                        if (wrapper != null) {
+                            wrapper.incrementScoreBy(
+                                    keywordMatchScorer.score(candidateFragment, keyword)
+                            );
+                            foundItems.put(item, wrapper);
+                        }
                     }
                 }
             }
         }
-
-        return matchingItems;
     }
 
     private boolean addItemImpl(T item, Set<String> keywords) {
@@ -480,6 +533,7 @@ public class QuickSearch<T> {
     }
 
     private void mapKeywordSubstrings(String keyword) {
+        // TODO - simplify if keyword already known?
         for (int i = 0; i < keyword.length(); i++) {
             for (int y = i + 1; y <= keyword.length(); y++) {
                 String keywordSubstring = keyword.substring(i, y).trim();
@@ -502,10 +556,10 @@ public class QuickSearch<T> {
     }
 
     private void mapSingleKeywordSubstring(String keyword, String keywordSubstring) {
-        List<String> substringKeywordsList = substringsToKeywordsMap.get(keywordSubstring);
+        Set<String> substringKeywordsList = substringsToKeywordsMap.get(keywordSubstring);
 
         if (substringKeywordsList == null) {
-            substringKeywordsList = new ArrayList<>();
+            substringKeywordsList = new LinkedHashSet<>();
             substringsToKeywordsMap.put(keywordSubstring, substringKeywordsList);
         }
 
@@ -515,7 +569,7 @@ public class QuickSearch<T> {
     }
 
     private void unmapSingleKeywordSubstring(String keyword, String keywordSubstring) {
-        List<String> substringKeywordsList = substringsToKeywordsMap.get(keywordSubstring);
+        Set<String> substringKeywordsList = substringsToKeywordsMap.get(keywordSubstring);
 
         if (substringKeywordsList != null) {
             substringKeywordsList.remove(keyword);
