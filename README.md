@@ -22,7 +22,7 @@ in single digit microsecond range. Less than 50MB of heap required for 100'000 u
 
 ## Demo
 
-Live demo available at http://zigurs.com/searchdemo.html.
+Live demo to play around with is available at http://zigurs.com/quicksearch.html.
 
 ## Use example
 
