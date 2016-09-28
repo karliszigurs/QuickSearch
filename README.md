@@ -20,6 +20,10 @@ It is well suited for small to medium datasets (e.g. up to a few tens of thousan
 Circa 500k - 1 million searches per second on a commodity server. Search request processing times
 in single digit microsecond range. Less than 50MB of heap required for 100'000 unique items. Thread safe.
 
+## Demo
+
+Live demo available at http://zigurs.com/searchdemo.html.
+
 ## Use example
 
 ```Java
