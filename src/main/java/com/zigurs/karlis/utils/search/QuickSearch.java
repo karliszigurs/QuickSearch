@@ -199,7 +199,7 @@ public class QuickSearch<T> {
         return score;
     });
 
-    private class ItemAndScoreWrapper implements Comparable<ItemAndScoreWrapper> {
+    private final class ItemAndScoreWrapper implements Comparable<ItemAndScoreWrapper> {
 
         private final T item;
         private double score;
@@ -209,8 +209,9 @@ public class QuickSearch<T> {
             this.score = score;
         }
 
-        void incrementScoreBy(double add) {
+        ItemAndScoreWrapper incrementScoreBy(double add) {
             score += add;
+            return this;
         }
 
         double getScore() {
@@ -242,7 +243,7 @@ public class QuickSearch<T> {
     public static final int DEFAULT_MINIMUM_KEYWORD_LENGTH = 2;
     private final int minimumKeywordLength;
 
-    private final Map<String, List<T>> keywordsToItemsMap = new HashMap<>();
+    private final Map<String, Set<T>> keywordsToItemsMap = new HashMap<>();
     private final Map<String, Set<String>> substringsToKeywordsMap = new HashMap<>();
     private final Map<T, List<String>> itemKeywordsMap = new HashMap<>();
 
@@ -432,8 +433,6 @@ public class QuickSearch<T> {
          * a small bonus if the found keyword begins with the search term.
          */
         for (String suppliedFragment : suppliedFragments) {
-            boolean firstRun = (matchingItems == null);
-
             Map<T, ItemAndScoreWrapper> fragmentIteration = new HashMap<T, ItemAndScoreWrapper>();
             matchSingleFragment(fragmentIteration, matchingItems, suppliedFragment);
             matchingItems = fragmentIteration;
@@ -442,7 +441,9 @@ public class QuickSearch<T> {
         return matchingItems;
     }
 
-    private void matchSingleFragment(Map<T, ItemAndScoreWrapper> foundItems, Map<T, ItemAndScoreWrapper> prevIterMap, String candidateFragment) {
+    private void matchSingleFragment(Map<T, ItemAndScoreWrapper> foundItems,
+                                     Map<T, ItemAndScoreWrapper> previousIterationMatch,
+                                     String candidateFragment) {
         Set<String> candidateKeywords = substringsToKeywordsMap.get(candidateFragment);
 
         if (candidateKeywords == null) {
@@ -454,41 +455,45 @@ public class QuickSearch<T> {
              * after two backtracking iterations.
              */
             if (candidateFragment.length() > 1) {
-                matchSingleFragment(foundItems, prevIterMap, candidateFragment.substring(0, candidateFragment.length() - 1));
+                matchSingleFragment(
+                        foundItems,
+                        previousIterationMatch,
+                        candidateFragment.substring(0, candidateFragment.length() - 1)
+                );
             }
         } else {
             /*
              * Otherwise proceed with normal 1:1 matching.
              */
-            for (String keyword : candidateKeywords) {
-                List<T> items = keywordsToItemsMap.get(keyword);
+            performOneToOneMapping(foundItems, previousIterationMatch, candidateFragment, candidateKeywords);
+        }
+    }
 
-                for (T item : items) {
-                    if (prevIterMap == null) {
-                        foundItems.put(item,
-                                new ItemAndScoreWrapper(item, keywordMatchScorer.score(candidateFragment, keyword))
-                        );
-                    } else {
-                        ItemAndScoreWrapper wrapper = prevIterMap.get(item);
-                        if (wrapper != null) {
-                            wrapper.incrementScoreBy(
-                                    keywordMatchScorer.score(candidateFragment, keyword)
-                            );
-                            foundItems.put(item, wrapper);
-                        }
-                    }
-                }
+    void performOneToOneMapping(Map<T, ItemAndScoreWrapper> foundItems, Map<T, ItemAndScoreWrapper> previousIterationMatch, String candidateFragment, Set<String> candidateKeywords) {
+        for (String keyword : candidateKeywords) {
+            Set<T> items = keywordsToItemsMap.get(keyword);
+
+            double score = keywordMatchScorer.score(candidateFragment, keyword);
+
+            if (previousIterationMatch == null) {
+                for (T item : items)
+                    foundItems.put(item, new ItemAndScoreWrapper(item, score));
+            } else {
+                items.stream()
+                        .map(previousIterationMatch::get)
+                        .filter(i -> i != null)
+                        .forEach(i -> foundItems.put(i.getItem(), i.incrementScoreBy(score)));
             }
         }
     }
 
-    private boolean addItemImpl(T item, Set<String> keywords) {
-        if (keywords.size() == 0) {
-            return false; // No valid keywords found, skip adding
+    private boolean addItemImpl(T item, Set<String> suppliedKeywords) {
+        if (suppliedKeywords.size() == 0 || item == null || String.valueOf(item).isEmpty()) {
+            return false; // No valid item or keywords found, skip adding
         }
 
         // Populate search maps
-        for (String keyword : keywords) {
+        for (String keyword : suppliedKeywords) {
             addItemToKeywordItemsList(item, keyword);
             mapKeywordSubstrings(keyword);
         }
@@ -502,7 +507,7 @@ public class QuickSearch<T> {
         }
 
         // Add keywords (or add keywords not already known if item already exists)
-        for (String keyword : keywords) {
+        for (String keyword : suppliedKeywords) {
             if (!knownKeywords.contains(keyword)) {
                 knownKeywords.add(keyword);
             }
@@ -518,9 +523,6 @@ public class QuickSearch<T> {
         //  all known keywords for the item
         List<String> knownKeywords = itemKeywordsMap.get(item);
 
-        if (knownKeywords == null)
-            return false; // No such item found?
-
         // remove search term mappings
         for (String keyword : knownKeywords) {
             unmapKeywordSubstrings(keyword);
@@ -533,13 +535,9 @@ public class QuickSearch<T> {
     }
 
     private void mapKeywordSubstrings(String keyword) {
-        // TODO - simplify if keyword already known?
         for (int i = 0; i < keyword.length(); i++) {
             for (int y = i + 1; y <= keyword.length(); y++) {
-                String keywordSubstring = keyword.substring(i, y).trim();
-                if (keywordSubstring.length() > 0) {
-                    mapSingleKeywordSubstring(keyword, keywordSubstring);
-                }
+                mapSingleKeywordSubstring(keyword, keyword.substring(i, y));
             }
         }
     }
@@ -547,10 +545,7 @@ public class QuickSearch<T> {
     private void unmapKeywordSubstrings(String keyword) {
         for (int i = 0; i < keyword.length(); i++) {
             for (int y = i + 1; y <= keyword.length(); y++) {
-                String keywordSubstring = keyword.substring(i, y).trim();
-                if (keywordSubstring.length() > 0) {
-                    unmapSingleKeywordSubstring(keyword, keywordSubstring);
-                }
+                unmapSingleKeywordSubstring(keyword, keyword.substring(i, y));
             }
         }
     }
@@ -581,10 +576,10 @@ public class QuickSearch<T> {
     }
 
     private void addItemToKeywordItemsList(T item, String keyword) {
-        List<T> keywordItems = keywordsToItemsMap.get(keyword);
+        Set<T> keywordItems = keywordsToItemsMap.get(keyword);
 
         if (keywordItems == null) {
-            keywordItems = new ArrayList<>();
+            keywordItems = new HashSet<>();
             keywordsToItemsMap.put(keyword, keywordItems);
         }
 
@@ -594,27 +589,27 @@ public class QuickSearch<T> {
     }
 
     private void removeItemFromKeywordItemsList(T item, String keyword) {
-        List<T> keywordItems = keywordsToItemsMap.get(keyword);
+        Set<T> keywordItems = keywordsToItemsMap.get(keyword);
 
-        if (keywordItems != null) {
-            keywordItems.remove(item);
+        keywordItems.remove(item);
 
-            if (keywordItems.size() == 0) {
-                keywordsToItemsMap.remove(keyword);
-            }
+        if (keywordItems.size() == 0) {
+            keywordsToItemsMap.remove(keyword);
         }
     }
 
     private Set<String> prepareKeywords(String rawInput, boolean filterShorts) {
-        return prepareKeywordsList(keywordsExtractor.extract(rawInput), filterShorts);
+        return rawInput != null
+                ? prepareKeywordsList(keywordsExtractor.extract(rawInput), filterShorts)
+                : Collections.EMPTY_SET;
     }
 
     private Set<String> prepareKeywordsList(Set<String> keywords, boolean filterShorts) {
         return keywords.stream()
-                .filter(kw -> kw != null && !kw.isEmpty())                          // prune empty and null keywords
-                .map(keywordNormalizer::normalize)                                  // cleanup each keyword
-                .map(String::trim)                                                  // also trim any whitespace
-                .filter(s -> !filterShorts || s.length() >= minimumKeywordLength)   // filter out keywords that are too short
+                .filter(kw -> !kw.isEmpty())
+                .map(keywordNormalizer::normalize)
+                .map(String::trim)
+                .filter(s -> !filterShorts || s.length() >= minimumKeywordLength)
                 .collect(Collectors.toSet());
     }
 }

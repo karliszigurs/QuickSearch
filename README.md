@@ -1,7 +1,7 @@
 # QuickSearch
 
 Simple and lightweight in-memory search library for Java 8 web and desktop applications.
-No external dependencies. Single 10KB jar.
+No external dependencies. Single 10KB jar. 100% test coverage.
 
 QuickSearch provides near-instant incremental search over arbitrary items and keywords preloaded in-memory.
 This is achieved by adding items to search index and pre-calculating corresponding matching keywords and their

@@ -15,11 +15,54 @@
  */
 package com.zigurs.karlis.utils.search;
 
+import org.junit.Test;
+
+import java.util.LinkedList;
 import java.util.List;
 
 import static org.junit.Assert.*;
 
 public class QuickSearchTest {
+
+    private static final class StoreItem {
+
+        private final int itemIdentifier;
+        private final String name;
+        private final String category;
+        private final String description;
+
+        public StoreItem(int itemIdentifier, String name, String category, String description) {
+            this.itemIdentifier = itemIdentifier;
+            this.name = name;
+            this.category = category;
+            this.description = description;
+        }
+
+        public int getItemIdentifier() {
+            return itemIdentifier;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public String getCategory() {
+            return category;
+        }
+
+        public String getDescription() {
+            return description;
+        }
+
+        @Override
+        public String toString() {
+            return String.format("(%s (%d) \"%s\")",
+                    getName(),
+                    getItemIdentifier(),
+                    getDescription()
+            );
+        }
+    }
 
     private final static String[][] USA_STATES = {
             {"AL", "Alabama", "Montgomery", "December 14, 1819"},
@@ -97,6 +140,30 @@ public class QuickSearchTest {
     }
 
     @org.junit.Test
+    public void addEmptyItem() throws Exception {
+        assertFalse("Failed to add a new search item.",
+                searchInstance.addItem("item", ""));
+    }
+
+    @org.junit.Test
+    public void addEmptyItem2() throws Exception {
+        assertFalse("Failed to add a new search item.",
+                searchInstance.addItem("", "one two three"));
+    }
+
+    @org.junit.Test
+    public void addNullItem() throws Exception {
+        assertFalse("Failed to add a new search item.",
+                searchInstance.addItem(null, "one two three"));
+    }
+
+    @org.junit.Test
+    public void addNullItem2() throws Exception {
+        assertFalse("Failed to add a new search item.",
+                searchInstance.addItem("item", null));
+    }
+
+    @org.junit.Test
     public void removeItem() throws Exception {
         assertTrue("Failed to add search item",
                 searchInstance.addItem("toBeRemoved", "one two three"));
@@ -130,6 +197,114 @@ public class QuickSearchTest {
                 searchInstance.findItems("one", 10).size() == 3
         );
     }
+
+    @org.junit.Test
+    public void findNoItems() throws Exception {
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test1", "one two three"));
+
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test2", "one two three"));
+
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test3", "one two three"));
+
+        assertTrue("Unexpected size",
+                searchInstance.findItems("       ", 10).size() == 0
+        );
+    }
+
+    @org.junit.Test
+    public void exerciseMultiStepMapping() throws Exception {
+        String exerciseString = "aquickbrownfoxjumpsoverthelazydog";
+
+        for (int i = 0; i < exerciseString.length(); i++) {
+            searchInstance.addItem("test" + i, exerciseString.substring(0, i));
+        }
+
+        for (int i = 0; i < exerciseString.length(); i++) {
+            searchInstance.addItem("test" + i, exerciseString.substring(i, exerciseString.length()));
+        }
+
+        assertEquals(10, searchInstance.findItems("e ex exe exer exerc i is ise", 10).size());
+    }
+
+    @org.junit.Test
+    public void statsAreEmpty() throws Exception {
+        assertEquals(searchInstance.getStats(), "0 items; 0 keywords; 0 fragments");
+    }
+
+    @org.junit.Test
+    public void statsAreFull() throws Exception {
+        String exerciseString = "aquickbrownfoxjumpsoverthelazydog";
+
+        for (int i = 0; i < exerciseString.length(); i++) {
+            searchInstance.addItem("test" + i, exerciseString.substring(0, i));
+        }
+
+        for (int i = 0; i < exerciseString.length(); i++) {
+            searchInstance.addItem("test" + i, exerciseString.substring(i, exerciseString.length()));
+        }
+
+        assertEquals(10, searchInstance.findItems("e ex exe exer exerc i is ise", 10).size());
+
+        assertEquals(searchInstance.getStats(), "33 items; 63 keywords; 554 fragments");
+    }
+
+    @org.junit.Test
+    public void noErrorsInLengthMatcher() throws Exception {
+        QuickSearch<String> alternativeConfig = new QuickSearch<>(
+                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
+                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
+                QuickSearch.LENGTH_MATCH_SCORER,
+                QuickSearch.DEFAULT_MINIMUM_KEYWORD_LENGTH
+        );
+
+        String exerciseString = "aquickbrownfoxjumpsoverthelazydog";
+
+        for (int i = 0; i < exerciseString.length(); i++) {
+            alternativeConfig.addItem("test" + i, exerciseString.substring(0, i));
+        }
+
+        for (int i = 0; i < exerciseString.length(); i++) {
+            alternativeConfig.addItem("test" + i, exerciseString.substring(i, exerciseString.length()));
+        }
+
+        assertEquals(10, alternativeConfig.findItems("e ex exe exer exerc i is ise", 10).size());
+
+        assertEquals(alternativeConfig.getStats(), "33 items; 63 keywords; 554 fragments");
+    }
+
+    @org.junit.Test
+    public void testExpandKeywords() throws Exception {
+        String exerciseString = "aquickbrownfoxjumpsoverthelazydog";
+
+        for (int i = 0; i < exerciseString.length(); i++) {
+            searchInstance.addItem("test" + i, exerciseString.substring(0, i));
+        }
+
+        for (int i = 0; i < exerciseString.length(); i++) {
+            searchInstance.addItem("test" + i, exerciseString.substring(i, exerciseString.length()));
+        }
+
+        assertEquals(10, searchInstance.findItems("e ex exe exer exerc i is ise", 10).size());
+
+        String stats = searchInstance.getStats();
+
+        //Repeat, but with different item names (forcing to expand the keywords
+        for (int i = 0; i < exerciseString.length(); i++) {
+            searchInstance.addItem("test" + (i % 3), exerciseString.substring(0, i));
+        }
+
+        for (int i = 0; i < exerciseString.length(); i++) {
+            searchInstance.addItem("test" + ((i % 3) + 3), exerciseString.substring(i, exerciseString.length()));
+        }
+
+        assertEquals(10, searchInstance.findItems("e ex exe exer exerc i is ise", 10).size());
+
+        assertEquals(stats, searchInstance.getStats());
+    }
+
 
     @org.junit.Test
     public void findItemsLimit() throws Exception {
@@ -173,10 +348,10 @@ public class QuickSearchTest {
     @org.junit.Test
     public void testDirectMatching() throws Exception {
         assertTrue("Failed to add search item",
-                searchInstance.addItem("test", "keyword"));
+                searchInstance.addItem("test1", "keyword"));
 
         assertTrue("Failed to add search item",
-                searchInstance.addItem("test", "keyboard"));
+                searchInstance.addItem("test2", "keyboard"));
 
 
         List<String> result = searchInstance.findItems("keyword", 10);
@@ -184,7 +359,26 @@ public class QuickSearchTest {
         assertTrue("Unexpected result size",
                 result.size() == 1);
 
-        assertEquals("test", result.get(0));
+        assertEquals("test1", result.get(0));
+    }
+
+
+    @org.junit.Test
+    public void testIntersectionWorks() throws Exception {
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test1", "one two"));
+
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test2", "two three"));
+
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test3", "twee onaa"));
+
+
+        List<String> result = searchInstance.findItems("two ", 10);
+
+        assertTrue("Unexpected result size",
+                result.size() == 2);
     }
 
     @org.junit.Test
@@ -244,6 +438,32 @@ public class QuickSearchTest {
     }
 
     @org.junit.Test
+    public void testRemoveTwice() throws Exception {
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test1", "onex two three"));
+
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test2", "onexx two three"));
+
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test3", "one two three"));
+
+        assertTrue("Unexpected result size",
+                searchInstance.findItems("one", 10).size() == 3);
+
+        for (int i = 1; i < 4; i++) {
+            searchInstance.removeItem("test" + i);
+        }
+
+        for (int i = 1; i < 4; i++) {
+            searchInstance.removeItem("test" + i);
+        }
+
+        assertTrue("Unexpected result size",
+                searchInstance.findItems("one", 10).size() == 0);
+    }
+
+    @org.junit.Test
     public void clear() throws Exception {
         assertTrue("Failed to add search item",
                 searchInstance.addItem("test1", "onex two three"));
@@ -286,5 +506,42 @@ public class QuickSearchTest {
         // Note - do not use the crude perf sanity check above for any kind of benchmarking.
         // JVM is notorious for under-performing for the first few seconds after startup
         // until the warmup is finished, caches filled and runtime optimisations kick in.
+    }
+
+    @Test
+    public void objectTypeExercise() {
+        List<StoreItem> items = new LinkedList<>();
+        String[] categories = new String[]{"Shoes", "Jackets", "Skirts"};
+
+        for (int i = 0; i < 1_000; i++) {
+            items.add(new StoreItem(i, "StoreItem", categories[i % 3],
+                    String.format("Item%d %s", i, categories[i % 3])));
+        }
+
+        items.add(new StoreItem(1, "Lord of The Rings",
+                "Fantasy", "tolkien fantasy hardbound middle earth lord of the rings"));
+
+        // create a quick search for StoreItems
+        QuickSearch<StoreItem> search = new QuickSearch<>();
+
+        // populate quick search data
+        for (StoreItem item : items) {
+            search.addItem(item, item.getDescription());
+        }
+
+        // do a few quick searches
+        assertNull(search.findItem("missing jeans"));
+        assertNotNull(search.findItem("item jack"));
+
+        assertEquals(6, search.findItems("item jack 20", 10).size());
+        assertEquals(6, search.findItems("sh 50", 10).size());
+
+        items.stream()
+                .filter(item -> categories[0].equals(item.getCategory()))
+                .forEach(search::removeItem);
+
+        assertEquals(10, search.findItems("red shoes", 10).size());
+        assertNotNull(search.findItems("midd", 10));
+        search.clear();
     }
 }
