@@ -15,6 +15,8 @@
  */
 package com.zigurs.karlis.utils.search;
 
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 
 import java.util.*;
@@ -118,18 +120,58 @@ public class QuickSearchTest {
 
     private QuickSearch<String> searchInstance;
 
-    @org.junit.Before
+    @Before
     public void setUp() throws Exception {
         searchInstance = new QuickSearch<>();
     }
 
-    @org.junit.After
+    @After
     public void tearDown() throws Exception {
         searchInstance.clear();
         searchInstance = null;
     }
 
-    @org.junit.Test
+    @Test(expected = RuntimeException.class)
+    public void testInvalidConstructor1() {
+        QuickSearch<String> qs = new QuickSearch<>(
+                null,
+                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
+                QuickSearch.DEFAULT_MATCH_SCORER,
+                1
+        );
+    }
+
+    @Test(expected = RuntimeException.class)
+    public void testInvalidConstructor2() {
+        QuickSearch<String> qs = new QuickSearch<>(
+                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
+                null,
+                QuickSearch.DEFAULT_MATCH_SCORER,
+                1
+        );
+    }
+
+    @Test(expected = RuntimeException.class)
+    public void testInvalidConstructor3() {
+        QuickSearch<String> qs = new QuickSearch<>(
+                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
+                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
+                null,
+                1
+        );
+    }
+
+    @Test(expected = RuntimeException.class)
+    public void testInvalidConstructor4() {
+        QuickSearch<String> qs = new QuickSearch<>(
+                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
+                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
+                QuickSearch.DEFAULT_MATCH_SCORER,
+                0
+        );
+    }
+
+    @Test
     public void addItem() throws Exception {
         assertTrue("Failed to add a new search item.",
                 searchInstance.addItem("item", "one two three"));
@@ -138,31 +180,31 @@ public class QuickSearchTest {
                 searchInstance.addItem("empty item", ""));
     }
 
-    @org.junit.Test
+    @Test
     public void addEmptyItem() throws Exception {
         assertFalse("Failed to add a new search item.",
                 searchInstance.addItem("item", ""));
     }
 
-    @org.junit.Test
+    @Test
     public void addEmptyItem2() throws Exception {
-        assertFalse("Failed to add a new search item.",
+        assertTrue("Failed to add a new search item.",
                 searchInstance.addItem("", "one two three"));
     }
 
-    @org.junit.Test
+    @Test
     public void addNullItem() throws Exception {
         assertFalse("Failed to add a new search item.",
                 searchInstance.addItem(null, "one two three"));
     }
 
-    @org.junit.Test
+    @Test
     public void addNullItem2() throws Exception {
         assertFalse("Failed to add a new search item.",
                 searchInstance.addItem("item", null));
     }
 
-    @org.junit.Test
+    @Test
     public void removeItem() throws Exception {
         assertTrue("Failed to add search item",
                 searchInstance.addItem("toBeRemoved", "one two three"));
@@ -171,7 +213,7 @@ public class QuickSearchTest {
                 searchInstance.removeItem("toBeRemoved"));
     }
 
-    @org.junit.Test
+    @Test
     public void findItem() throws Exception {
         assertTrue("Failed to add search item",
                 searchInstance.addItem("test", "one two three"));
@@ -181,7 +223,7 @@ public class QuickSearchTest {
 
     }
 
-    @org.junit.Test
+    @Test
     public void findAugumentedItem() throws Exception {
         assertTrue("Failed to add search item",
                 searchInstance.addItem("test", "one two three"));
@@ -190,7 +232,16 @@ public class QuickSearchTest {
 
     }
 
-    @org.junit.Test
+    @Test
+    public void findAugumentedItemWithNull() throws Exception {
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test", "one two three"));
+
+        assertEquals(0, searchInstance.findAugumentedItem(null).getResponseItems().size());
+
+    }
+
+    @Test
     public void findItems() throws Exception {
         assertTrue("Failed to add search item",
                 searchInstance.addItem("test1", "one two three"));
@@ -223,7 +274,7 @@ public class QuickSearchTest {
         ));
 
         QuickSearch.Response<String> qsr =
-                new QuickSearch.Response<String>(
+                new QuickSearch.Response<>(
                         "test",
                         Collections.singletonList("test"),
                         items);
@@ -234,7 +285,7 @@ public class QuickSearchTest {
         assertFalse(qsr.getIntersectingKeywords().contains("one"));
     }
 
-    @org.junit.Test
+    @Test
     public void checkResultsIntersection() throws Exception {
         assertTrue("Failed to add search item",
                 searchInstance.addItem("test1", "one two three intersecting"));
@@ -251,7 +302,7 @@ public class QuickSearchTest {
         assertFalse("Invalid response", searchInstance.findAugumentedItems("three", 10).getIntersectingKeywords().contains("intersecting"));
     }
 
-    @org.junit.Test
+    @Test
     public void verifyResponseObject() throws Exception {
         assertTrue("Failed to add search item",
                 searchInstance.addItem("test1", "one two three intersecting"));
@@ -290,8 +341,7 @@ public class QuickSearchTest {
         assertEquals(2.0, searchInstance.findAugumentedItem("two").getResponseItems().get(0).getScore(), 0);
     }
 
-
-    @org.junit.Test
+    @Test
     public void findAugumentedItems() throws Exception {
         assertTrue("Failed to add search item",
                 searchInstance.addItem("test1", "one two three"));
@@ -307,7 +357,7 @@ public class QuickSearchTest {
         );
     }
 
-    @org.junit.Test
+    @Test
     public void findNoItems() throws Exception {
         assertTrue("Failed to add search item",
                 searchInstance.addItem("test1", "one two three"));
@@ -323,7 +373,7 @@ public class QuickSearchTest {
         );
     }
 
-    @org.junit.Test
+    @Test
     public void findWithNullItems() throws Exception {
         assertTrue("Failed to add search item",
                 searchInstance.addItem("test1", "one two three"));
@@ -339,7 +389,7 @@ public class QuickSearchTest {
         );
     }
 
-    @org.junit.Test
+    @Test
     public void findNoAugumentedItems() throws Exception {
         assertTrue("Failed to add search item",
                 searchInstance.addItem("test1", "one two three"));
@@ -355,7 +405,7 @@ public class QuickSearchTest {
         );
     }
 
-    @org.junit.Test
+    @Test
     public void exerciseMultiStepMapping() throws Exception {
         String exerciseString = "aquickbrownfoxjumpsoverthelazydog";
 
@@ -370,12 +420,12 @@ public class QuickSearchTest {
         assertEquals(10, searchInstance.findItems("e ex exe exer exerc i is ise", 10).size());
     }
 
-    @org.junit.Test
+    @Test
     public void statsAreEmpty() throws Exception {
         assertEquals(searchInstance.getStats(), "0 items; 0 keywords; 0 fragments");
     }
 
-    @org.junit.Test
+    @Test
     public void statsAreFull() throws Exception {
         String exerciseString = "aquickbrownfoxjumpsoverthelazydog";
 
@@ -392,7 +442,7 @@ public class QuickSearchTest {
         assertEquals(searchInstance.getStats(), "33 items; 63 keywords; 554 fragments");
     }
 
-    @org.junit.Test
+    @Test
     public void noErrorsInLengthMatcher() throws Exception {
         QuickSearch<String> alternativeConfig = new QuickSearch<>(
                 QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
@@ -416,7 +466,7 @@ public class QuickSearchTest {
         assertEquals(alternativeConfig.getStats(), "33 items; 63 keywords; 554 fragments");
     }
 
-    @org.junit.Test
+    @Test
     public void testExpandKeywords() throws Exception {
         String exerciseString = "aquickbrownfoxjumpsoverthelazydog";
 
@@ -447,7 +497,7 @@ public class QuickSearchTest {
     }
 
 
-    @org.junit.Test
+    @Test
     public void findItemsLimit() throws Exception {
         assertTrue("Failed to add search item",
                 searchInstance.addItem("test1", "one two three"));
@@ -465,7 +515,7 @@ public class QuickSearchTest {
                 searchInstance.findItems("one", 2).size() == 2);
     }
 
-    @org.junit.Test
+    @Test
     public void itemsRanking() throws Exception {
         assertTrue("Failed to add search item",
                 searchInstance.addItem("test1", "onex two three"));
@@ -486,7 +536,7 @@ public class QuickSearchTest {
         assertEquals("test2", result.get(2));
     }
 
-    @org.junit.Test
+    @Test
     public void testDirectMatching() throws Exception {
         assertTrue("Failed to add search item",
                 searchInstance.addItem("test1", "keyword"));
@@ -503,8 +553,7 @@ public class QuickSearchTest {
         assertEquals("test1", result.get(0));
     }
 
-
-    @org.junit.Test
+    @Test
     public void testIntersectionWorks() throws Exception {
         assertTrue("Failed to add search item",
                 searchInstance.addItem("test1", "one two"));
@@ -522,7 +571,7 @@ public class QuickSearchTest {
                 result.size() == 2);
     }
 
-    @org.junit.Test
+    @Test
     public void testBacktrackMatchingStops() throws Exception {
         assertTrue("Failed to add search item",
                 searchInstance.addItem("keyword", "keyword"));
@@ -539,7 +588,7 @@ public class QuickSearchTest {
         assertEquals("keyword", result.get(0));
     }
 
-    @org.junit.Test
+    @Test
     public void testBacktrackMatchingContinues() throws Exception {
         assertTrue("Failed to add search item",
                 searchInstance.addItem("keyword", "keyword one"));
@@ -556,7 +605,7 @@ public class QuickSearchTest {
         assertEquals("keyboard", result.get(1));
     }
 
-    @org.junit.Test
+    @Test
     public void testRemove() throws Exception {
         assertTrue("Failed to add search item",
                 searchInstance.addItem("test1", "onex two three"));
@@ -578,7 +627,7 @@ public class QuickSearchTest {
                 searchInstance.findItems("one", 10).size() == 0);
     }
 
-    @org.junit.Test
+    @Test
     public void testRemoveTwice() throws Exception {
         assertTrue("Failed to add search item",
                 searchInstance.addItem("test1", "onex two three"));
@@ -603,7 +652,7 @@ public class QuickSearchTest {
                 searchInstance.findItems("one", 10).size() == 0);
     }
 
-    @org.junit.Test
+    @Test
     public void clear() throws Exception {
         assertTrue("Failed to add search item",
                 searchInstance.addItem("test1", "onex two three"));
@@ -619,7 +668,7 @@ public class QuickSearchTest {
         assertFalse("Unexpected result", searchInstance.findItem("one").isPresent());
     }
 
-    @org.junit.Test
+    @Test
     public void quickLoadTest() throws Exception {
         for (String[] items : USA_STATES) {
             assertTrue("Failed to add item",
