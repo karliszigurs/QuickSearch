@@ -66,10 +66,10 @@ import java.util.stream.Collectors;
  * <p>
  * Example use:
  * <p>
- * <code>QuickSearch&lt;String&gt; qs = new QuickSearch&lt;&gt;();
- * qs.addItem("Villain", "Roy Batty Lord Voldemort Colonel Kurtz");
- * qs.addItem("Hero", "Walt Kowalksi Jake Blues Shaun");
- * qs.findItem("walk"); // finds "Hero"</code>
+ * <code>QuickSearch&lt;String&gt; qs = new QuickSearch&lt;&gt;();<br/>
+ * qs.addItem("Villain", "Roy Batty Lord Voldemort Colonel Kurtz");<br/>
+ * qs.addItem("Hero", "Walt Kowalksi Jake Blues Shaun");<br/>
+ * System.out.println(qs.findItem("walk")); // finds "Hero"</code>
  * <p>
  * Concurrency - This class is thread safe (public functions are synchronised). Implementation is completely passive
  * and can be deployed horizontally as identical datasets will produce identical search results.
@@ -199,13 +199,90 @@ public class QuickSearch<T> {
         return score;
     });
 
+    /**
+     * Container for augumented search results (including item scores and
+     * intersect of keywords for all items).
+     *
+     * @param <T> wrapped response item type
+     */
+    public static final class Response<RT> {
+
+        public static final class Item<I> {
+
+            private final I item;
+
+            private final Set<String> itemKeywords;
+
+            private final double score;
+
+            public Item(I item, Collection<String> itemKeywords, double score) {
+                this.item = item;
+                this.itemKeywords = new HashSet<>(itemKeywords);
+                this.score = score;
+            }
+
+            public I getItem() {
+                return item;
+            }
+
+            public Set<String> getItemKeywords() {
+                return itemKeywords;
+            }
+
+            public double getScore() {
+                return score;
+            }
+        }
+
+        private final String searchString;
+        private final List<String> searchStringKeywords;
+        private Collection<String> intersectingKeywords;
+
+        private final List<Item<RT>> responseItems;
+
+        public Response(String searchString, List<String> searchStringKeywords, List<Item<RT>> responseItems) {
+            this.searchString = searchString;
+            this.searchStringKeywords = searchStringKeywords;
+            this.responseItems = responseItems;
+        }
+
+        public String getSearchString() {
+            return searchString;
+        }
+
+        public List<String> getSearchStringKeywords() {
+            return searchStringKeywords;
+        }
+
+        public List<Item<RT>> getResponseItems() {
+            return responseItems;
+        }
+
+        public synchronized Collection<String> getIntersectingKeywords() {
+            if (intersectingKeywords != null)
+                return intersectingKeywords;
+
+            for (Item<RT> item : getResponseItems()) {
+                if (intersectingKeywords == null) {
+                    intersectingKeywords = new HashSet<>(item.getItemKeywords());
+                } else {
+                    intersectingKeywords.removeIf(i -> !item.getItemKeywords().contains(i));
+                }
+            }
+
+            return intersectingKeywords;
+        }
+    }
+
     private final class ItemAndScoreWrapper implements Comparable<ItemAndScoreWrapper> {
 
         private final T item;
+        private final List<String> itemKeywords;
         private double score;
 
-        ItemAndScoreWrapper(T item, double score) {
+        ItemAndScoreWrapper(T item, List<String> itemKeywords, double score) {
             this.item = item;
+            this.itemKeywords = itemKeywords;
             this.score = score;
         }
 
@@ -214,12 +291,16 @@ public class QuickSearch<T> {
             return this;
         }
 
-        double getScore() {
-            return score;
-        }
-
         T getItem() {
             return item;
+        }
+
+        List<String> getItemKeywords() {
+            return itemKeywords;
+        }
+
+        double getScore() {
+            return score;
         }
 
         @Override
@@ -237,8 +318,7 @@ public class QuickSearch<T> {
     private final KeywordsExtractor keywordsExtractor;
 
     /**
-     * Default for minimum keyword length. Any keywords shorter than this will be ignored internally, therefore,
-     * a user supplied string <code><strong>"New y"</strong></code> will be treated the same as <code><strong>"new"</strong></code>.
+     * Default for minimum keyword length. Any keywords shorter than this will be ignored internally.
      */
     public static final int DEFAULT_MINIMUM_KEYWORD_LENGTH = 2;
     private final int minimumKeywordLength;
@@ -308,16 +388,10 @@ public class QuickSearch<T> {
      * Find top matching item for the supplied search string
      *
      * @param searchString Raw search string
-     * @return Top scoring item or null if no match was found
+     * @return Optional containing (or not) the top scoring item
      */
-    public synchronized T findItem(String searchString) {
-        List<T> foundItems = findItems(searchString, 1);
-
-        if (foundItems.size() > 0) {
-            return foundItems.get(0);
-        } else {
-            return null;
-        }
+    public synchronized Optional<T> findItem(String searchString) {
+        return findItems(searchString, 1).stream().findFirst();
     }
 
     /**
@@ -330,7 +404,40 @@ public class QuickSearch<T> {
      * @return List of 0 to numberOfTopItems elements
      */
     public synchronized List<T> findItems(String searchString, int numberOfTopItems) {
-        return findItemsImpl(searchString, numberOfTopItems);
+        return findItemsImpl(prepareKeywords(searchString, false), numberOfTopItems)
+                .stream()
+                .map(ItemAndScoreWrapper::getItem)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Find top matching item for the supplied search string and return it
+     * wrapped in the augumented response object.
+     *
+     * @param searchString Raw search string
+     * @return Response Response containing search keywords and possibly a single item.
+     */
+    public synchronized Response<T> findAugumentedItem(String searchString) {
+        return findAugumentedItems(searchString, 1);
+    }
+
+    /**
+     * Request an augumented result containing the search string, scores for all items
+     * and list of keywords matched (can be used to provide hints to user).
+     *
+     * @param searchString     Raw search string, e.g. "new york pizza"
+     * @param numberOfTopItems Number of items the result should be limited to
+     * @return Response object containing 0 to n top scoring items and corresponding metadata
+     */
+    public synchronized Response<T> findAugumentedItems(String searchString, int numberOfTopItems) {
+        List<String> searchKeywords = prepareKeywords(searchString, false);
+
+        List<Response.Item<T>> results = findItemsImpl(prepareKeywords(searchString, false), numberOfTopItems)
+                .stream()
+                .map(i -> new Response.Item<>(i.getItem(), i.getItemKeywords(), i.getScore()))
+                .collect(Collectors.toList());
+
+        return new Response<>(searchString, searchKeywords, results);
     }
 
     /**
@@ -359,9 +466,7 @@ public class QuickSearch<T> {
      * Implementation methods
      */
 
-    private List<T> findItemsImpl(String searchString, int maxItemsToList) {
-        Set<String> searchKeywords = prepareKeywords(searchString, false);
-
+    private List<ItemAndScoreWrapper> findItemsImpl(List<String> searchKeywords, int maxItemsToList) {
         // empty list if no matches found
         if (searchKeywords.isEmpty())
             return Collections.emptyList(); //No viable keywords found
@@ -386,7 +491,7 @@ public class QuickSearch<T> {
         }
     }
 
-    private List<T> resultsSortManual(int maxItemsToList, Map<T, ItemAndScoreWrapper> unsortedResults) {
+    private List<ItemAndScoreWrapper> resultsSortManual(int maxItemsToList, Map<T, ItemAndScoreWrapper> unsortedResults) {
         LinkedList<ItemAndScoreWrapper> topResults = new LinkedList<>();
 
         for (Map.Entry<T, ItemAndScoreWrapper> entry : unsortedResults.entrySet()) {
@@ -400,9 +505,7 @@ public class QuickSearch<T> {
             }
         }
 
-        return topResults.stream()
-                .map(ItemAndScoreWrapper::getItem)
-                .collect(Collectors.toList());
+        return topResults;
     }
 
     private void insertSorted(LinkedList<ItemAndScoreWrapper> lList, ItemAndScoreWrapper score) {
@@ -415,15 +518,15 @@ public class QuickSearch<T> {
         lList.addLast(score);
     }
 
-    private List<T> resultsSortAPI(int maxItemsToList, Map<T, ItemAndScoreWrapper> unsortedResults) {
+    private List<ItemAndScoreWrapper> resultsSortAPI(int maxItemsToList, Map<T, ItemAndScoreWrapper> unsortedResults) {
         return unsortedResults.entrySet().stream()
                 .sorted(Map.Entry.comparingByValue(Collections.reverseOrder()))
                 .limit(maxItemsToList)
-                .map(Map.Entry::getKey)
+                .map(Map.Entry::getValue)
                 .collect(Collectors.toList());
     }
 
-    private Map<T, ItemAndScoreWrapper> findAndScoreImpl(Set<String> suppliedFragments) {
+    private Map<T, ItemAndScoreWrapper> findAndScoreImpl(List<String> suppliedFragments) {
         // temp array to contain found matching items
         Map<T, ItemAndScoreWrapper> matchingItems = null;
 
@@ -433,19 +536,22 @@ public class QuickSearch<T> {
          * a small bonus if the found keyword begins with the search term.
          */
         for (String suppliedFragment : suppliedFragments) {
-            Map<T, ItemAndScoreWrapper> fragmentIteration = new HashMap<T, ItemAndScoreWrapper>();
-            matchSingleFragment(fragmentIteration, matchingItems, suppliedFragment);
-            matchingItems = fragmentIteration;
+            Map<T, ItemAndScoreWrapper> fragmentItems = matchSingleFragment(suppliedFragment);
+
+            if (matchingItems == null) {
+                matchingItems = fragmentItems;
+            } else {
+                matchingItems = matchingItems.entrySet().stream()
+                        .filter(e -> fragmentItems.containsKey(e.getKey()))
+                        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+            }
         }
 
         return matchingItems;
     }
 
-    private void matchSingleFragment(Map<T, ItemAndScoreWrapper> foundItems,
-                                     Map<T, ItemAndScoreWrapper> previousIterationMatch,
-                                     String candidateFragment) {
+    private Map<T, ItemAndScoreWrapper> matchSingleFragment(String candidateFragment) {
         Set<String> candidateKeywords = substringsToKeywordsMap.get(candidateFragment);
-
         if (candidateKeywords == null) {
             /*
              * Being smart here, if we have a supplied keyword we don't have a match
@@ -455,39 +561,41 @@ public class QuickSearch<T> {
              * after two backtracking iterations.
              */
             if (candidateFragment.length() > 1) {
-                matchSingleFragment(
-                        foundItems,
-                        previousIterationMatch,
+                return matchSingleFragment(
                         candidateFragment.substring(0, candidateFragment.length() - 1)
                 );
+            } else {
+                return Collections.emptyMap();
             }
         } else {
             /*
              * Otherwise proceed with normal 1:1 matching.
              */
-            performOneToOneMapping(foundItems, previousIterationMatch, candidateFragment, candidateKeywords);
+            return scoreSingleFragment(candidateFragment, candidateKeywords);
         }
     }
 
-    void performOneToOneMapping(Map<T, ItemAndScoreWrapper> foundItems, Map<T, ItemAndScoreWrapper> previousIterationMatch, String candidateFragment, Set<String> candidateKeywords) {
+    private Map<T, ItemAndScoreWrapper> scoreSingleFragment(String candidateFragment, Set<String> candidateKeywords) {
+        Map<T, ItemAndScoreWrapper> itemsForKeywords = new HashMap<T, ItemAndScoreWrapper>();
+
         for (String keyword : candidateKeywords) {
+            double score = keywordMatchScorer.score(candidateFragment, keyword);
             Set<T> items = keywordsToItemsMap.get(keyword);
 
-            double score = keywordMatchScorer.score(candidateFragment, keyword);
-
-            if (previousIterationMatch == null) {
-                for (T item : items)
-                    foundItems.put(item, new ItemAndScoreWrapper(item, score));
-            } else {
-                items.stream()
-                        .map(previousIterationMatch::get)
-                        .filter(i -> i != null)
-                        .forEach(i -> foundItems.put(i.getItem(), i.incrementScoreBy(score)));
+            for (T i : items) {
+                ItemAndScoreWrapper w = itemsForKeywords.get(i);
+                if (w == null) {
+                    itemsForKeywords.put(i, new ItemAndScoreWrapper(i, itemKeywordsMap.get(i), score));
+                } else {
+                    w.incrementScoreBy(score);
+                }
             }
         }
+
+        return itemsForKeywords;
     }
 
-    private boolean addItemImpl(T item, Set<String> suppliedKeywords) {
+    private boolean addItemImpl(T item, List<String> suppliedKeywords) {
         if (suppliedKeywords.size() == 0 || item == null || String.valueOf(item).isEmpty()) {
             return false; // No valid item or keywords found, skip adding
         }
@@ -598,18 +706,18 @@ public class QuickSearch<T> {
         }
     }
 
-    private Set<String> prepareKeywords(String rawInput, boolean filterShorts) {
+    private List<String> prepareKeywords(String rawInput, boolean filterShortKeywords) {
         return rawInput != null
-                ? prepareKeywordsList(keywordsExtractor.extract(rawInput), filterShorts)
-                : Collections.EMPTY_SET;
+                ? prepareKeywordsList(keywordsExtractor.extract(rawInput), filterShortKeywords)
+                : Collections.EMPTY_LIST;
     }
 
-    private Set<String> prepareKeywordsList(Set<String> keywords, boolean filterShorts) {
+    private List<String> prepareKeywordsList(Set<String> keywords, boolean filterShorts) {
         return keywords.stream()
                 .filter(kw -> !kw.isEmpty())
                 .map(keywordNormalizer::normalize)
                 .map(String::trim)
                 .filter(s -> !filterShorts || s.length() >= minimumKeywordLength)
-                .collect(Collectors.toSet());
+                .collect(Collectors.toList());
     }
 }

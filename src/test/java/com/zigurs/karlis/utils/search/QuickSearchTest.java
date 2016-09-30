@@ -17,8 +17,7 @@ package com.zigurs.karlis.utils.search;
 
 import org.junit.Test;
 
-import java.util.LinkedList;
-import java.util.List;
+import java.util.*;
 
 import static org.junit.Assert.*;
 
@@ -183,6 +182,15 @@ public class QuickSearchTest {
     }
 
     @org.junit.Test
+    public void findAugumentedItem() throws Exception {
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test", "one two three"));
+
+        assertEquals(1, searchInstance.findAugumentedItem("one").getResponseItems().size());
+
+    }
+
+    @org.junit.Test
     public void findItems() throws Exception {
         assertTrue("Failed to add search item",
                 searchInstance.addItem("test1", "one two three"));
@@ -195,6 +203,107 @@ public class QuickSearchTest {
 
         assertTrue("Unexpected size",
                 searchInstance.findItems("one", 10).size() == 3
+        );
+    }
+
+    @Test
+    public void checkIntersectionDirectly() {
+        List<QuickSearch.Response.Item<String>> items = new ArrayList<>();
+
+        items.add(new QuickSearch.Response.Item<>(
+                "one",
+                Arrays.asList("one", "two", "three", "four", "five"),
+                1.0
+        ));
+
+        items.add(new QuickSearch.Response.Item<>(
+                "two",
+                Arrays.asList("two", "three", "four"),
+                1.0
+        ));
+
+        QuickSearch.Response<String> qsr =
+                new QuickSearch.Response<String>(
+                        "test",
+                        Collections.singletonList("test"),
+                        items);
+
+        assertTrue(qsr.getIntersectingKeywords().contains("two"));
+        assertTrue(qsr.getIntersectingKeywords().contains("three"));
+        assertTrue(qsr.getIntersectingKeywords().contains("four"));
+        assertFalse(qsr.getIntersectingKeywords().contains("one"));
+    }
+
+    @org.junit.Test
+    public void checkResultsIntersection() throws Exception {
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test1", "one two three intersecting"));
+
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test2", "one two three intersecting"));
+
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test3", "one three"));
+
+        assertTrue("Invalid response", searchInstance.findAugumentedItems("one", 10).getIntersectingKeywords().contains("three"));
+        assertTrue("Invalid response", searchInstance.findAugumentedItems("three", 10).getIntersectingKeywords().contains("three"));
+        assertFalse("Invalid response", searchInstance.findAugumentedItems("thee", 10).getIntersectingKeywords().contains("intersecting"));
+        assertFalse("Invalid response", searchInstance.findAugumentedItems("three", 10).getIntersectingKeywords().contains("intersecting"));
+    }
+
+    @org.junit.Test
+    public void verifyResponseObject() throws Exception {
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test1", "one two three intersecting"));
+
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test2", "one two three intersecting"));
+
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test3", "one three"));
+
+        assertEquals("one", searchInstance.findAugumentedItem("one").getSearchString());
+        assertTrue(searchInstance.findAugumentedItem("th").getSearchStringKeywords().contains("th"));
+        assertTrue(searchInstance.findAugumentedItem("thå¨^ Nothing").getSearchStringKeywords().contains("nothing"));
+        assertTrue(searchInstance.findAugumentedItem("thå¨^ Nothing").getSearchStringKeywords().contains("th"));
+
+        assertEquals("test2", searchInstance.findAugumentedItem("two").getResponseItems().get(0).getItem());
+        assertTrue(searchInstance.findAugumentedItem("one").getResponseItems().get(0).getItemKeywords().contains("intersecting"));
+
+        assertTrue("Invalid response", searchInstance.findAugumentedItems("one", 10).getIntersectingKeywords().contains("three"));
+        assertTrue("Invalid response", searchInstance.findAugumentedItems("three", 10).getIntersectingKeywords().contains("three"));
+        assertFalse("Invalid response", searchInstance.findAugumentedItems("thee", 10).getIntersectingKeywords().contains("intersecting"));
+        assertFalse("Invalid response", searchInstance.findAugumentedItems("three", 10).getIntersectingKeywords().contains("intersecting"));
+    }
+
+    @Test
+    public void verifyScore() {
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test1", "one two three intersecting"));
+
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test2", "one two three intersecting"));
+
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test3", "one three"));
+
+        assertEquals(2.0, searchInstance.findAugumentedItem("two").getResponseItems().get(0).getScore(), 0);
+    }
+
+
+    @org.junit.Test
+    public void findAugumentedItems() throws Exception {
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test1", "one two three"));
+
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test2", "one two three"));
+
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test3", "one two three"));
+
+        assertTrue("Unexpected size",
+                searchInstance.findAugumentedItems("one", 10).getResponseItems().size() == 3
         );
     }
 
@@ -211,6 +320,38 @@ public class QuickSearchTest {
 
         assertTrue("Unexpected size",
                 searchInstance.findItems("       ", 10).size() == 0
+        );
+    }
+
+    @org.junit.Test
+    public void findWithNullItems() throws Exception {
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test1", "one two three"));
+
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test2", "one two three"));
+
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test3", "one two three"));
+
+        assertTrue("Unexpected size",
+                searchInstance.findItems(null, 10).size() == 0
+        );
+    }
+
+    @org.junit.Test
+    public void findNoAugumentedItems() throws Exception {
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test1", "one two three"));
+
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test2", "one two three"));
+
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test3", "one two three"));
+
+        assertTrue("Unexpected size",
+                searchInstance.findAugumentedItems("       ", 10).getResponseItems().size() == 0
         );
     }
 
@@ -448,8 +589,7 @@ public class QuickSearchTest {
         assertTrue("Failed to add search item",
                 searchInstance.addItem("test3", "one two three"));
 
-        assertTrue("Unexpected result size",
-                searchInstance.findItems("one", 10).size() == 3);
+        assertEquals("Unexpected result size", 3, searchInstance.findItems("one", 10).size());
 
         for (int i = 1; i < 4; i++) {
             searchInstance.removeItem("test" + i);
@@ -476,32 +616,24 @@ public class QuickSearchTest {
 
         searchInstance.clear();
 
-        assertNull("Unexpected result",
-                searchInstance.findItem("one"));
+        assertFalse("Unexpected result", searchInstance.findItem("one").isPresent());
     }
 
     @org.junit.Test
     public void quickLoadTest() throws Exception {
         for (String[] items : USA_STATES) {
-            assertTrue(
-                    "Failed to add item",
-                    searchInstance.addItem(items[0], String.format("%s %s %s", items[1], items[2], items[3]))
-            );
+            assertTrue("Failed to add item",
+                    searchInstance.addItem(items[0], String.format("%s %s %s", items[1], items[2], items[3])));
         }
 
         long startTime = System.currentTimeMillis();
-        int iterationsCount = 1000;
 
-        for (int i = 0; i < iterationsCount; i++) {
+        for (int i = 0; i < 1000; i++) {
             assertTrue("No results found?",
                     searchInstance.findItems(USA_STATES[i % USA_STATES.length][1].substring(0, 3), 10).size() > 0);
         }
 
-        long totalTime = System.currentTimeMillis() - startTime;
-
-        assertTrue("Shouldn't be anywhere near this slow...",
-                totalTime < 1000);
-
+        assertTrue("Shouldn't be anywhere near this slow...", (System.currentTimeMillis() - startTime) < 1000);
 
         // Note - do not use the crude perf sanity check above for any kind of benchmarking.
         // JVM is notorious for under-performing for the first few seconds after startup
@@ -530,8 +662,8 @@ public class QuickSearchTest {
         }
 
         // do a few quick searches
-        assertNull(search.findItem("missing jeans"));
-        assertNotNull(search.findItem("item jack"));
+        assertFalse(search.findItem("missing jeans").isPresent());
+        assertTrue(search.findItem("item jack").isPresent());
 
         assertEquals(6, search.findItems("item jack 20", 10).size());
         assertEquals(6, search.findItems("sh 50", 10).size());
@@ -541,7 +673,7 @@ public class QuickSearchTest {
                 .forEach(search::removeItem);
 
         assertEquals(10, search.findItems("red shoes", 10).size());
-        assertNotNull(search.findItems("midd", 10));
+        assertEquals(1, search.findItems("midd", 10).size());
         search.clear();
     }
 }
