@@ -20,6 +20,9 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.util.*;
+import java.util.function.Function;
+import java.util.function.LongSupplier;
+import java.util.stream.Collectors;
 
 import static org.junit.Assert.*;
 
@@ -132,7 +135,7 @@ public class QuickSearchTest {
     }
 
     @Test(expected = RuntimeException.class)
-    public void testInvalidConstructor1() {
+    public void missingExtractor() {
         QuickSearch<String> qs = new QuickSearch<>(
                 null,
                 QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
@@ -142,7 +145,7 @@ public class QuickSearchTest {
     }
 
     @Test(expected = RuntimeException.class)
-    public void testInvalidConstructor2() {
+    public void missingNormaliser() {
         QuickSearch<String> qs = new QuickSearch<>(
                 QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
                 null,
@@ -152,7 +155,7 @@ public class QuickSearchTest {
     }
 
     @Test(expected = RuntimeException.class)
-    public void testInvalidConstructor3() {
+    public void missingScorer() {
         QuickSearch<String> qs = new QuickSearch<>(
                 QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
                 QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
@@ -162,7 +165,7 @@ public class QuickSearchTest {
     }
 
     @Test(expected = RuntimeException.class)
-    public void testInvalidConstructor4() {
+    public void invalidMinimumLength() {
         QuickSearch<String> qs = new QuickSearch<>(
                 QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
                 QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
@@ -172,7 +175,16 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void addItem() throws Exception {
+    public void itemAddedOnlyOnce() {
+        for (int i = 0; i < 1000; i++) {
+            String testString = "teststring5" + i;
+            searchInstance.addItem(testString.substring(0, 5), testString.substring(0, 5));
+        }
+        assertEquals("1 items; 1 keywords; 13 fragments", searchInstance.getStats());
+    }
+
+    @Test
+    public void itemAdded() throws Exception {
         assertTrue("Failed to add a new search item.",
                 searchInstance.addItem("item", "one two three"));
 
@@ -181,31 +193,31 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void addEmptyItem() throws Exception {
+    public void emptyItemAdded() throws Exception {
         assertFalse("Failed to add a new search item.",
                 searchInstance.addItem("item", ""));
     }
 
     @Test
-    public void addEmptyItem2() throws Exception {
+    public void emptyItemAdded2() throws Exception {
         assertTrue("Failed to add a new search item.",
                 searchInstance.addItem("", "one two three"));
     }
 
     @Test
-    public void addNullItem() throws Exception {
+    public void nullItemAdded() throws Exception {
         assertFalse("Failed to add a new search item.",
                 searchInstance.addItem(null, "one two three"));
     }
 
     @Test
-    public void addNullItem2() throws Exception {
+    public void nullItemAdded2() throws Exception {
         assertFalse("Failed to add a new search item.",
                 searchInstance.addItem("item", null));
     }
 
     @Test
-    public void removeItem() throws Exception {
+    public void itemRemoved() throws Exception {
         assertTrue("Failed to add search item",
                 searchInstance.addItem("toBeRemoved", "one two three"));
 
@@ -214,35 +226,52 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void findItem() throws Exception {
+    public void itemFound() throws Exception {
         assertTrue("Failed to add search item",
                 searchInstance.addItem("test", "one two three"));
 
         assertNotNull("Search item not found",
                 searchInstance.findItem("one"));
-
     }
 
     @Test
-    public void findAugumentedItem() throws Exception {
+    public void augumentedItemFound() throws Exception {
         assertTrue("Failed to add search item",
                 searchInstance.addItem("test", "one two three"));
 
-        assertEquals(1, searchInstance.findAugumentedItem("one").getResponseItems().size());
-
+        assertEquals(1,
+                searchInstance.findAugumentedItem("one").getResponseItems().size());
     }
 
     @Test
-    public void findAugumentedItemWithNull() throws Exception {
+    public void augumentedItemFoundWithNull() throws Exception {
         assertTrue("Failed to add search item",
                 searchInstance.addItem("test", "one two three"));
 
-        assertEquals(0, searchInstance.findAugumentedItem(null).getResponseItems().size());
-
+        assertEquals(0,
+                searchInstance.findAugumentedItem(null).getResponseItems().size());
     }
 
     @Test
-    public void findItems() throws Exception {
+    public void findEmptyResult() throws Exception {
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test", "one two three test"));
+
+        assertEquals(0,
+                searchInstance.findAugumentedItems("test", 0).getResponseItems().size());
+    }
+
+    @Test
+    public void findCompletelyUnrelated() throws Exception {
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test", "one two three"));
+
+        assertEquals(0,
+                searchInstance.findAugumentedItems("search engine", 0).getResponseItems().size());
+    }
+
+    @Test
+    public void itemsFound() throws Exception {
         assertTrue("Failed to add search item",
                 searchInstance.addItem("test1", "one two three"));
 
@@ -255,76 +284,6 @@ public class QuickSearchTest {
         assertTrue("Unexpected size",
                 searchInstance.findItems("one", 10).size() == 3
         );
-    }
-
-    @Test
-    public void checkIntersectionDirectly() {
-        List<QuickSearch.Response.Item<String>> items = new ArrayList<>();
-
-        items.add(new QuickSearch.Response.Item<>(
-                "one",
-                Arrays.asList("one", "two", "three", "four", "five"),
-                1.0
-        ));
-
-        items.add(new QuickSearch.Response.Item<>(
-                "two",
-                Arrays.asList("two", "three", "four"),
-                1.0
-        ));
-
-        QuickSearch.Response<String> qsr =
-                new QuickSearch.Response<>(
-                        "test",
-                        Collections.singletonList("test"),
-                        items);
-
-        assertTrue(qsr.getIntersectingKeywords().contains("two"));
-        assertTrue(qsr.getIntersectingKeywords().contains("three"));
-        assertTrue(qsr.getIntersectingKeywords().contains("four"));
-        assertFalse(qsr.getIntersectingKeywords().contains("one"));
-    }
-
-    @Test
-    public void checkResultsIntersection() throws Exception {
-        assertTrue("Failed to add search item",
-                searchInstance.addItem("test1", "one two three intersecting"));
-
-        assertTrue("Failed to add search item",
-                searchInstance.addItem("test2", "one two three intersecting"));
-
-        assertTrue("Failed to add search item",
-                searchInstance.addItem("test3", "one three"));
-
-        assertTrue("Invalid response", searchInstance.findAugumentedItems("one", 10).getIntersectingKeywords().contains("three"));
-        assertTrue("Invalid response", searchInstance.findAugumentedItems("three", 10).getIntersectingKeywords().contains("three"));
-        assertFalse("Invalid response", searchInstance.findAugumentedItems("thee", 10).getIntersectingKeywords().contains("intersecting"));
-        assertFalse("Invalid response", searchInstance.findAugumentedItems("three", 10).getIntersectingKeywords().contains("intersecting"));
-    }
-
-    @Test
-    public void verifyResponseObject() throws Exception {
-        assertTrue("Failed to add search item",
-                searchInstance.addItem("test1", "one two three intersecting"));
-
-        assertTrue("Failed to add search item",
-                searchInstance.addItem("test2", "one two three intersecting"));
-
-        assertTrue("Failed to add search item",
-                searchInstance.addItem("test3", "one three"));
-
-        assertEquals("one", searchInstance.findAugumentedItem("one").getSearchString());
-        assertTrue(searchInstance.findAugumentedItem("th").getSearchStringKeywords().contains("th"));
-        assertTrue(searchInstance.findAugumentedItem("thå¨^ Nothing").getSearchStringKeywords().contains("nothing"));
-        assertTrue(searchInstance.findAugumentedItem("thå¨^ Nothing").getSearchStringKeywords().contains("th"));
-
-        assertEquals("test2", searchInstance.findAugumentedItem("two").getResponseItems().get(0).getItem());
-        assertTrue(searchInstance.findAugumentedItem("one").getResponseItems().get(0).getItemKeywords().contains("intersecting"));
-
-        assertTrue("Invalid response", searchInstance.findAugumentedItems("one", 10).getIntersectingKeywords().contains("three"));
-        assertTrue("Invalid response", searchInstance.findAugumentedItems("three", 10).getIntersectingKeywords().contains("three"));
-        assertFalse("Invalid response", searchInstance.findAugumentedItems("thee", 10).getIntersectingKeywords().contains("intersecting"));
-        assertFalse("Invalid response", searchInstance.findAugumentedItems("three", 10).getIntersectingKeywords().contains("intersecting"));
     }
 
     @Test
@@ -653,6 +612,25 @@ public class QuickSearchTest {
     }
 
     @Test
+    public void testRemoveNull() {
+        searchInstance.removeItem(null);
+    }
+
+    @Test
+    public void testRemoveNull2() {
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test1", "onex two three"));
+
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test2", "onexx two three"));
+
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test3", "one two three"));
+
+        searchInstance.removeItem(null);
+    }
+
+    @Test
     public void clear() throws Exception {
         assertTrue("Failed to add search item",
                 searchInstance.addItem("test1", "onex two three"));
@@ -711,11 +689,11 @@ public class QuickSearchTest {
         }
 
         // do a few quick searches
-        assertFalse(search.findItem("missing jeans").isPresent());
+        assertTrue(search.findItem("missing jeans").isPresent());
         assertTrue(search.findItem("item jack").isPresent());
 
-        assertEquals(6, search.findItems("item jack 20", 10).size());
-        assertEquals(6, search.findItems("sh 50", 10).size());
+        assertEquals(10, search.findItems("item jack 20", 10).size());
+        assertEquals(10, search.findItems("sh 50", 10).size());
 
         items.stream()
                 .filter(item -> categories[0].equals(item.getCategory()))
@@ -724,5 +702,128 @@ public class QuickSearchTest {
         assertEquals(10, search.findItems("red shoes", 10).size());
         assertEquals(1, search.findItems("midd", 10).size());
         search.clear();
+    }
+
+    @Test
+    public void testCustomSorting() {
+        List<Double> testSet = new ArrayList<>();
+
+        for (int i = 0; i < 100; i++) {
+            testSet.add((double) i);
+        }
+
+        testSet.add(1000.0);
+
+        Collections.shuffle(testSet);
+
+        List<Double> list = searchInstance.sortAndLimit(testSet, 10, Comparator.naturalOrder());
+        assertEquals(0.0, list.get(0), 0);
+        assertEquals(1.0, list.get(1), 0);
+        assertEquals(2.0, list.get(2), 0);
+        assertEquals(9.0, list.get(9), 0);
+        assertEquals(10, list.size());
+    }
+
+    @Test
+    public void testCustomSortingReverse() {
+        List<Double> testSet = new ArrayList<>();
+
+        for (int i = 0; i < 100; i++) {
+            testSet.add((double) i);
+        }
+
+        testSet.add(1000.0);
+
+        Collections.shuffle(testSet);
+
+        List<Double> list = searchInstance.sortAndLimit(testSet, 1, Comparator.reverseOrder());
+
+        assertEquals(1000.0, list.get(0), 0);
+        assertEquals(1, list.size());
+    }
+
+    @Test
+    public void customSortingBenchmark() {
+        /*
+         * Microbenchmarking caveats apply. Make sure the number of iterations is
+         * large enough and JVM is given a chance to warm up and apply the
+         * optimisations on the code exercised.
+         */
+        List<Double> testList = new LinkedList<>();
+
+        for (int i = 0; i < 100; i++) {
+            testList.add((double) i);
+        }
+
+        Collections.shuffle(testList);
+
+        Map<Double, Double> testMap = new LinkedHashMap<>();
+        testList.forEach(d -> testMap.put(d,d));
+
+        int iterationsCount = 100;
+        int topItems = 10;
+
+        Comparator<Double> comparator = Comparator.reverseOrder();
+        double topResultShouldBe = 99.0;
+
+        runSortingBenchmarks("Warmup: ", testMap.values(), iterationsCount, topItems, comparator, topResultShouldBe);
+        runSortingBenchmarks("Warmer: ", testMap.values(), iterationsCount, topItems, comparator, topResultShouldBe);
+        runSortingBenchmarks("Warm:   ", testMap.values(), iterationsCount, topItems, comparator, topResultShouldBe);
+    }
+
+    private void runSortingBenchmarks(String prefix, Collection<Double> testList, int iterationsCount, int topItems, Comparator<Double> comparator, double topResultShouldBe) {
+        LongSupplier time = System::nanoTime;
+        int timeDivisor = 1000;
+        String unit = "us";
+
+//        LongSupplier time = System::currentTimeMillis;
+//        int timeDivisor = 1;
+//        String unit = "ms";
+
+        long totalTimeCropped = 0;
+        long totalTimeCollections = 0;
+        long totalTimeStreamed = 0;
+        long totalTimeParallel = 0;
+        long startTime;
+
+
+        for (int i = 0; i < iterationsCount; i++) {
+            startTime = time.getAsLong();
+            List<Double> listCropped = searchInstance.sortAndLimit(testList, topItems, comparator);
+            assertEquals(topResultShouldBe, listCropped.get(0), 0);
+            totalTimeCropped += time.getAsLong() - startTime;
+
+            List<Double> listRepresentation = new LinkedList<>(testList);
+            Collections.shuffle(listRepresentation);
+            startTime = time.getAsLong();
+            Collections.sort(listRepresentation, comparator);
+            assertEquals(topResultShouldBe, listRepresentation.get(0), 0);
+            totalTimeCollections += time.getAsLong() - startTime;
+
+            startTime = time.getAsLong();
+            List<Double> listStreamed = testList.stream()
+                    .sorted(comparator)
+                    .limit(topItems)
+                    .collect(Collectors.toList());
+            assertEquals(topResultShouldBe, listStreamed.get(0), 0);
+            totalTimeStreamed += time.getAsLong() - startTime;
+
+            startTime = time.getAsLong();
+            List<Double> listParallel = testList.parallelStream()
+                    .sorted(comparator)
+                    .limit(topItems)
+                    .collect(Collectors.toList());
+            assertEquals(topResultShouldBe, listParallel.get(0), 0);
+            totalTimeParallel += time.getAsLong() - startTime;
+        }
+
+        System.out.println(String.format("%6$s %1$d%5$s cropped, %2$d%5$s collections, %3$d%5$s streamed, %4$d%5$s parallel on average",
+                (totalTimeCropped / iterationsCount) / timeDivisor,
+                (totalTimeCollections / iterationsCount) / timeDivisor,
+                (totalTimeStreamed / iterationsCount) / timeDivisor,
+                (totalTimeParallel / iterationsCount) / timeDivisor,
+                unit,
+                prefix
+        ));
     }
 }

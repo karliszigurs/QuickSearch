@@ -20,6 +20,10 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import static com.zigurs.karlis.utils.search.QuickSearch.CANDIDATE_ACCUMULATION_POLICY.UNION;
+import static com.zigurs.karlis.utils.search.QuickSearch.UNMATCHED_POLICY.BACKTRACKING;
 
 /**
  * Simple and lightweight in-memory quick search provider.
@@ -69,9 +73,9 @@ import java.util.stream.Collectors;
  * <p>
  * Example use:
  * <p>
- * <code>QuickSearch&lt;String&gt; qs = new QuickSearch&lt;&gt;();<br/>
- * qs.addItem("Villain", "Roy Batty Lord Voldemort Colonel Kurtz");<br/>
- * qs.addItem("Hero", "Walt Kowalksi Jake Blues Shaun");<br/>
+ * <code>QuickSearch&lt;String&gt; qs = new QuickSearch&lt;&gt;();<br>
+ * qs.addItem("Villain", "Roy Batty Lord Voldemort Colonel Kurtz");<br>
+ * qs.addItem("Hero", "Walt Kowalksi Jake Blues Shaun");<br>
  * System.out.println(qs.findItem("walk")); // finds "Hero"</code>
  * <p>
  * Concurrency - This class is thread safe (public functions are synchronised). Implementation is completely passive
@@ -81,6 +85,10 @@ import java.util.stream.Collectors;
  */
 public class QuickSearch<T> {
 
+    public enum UNMATCHED_POLICY {EXACT, BACKTRACKING}
+
+    public enum CANDIDATE_ACCUMULATION_POLICY {UNION, INTERSECTION}
+
     /**
      * Interface to 'clean up' supplied keyword and user input strings. We assume that the input is
      * going to be ether free form or malformed, therefore this allows to apply required actions to generate
@@ -89,7 +97,7 @@ public class QuickSearch<T> {
     public interface KeywordsExtractor {
 
         /**
-         * Convert the input string into a list of keywords to be used internally.
+         * Convert the input string into a set of keywords to be used internally.
          *
          * @param inputString supplied keywords or search input string
          * @return Set of extracted keywords, can be empty if no viable keywords could be extracted.
@@ -208,26 +216,26 @@ public class QuickSearch<T> {
      * Container for augumented search results (including item scores and
      * intersect of keywords for all items).
      *
-     * @param <RT> wrapped response item type
+     * @param <T> wrapped response item type
      */
-    public static final class Response<RT> {
+    public static final class Response<T> {
 
-        public static final class Item<I> {
+        public static final class Item<T> {
             @NotNull
-            private final I item;
+            private final T item;
             @NotNull
             private final Set<String> itemKeywords;
 
             private final double score;
 
-            public Item(@NotNull I item, @NotNull Collection<String> itemKeywords, double score) {
+            public Item(@NotNull T item, @NotNull Collection<String> itemKeywords, double score) {
                 this.item = item;
                 this.itemKeywords = new HashSet<>(itemKeywords);
                 this.score = score;
             }
 
             @NotNull
-            public I getItem() {
+            public T getItem() {
                 return item;
             }
 
@@ -243,16 +251,12 @@ public class QuickSearch<T> {
 
         @NotNull
         private final String searchString;
-        @NotNull
-        private final Collection<String> searchStringKeywords;
-        private Collection<String> intersectingKeywords;
 
         @NotNull
-        private final List<Item<RT>> responseItems;
+        private final List<Item<T>> responseItems;
 
-        public Response(@NotNull String searchString, @NotNull Collection<String> searchStringKeywords, @NotNull List<Item<RT>> responseItems) {
+        public Response(@NotNull String searchString, @NotNull List<Item<T>> responseItems) {
             this.searchString = searchString;
-            this.searchStringKeywords = searchStringKeywords;
             this.responseItems = responseItems;
         }
 
@@ -262,47 +266,47 @@ public class QuickSearch<T> {
         }
 
         @NotNull
-        public Collection<String> getSearchStringKeywords() {
-            return searchStringKeywords;
-        }
-
-        @NotNull
-        public List<Item<RT>> getResponseItems() {
+        public List<Item<T>> getResponseItems() {
             return responseItems;
-        }
-
-        @NotNull
-        public synchronized Collection<String> getIntersectingKeywords() {
-            if (intersectingKeywords != null)
-                return intersectingKeywords;
-
-            for (Item<RT> item : getResponseItems()) {
-                if (intersectingKeywords == null) {
-                    intersectingKeywords = new HashSet<>(item.getItemKeywords());
-                } else {
-                    intersectingKeywords.removeIf(i -> !item.getItemKeywords().contains(i));
-                }
-            }
-
-            return intersectingKeywords;
         }
     }
 
-    private final class ItemAndScoreWrapper implements Comparable<ItemAndScoreWrapper> {
+    private final class ItemHashWrapper {
+        private final T item;
+        private final int hash;
+
+        public ItemHashWrapper(T item) {
+            this.item = item;
+            hash = item.hashCode();
+        }
+
+        public T getItem() {
+            return item;
+        }
+
+        @Override
+        public int hashCode() {
+            return hash;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            return item.equals(obj);
+        }
+    }
+
+    private final class ItemScoreWrapper implements Comparable<ItemScoreWrapper> {
         @NotNull
         private final T item;
-        @NotNull
-        private final Set<String> itemKeywords;
         private double score;
 
-        ItemAndScoreWrapper(@NotNull T item, @NotNull Set<String> itemKeywords, double score) {
+        ItemScoreWrapper(@NotNull T item, double score) {
             this.item = item;
-            this.itemKeywords = itemKeywords;
             this.score = score;
         }
 
         @NotNull
-        ItemAndScoreWrapper incrementScoreBy(double add) {
+        ItemScoreWrapper incrementScoreBy(double add) {
             score += add;
             return this;
         }
@@ -312,17 +316,12 @@ public class QuickSearch<T> {
             return item;
         }
 
-        @NotNull
-        Set<String> getItemKeywords() {
-            return itemKeywords;
-        }
-
         double getScore() {
             return score;
         }
 
         @Override
-        public int compareTo(@NotNull ItemAndScoreWrapper o) {
+        public int compareTo(@NotNull ItemScoreWrapper o) {
             return Double.compare(this.score, o.score);
         }
     }
@@ -337,6 +336,10 @@ public class QuickSearch<T> {
     private final KeywordNormalizer keywordNormalizer;
     @NotNull
     private final KeywordsExtractor keywordsExtractor;
+    @NotNull
+    private final UNMATCHED_POLICY unmatchedPolicy;
+    @NotNull
+    private final CANDIDATE_ACCUMULATION_POLICY candidateAccumulationPolicy;
 
     /**
      * Default for minimum keyword length. Any keywords shorter than this will be ignored internally.
@@ -357,7 +360,11 @@ public class QuickSearch<T> {
      * minimum keyword length.
      */
     public QuickSearch() {
-        this(DEFAULT_KEYWORDS_EXTRACTOR, DEFAULT_KEYWORD_NORMALIZER, DEFAULT_MATCH_SCORER, DEFAULT_MINIMUM_KEYWORD_LENGTH);
+        this(
+                DEFAULT_KEYWORDS_EXTRACTOR,
+                DEFAULT_KEYWORD_NORMALIZER,
+                DEFAULT_MATCH_SCORER,
+                DEFAULT_MINIMUM_KEYWORD_LENGTH);
     }
 
     /**
@@ -369,7 +376,30 @@ public class QuickSearch<T> {
      * @param keywordMatchScorer   Scorer. {@link  KeywordMatchScorer}
      * @param minimumKeywordLength Minimum length for keywords internally. Any keywords shorter than specified will be ignored. Should be at least 1
      */
-    public QuickSearch(@Nullable KeywordsExtractor keywordsExtractor, @Nullable KeywordNormalizer keywordNormalizer, @Nullable KeywordMatchScorer keywordMatchScorer, int minimumKeywordLength) {
+    public QuickSearch(
+            @Nullable KeywordsExtractor keywordsExtractor,
+            @Nullable KeywordNormalizer keywordNormalizer,
+            @Nullable KeywordMatchScorer keywordMatchScorer,
+            int minimumKeywordLength) {
+        this(keywordsExtractor, keywordNormalizer, keywordMatchScorer, minimumKeywordLength, BACKTRACKING, UNION);
+    }
+
+    /**
+     * Constructs a QuickSearch instance with the provided keyword processing implementations and specified minimum
+     * keyword length.
+     *
+     * @param keywordsExtractor    Extractor. {@link  KeywordsExtractor}
+     * @param keywordNormalizer    Normalizer. {@link  KeywordNormalizer}
+     * @param keywordMatchScorer   Scorer. {@link  KeywordMatchScorer}
+     * @param minimumKeywordLength Minimum length for keywords internally. Any keywords shorter than specified will be ignored. Should be at least 1
+     */
+    public QuickSearch(
+            @Nullable KeywordsExtractor keywordsExtractor,
+            @Nullable KeywordNormalizer keywordNormalizer,
+            @Nullable KeywordMatchScorer keywordMatchScorer,
+            int minimumKeywordLength,
+            @NotNull UNMATCHED_POLICY unmatchedPolicy,
+            @NotNull CANDIDATE_ACCUMULATION_POLICY candidateAccumulationPolicy) {
         if (keywordsExtractor == null || keywordNormalizer == null || keywordMatchScorer == null || minimumKeywordLength < 1)
             throw new RuntimeException("Null instances or invalid minimum length supplied.");
 
@@ -377,7 +407,11 @@ public class QuickSearch<T> {
         this.keywordNormalizer = keywordNormalizer;
         this.keywordMatchScorer = keywordMatchScorer;
         this.minimumKeywordLength = minimumKeywordLength;
+
+        this.unmatchedPolicy = unmatchedPolicy;
+        this.candidateAccumulationPolicy = candidateAccumulationPolicy;
     }
+
 
     /*
      * Public interface
@@ -432,7 +466,7 @@ public class QuickSearch<T> {
     public synchronized List<T> findItems(@Nullable String searchString, int numberOfTopItems) {
         return findItemsImpl(prepareKeywords(searchString, false), numberOfTopItems)
                 .stream()
-                .map(ItemAndScoreWrapper::getItem)
+                .map(ItemScoreWrapper::getItem)
                 .collect(Collectors.toList());
     }
 
@@ -466,10 +500,10 @@ public class QuickSearch<T> {
 
         List<Response.Item<T>> results = findItemsImpl(prepareKeywords(searchString, false), numberOfTopItems)
                 .stream()
-                .map(i -> new Response.Item<>(i.getItem(), i.getItemKeywords(), i.getScore()))
+                .map(i -> new Response.Item<>(i.getItem(), itemKeywordsMap.get(i.getItem()), i.getScore()))
                 .collect(Collectors.toList());
 
-        return new Response<>(searchString, searchKeywords, results);
+        return new Response<>(searchString, results);
     }
 
     /**
@@ -500,95 +534,90 @@ public class QuickSearch<T> {
      */
 
     @NotNull
-    private List<ItemAndScoreWrapper> findItemsImpl(@NotNull Set<String> searchKeywords, int maxItemsToList) {
+    private List<ItemScoreWrapper> findItemsImpl(@NotNull Set<String> searchKeywords, int maxItemsToList) {
         // empty list if no matches found
         if (searchKeywords.isEmpty() || maxItemsToList < 1)
             return Collections.emptyList(); //No viable keywords found
 
         // search itself
-        Map<T, ItemAndScoreWrapper> unsortedResults = findAndScoreImpl(searchKeywords);
+        Collection<ItemScoreWrapper> matchingItems = findAndScoreImpl(searchKeywords);
 
         /*
-         * Choose best results sorting approach based on how large a portion
-         * of matches is to be delivered to client.
-         *
-         * Although less efficient on smaller sample sizes sorting the result set
-         * manually brings circa 50-70% better throughput for queries that result in lot of hits
-         * as we can avoid sorting (discarding early) a significant proportion of the results.
-         *
-         * Yay for not doing unnecessary work!
+         * Use custom sort if the candidates list is larger than number of items we
+         * need to report back. On large sets of results this can bring significant
+         * improvements in speed when compared to built-in sorting methods.
          */
-        if (unsortedResults.size() > maxItemsToList * 2) {
-            return resultsSortManual(unsortedResults, maxItemsToList);
+        if (matchingItems.size() > maxItemsToList) {
+            return sortAndLimit(matchingItems, maxItemsToList, Comparator.reverseOrder());
         } else {
-            return resultsSortAPI(unsortedResults, maxItemsToList);
+            /* TODO - when to decide to switch to parallel sort? Has benefits for large sets on multicore... */
+            return matchingItems.stream()
+                    .sorted(Comparator.reverseOrder())
+                    .limit(maxItemsToList)
+                    .collect(Collectors.toList());
         }
     }
 
     @NotNull
-    private List<ItemAndScoreWrapper> resultsSortManual(@NotNull Map<T, ItemAndScoreWrapper> unsortedResults, int maxItemsToList) {
-        LinkedList<ItemAndScoreWrapper> topResults = new LinkedList<>();
-
-        for (Map.Entry<T, ItemAndScoreWrapper> entry : unsortedResults.entrySet()) {
-            ItemAndScoreWrapper score = entry.getValue();
-
-            if (topResults.size() < maxItemsToList) {
-                insertSorted(topResults, score);
-            } else if (score.getScore() > topResults.getLast().getScore()) {
-                insertSorted(topResults, score);
-                topResults.removeLast();
-            }
-        }
-
-        return topResults;
-    }
-
-    private void insertSorted(@NotNull LinkedList<ItemAndScoreWrapper> lList, @NotNull ItemAndScoreWrapper itemAndScoreWrapper) {
-        for (int i = 0; i < lList.size(); i++) {
-            if (itemAndScoreWrapper.getScore() > lList.get(i).getScore()) {
-                lList.add(i, itemAndScoreWrapper);
-                return;
-            }
-        }
-        lList.addLast(itemAndScoreWrapper);
-    }
-
-    @NotNull
-    private List<ItemAndScoreWrapper> resultsSortAPI(@NotNull Map<T, ItemAndScoreWrapper> unsortedResults, int maxItemsToList) {
-        return unsortedResults.entrySet().stream()
-                .sorted(Map.Entry.comparingByValue(Collections.reverseOrder()))
-                .limit(maxItemsToList)
-                .map(Map.Entry::getValue)
-                .collect(Collectors.toList());
-    }
-
-    @NotNull
-    private Map<T, ItemAndScoreWrapper> findAndScoreImpl(@NotNull Set<String> suppliedFragments) {
-        // temp array to contain found matching items
-        Map<T, ItemAndScoreWrapper> matchingItems = null;
+    private Collection<ItemScoreWrapper> findAndScoreImpl(@NotNull Set<String> suppliedFragments) {
+        LinkedHashMap<T, ItemScoreWrapper> matchingItems = new LinkedHashMap<>();
 
         /*
          * Scoring happens here. Basic implementation that weights the
          * length of search term against matching keyword length and adds
          * a small bonus if the found keyword begins with the search term.
          */
+        boolean firstFragment = true;
         for (String suppliedFragment : suppliedFragments) {
-            Map<T, ItemAndScoreWrapper> fragmentItems = matchSingleFragment(suppliedFragment);
+            LinkedHashMap<T, ItemScoreWrapper> fragmentItems = matchSingleFragment(suppliedFragment);
 
-            if (matchingItems == null) {
+            if (firstFragment) {
                 matchingItems = fragmentItems;
+                firstFragment = false;
             } else {
-                matchingItems = matchingItems.entrySet().stream()
-                        .filter(e -> fragmentItems.containsKey(e.getKey()))
-                        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+                if (candidateAccumulationPolicy == CANDIDATE_ACCUMULATION_POLICY.INTERSECTION) {
+                    matchingItems = matchingItems.values().stream()
+                            .filter(e -> fragmentItems.containsKey(e.getItem()))
+                            .map(e -> e.incrementScoreBy(fragmentItems.get(e.getItem()).getScore()))
+                            .collect(Collectors.toMap(ItemScoreWrapper::getItem, e -> e, (v1, v2) -> v1.incrementScoreBy(v2.getScore()), LinkedHashMap::new));
+
+                    /*
+                     * If we end up with no items in second or latter iterations we may as well break
+                     * as no new results will be permitted through.
+                     */
+                    if (matchingItems.size() == 0)
+                        break;
+                } else if (candidateAccumulationPolicy == UNION) {
+                    matchingItems = Stream.of(matchingItems, fragmentItems)
+                            .map(Map::entrySet)
+                            .flatMap(Collection::stream)
+                            .collect(
+                                    Collectors.toMap(
+                                            Map.Entry::getKey,
+                                            Map.Entry::getValue,
+                                            (v1, v2) -> v1.incrementScoreBy(v2.getScore()),
+                                            LinkedHashMap::new
+                                    )
+                            );
+
+//TODO - perf test this
+//                    for (ItemScoreWrapper item : fragmentItems.values()) {
+//                        ItemScoreWrapper existingItem = matchingItems.get(item.getItem());
+//                        if (existingItem != null) {
+//                            existingItem.incrementScoreBy(item.getScore());
+//                        } else {
+//                            matchingItems.put(item.getItem(), item);
+//                        }
+//                    }
+                }
             }
         }
 
-        return matchingItems != null ? matchingItems : Collections.emptyMap();
+        return matchingItems.values();
     }
 
     @NotNull
-    private Map<T, ItemAndScoreWrapper> matchSingleFragment(@NotNull String candidateFragment) {
+    private LinkedHashMap<T, ItemScoreWrapper> matchSingleFragment(@NotNull String candidateFragment) {
         Set<String> candidateKeywords = substringsToKeywordsMap.get(candidateFragment);
         if (candidateKeywords == null) {
             /*
@@ -598,12 +627,10 @@ public class QuickSearch<T> {
              * As a result we should be able to match 'termite' against 'terminator'
              * after two backtracking iterations.
              */
-            if (candidateFragment.length() > 1) {
-                return matchSingleFragment(
-                        candidateFragment.substring(0, candidateFragment.length() - 1)
-                );
+            if (unmatchedPolicy == BACKTRACKING && candidateFragment.length() > 1) {
+                return matchSingleFragment(candidateFragment.substring(0, candidateFragment.length() - 1));
             } else {
-                return Collections.emptyMap();
+                return new LinkedHashMap<>();
             }
         } else {
             /*
@@ -614,17 +641,18 @@ public class QuickSearch<T> {
     }
 
     @NotNull
-    private Map<T, ItemAndScoreWrapper> scoreSingleFragment(@NotNull String candidateFragment, @NotNull Set<String> candidateKeywords) {
-        Map<T, ItemAndScoreWrapper> itemsForKeywords = new HashMap<>();
+    private LinkedHashMap<T, ItemScoreWrapper> scoreSingleFragment(@NotNull String candidateFragment, @NotNull Set<String> candidateKeywords) {
+        //TODO - can this be made to return underlying maps directly? Perhaps inserting them directly in a supplied map?
+        LinkedHashMap<T, ItemScoreWrapper> itemsForKeywords = new LinkedHashMap<T, ItemScoreWrapper>();
 
         for (String keyword : candidateKeywords) {
             double score = keywordMatchScorer.score(candidateFragment, keyword);
             Set<T> items = keywordsToItemsMap.get(keyword);
 
             for (T i : items) {
-                ItemAndScoreWrapper w = itemsForKeywords.get(i);
+                ItemScoreWrapper w = itemsForKeywords.get(i);
                 if (w == null) {
-                    itemsForKeywords.put(i, new ItemAndScoreWrapper(i, itemKeywordsMap.get(i), score));
+                    itemsForKeywords.put(i, new ItemScoreWrapper(i, score));
                 } else {
                     w.incrementScoreBy(score);
                 }
@@ -752,7 +780,7 @@ public class QuickSearch<T> {
     @NotNull
     private Set<String> prepareKeywordsList(@NotNull Collection<String> keywords,
                                             boolean filterShorts,
-                                            @NotNull KeywordNormalizer kwn,
+                                            KeywordNormalizer kwn,
                                             int minimumKeywordLength) {
         return keywords.stream()
                 .filter(kw -> !kw.isEmpty())
@@ -760,5 +788,53 @@ public class QuickSearch<T> {
                 .map(String::trim)
                 .filter(s -> !filterShorts || s.length() >= minimumKeywordLength)
                 .collect(Collectors.toSet());
+    }
+
+    /*
+     * Utilities
+     */
+
+    /**
+     * Purpose built sort discarding known beyond-the-cut elements early.
+     * Trades the cost of manual insertion against the cost of having to sort whole array.
+     * <p>
+     * Comparable to built in sort functions on smaller datasets (<1000 elements), becomes
+     * significantly quicker for larger datasets.
+     *
+     * @param input          collection to select elements from
+     * @param limitResultsTo maximum size of generated ordered list
+     * @param comparator     comparator to use (or use Comparator.naturalOrder())
+     * @param <X>            type of objects to sort
+     * @return sorted list consisting of first (up to limitResultsTo) elements in specified comparator order
+     */
+    <X> List<X> sortAndLimit(@NotNull Collection<? extends X> input,
+                             int limitResultsTo,
+                             @NotNull Comparator<X> comparator) {
+        limitResultsTo = Math.max(limitResultsTo, 0); // Safety check that limit is not negative
+        LinkedList<X> result = new LinkedList<>();
+
+        for (X entry : input) {
+            if (result.size() < limitResultsTo) {
+                insertInListInOrderedPos(result, entry, comparator);
+            } else if (comparator.compare(entry, result.getLast()) < 0) {
+                insertInListInOrderedPos(result, entry, comparator);
+                result.removeLast();
+            }
+        }
+
+        return result;
+    }
+
+    private <X> void insertInListInOrderedPos(@NotNull List<X> result,
+                                              @NotNull X entry,
+                                              @NotNull Comparator<X> comparator) {
+        for (int pos = 0; pos < result.size(); pos++) {
+            if (comparator.compare(entry, result.get(pos)) < 0) {
+                result.add(pos, entry);
+                return;
+            }
+        }
+        // If not added already (and returned), append to end of the list
+        result.add(entry);
     }
 }
