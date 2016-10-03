@@ -17,13 +17,17 @@ package com.zigurs.karlis.utils.search;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.*;
-import java.util.function.Function;
 import java.util.function.LongSupplier;
 import java.util.stream.Collectors;
 
+import static com.zigurs.karlis.utils.search.QuickSearch.CANDIDATE_ACCUMULATION_POLICY.INTERSECTION;
+import static com.zigurs.karlis.utils.search.QuickSearch.CANDIDATE_ACCUMULATION_POLICY.UNION;
+import static com.zigurs.karlis.utils.search.QuickSearch.UNMATCHED_POLICY.BACKTRACKING;
+import static com.zigurs.karlis.utils.search.QuickSearch.UNMATCHED_POLICY.EXACT;
 import static org.junit.Assert.*;
 
 public class QuickSearchTest {
@@ -134,7 +138,7 @@ public class QuickSearchTest {
         searchInstance = null;
     }
 
-    @Test(expected = RuntimeException.class)
+    @Test(expected = IllegalArgumentException.class)
     public void missingExtractor() {
         QuickSearch<String> qs = new QuickSearch<>(
                 null,
@@ -142,9 +146,10 @@ public class QuickSearchTest {
                 QuickSearch.DEFAULT_MATCH_SCORER,
                 1
         );
+        assertNotNull(qs.getStats());
     }
 
-    @Test(expected = RuntimeException.class)
+    @Test(expected = IllegalArgumentException.class)
     public void missingNormaliser() {
         QuickSearch<String> qs = new QuickSearch<>(
                 QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
@@ -152,9 +157,10 @@ public class QuickSearchTest {
                 QuickSearch.DEFAULT_MATCH_SCORER,
                 1
         );
+        assertNotNull(qs.getStats());
     }
 
-    @Test(expected = RuntimeException.class)
+    @Test(expected = IllegalArgumentException.class)
     public void missingScorer() {
         QuickSearch<String> qs = new QuickSearch<>(
                 QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
@@ -162,9 +168,10 @@ public class QuickSearchTest {
                 null,
                 1
         );
+        assertNotNull(qs.getStats());
     }
 
-    @Test(expected = RuntimeException.class)
+    @Test(expected = IllegalArgumentException.class)
     public void invalidMinimumLength() {
         QuickSearch<String> qs = new QuickSearch<>(
                 QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
@@ -172,24 +179,39 @@ public class QuickSearchTest {
                 QuickSearch.DEFAULT_MATCH_SCORER,
                 0
         );
+        assertNotNull(qs.getStats());
     }
 
-    @Test
-    public void itemAddedOnlyOnce() {
-        for (int i = 0; i < 1000; i++) {
-            String testString = "teststring5" + i;
-            searchInstance.addItem(testString.substring(0, 5), testString.substring(0, 5));
-        }
-        assertEquals("1 items; 1 keywords; 13 fragments", searchInstance.getStats());
+    @Test(expected = IllegalArgumentException.class)
+    public void invalidMatchingPolicy() {
+        QuickSearch<String> qs = new QuickSearch<>(
+                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
+                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
+                QuickSearch.DEFAULT_MATCH_SCORER,
+                1,
+                null,
+                QuickSearch.CANDIDATE_ACCUMULATION_POLICY.UNION
+        );
+        assertNotNull(qs.getStats());
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void invalidCandidatePolicy() {
+        QuickSearch<String> qs = new QuickSearch<>(
+                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
+                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
+                QuickSearch.DEFAULT_MATCH_SCORER,
+                1,
+                QuickSearch.UNMATCHED_POLICY.EXACT,
+                null
+        );
+        assertNotNull(qs.getStats());
     }
 
     @Test
     public void itemAdded() throws Exception {
         assertTrue("Failed to add a new search item.",
                 searchInstance.addItem("item", "one two three"));
-
-        assertFalse("Item added with no keywords",
-                searchInstance.addItem("empty item", ""));
     }
 
     @Test
@@ -217,12 +239,80 @@ public class QuickSearchTest {
     }
 
     @Test
+    public void itemAddedOnce() {
+        for (int i = 0; i < 10; i++) {
+            String testString = "teststring5" + i;
+            searchInstance.addItem(testString.substring(0, 5), testString.substring(0, 5));
+        }
+        assertEquals("1 items; 1 keywords; 13 fragments", searchInstance.getStats());
+    }
+
+    @Test
     public void itemRemoved() throws Exception {
         assertTrue("Failed to add search item",
                 searchInstance.addItem("toBeRemoved", "one two three"));
 
         assertTrue("Failed to remove search item",
                 searchInstance.removeItem("toBeRemoved"));
+    }
+
+    @Test
+    public void itemNotRemoved() throws Exception {
+        assertFalse("Failed to remove search item",
+                searchInstance.removeItem("toBeRemoved"));
+    }
+
+    @Test
+    public void itemRemovedNull() throws Exception {
+        assertFalse("Failed to remove search item",
+                searchInstance.removeItem(null));
+    }
+
+    @Test
+    public void remove() throws Exception {
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test1", "onex two three"));
+
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test2", "onexx two three"));
+
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test3", "one two three"));
+
+        assertTrue("Unexpected result size",
+                searchInstance.findItems("one", 10).size() == 3);
+
+        for (int i = 1; i < 4; i++) {
+            searchInstance.removeItem("test" + i);
+        }
+
+        assertTrue("Unexpected result size",
+                searchInstance.findItems("one", 10).size() == 0);
+    }
+
+    @Test
+    public void removeTwice() throws Exception {
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test1", "onex two three"));
+
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test2", "onexx two three"));
+
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test3", "one two three"));
+
+        assertEquals("Unexpected result size", 3, searchInstance.findItems("one", 10).size());
+
+        for (int i = 1; i < 4; i++) {
+            searchInstance.removeItem("test" + i);
+        }
+
+        for (int i = 1; i < 4; i++) {
+            searchInstance.removeItem("test" + i);
+        }
+
+        assertTrue("Unexpected result size",
+                searchInstance.findItems("one", 10).size() == 0);
     }
 
     @Test
@@ -235,12 +325,31 @@ public class QuickSearchTest {
     }
 
     @Test
+    public void nullItemNotFound() throws Exception {
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test", "one two three"));
+
+        assertFalse("Search item found",
+                searchInstance.findItem(null).isPresent());
+    }
+
+    @Test
     public void augumentedItemFound() throws Exception {
         assertTrue("Failed to add search item",
                 searchInstance.addItem("test", "one two three"));
 
         assertEquals(1,
                 searchInstance.findAugumentedItem("one").getResponseItems().size());
+
+        assertEquals("test",
+                searchInstance.findAugumentedItem("one").getResponseItems().get(0).getItem());
+
+        assertEquals(new HashSet<>(Arrays.asList("one", "two", "three")),
+                searchInstance.findAugumentedItem("one").getResponseItems().get(0).getItemKeywords());
+
+        assertEquals("one",
+                searchInstance.findAugumentedItem("one").getSearchString());
+
     }
 
     @Test
@@ -298,6 +407,9 @@ public class QuickSearchTest {
                 searchInstance.addItem("test3", "one three"));
 
         assertEquals(2.0, searchInstance.findAugumentedItem("two").getResponseItems().get(0).getScore(), 0);
+        assertEquals(4.0, searchInstance.findAugumentedItem("two three").getResponseItems().get(0).getScore(), 0);
+        assertEquals(4.5, searchInstance.findAugumentedItem("two three ecting").getResponseItems().get(0).getScore(), 0);
+        assertEquals(5.5, searchInstance.findAugumentedItem("two three inters").getResponseItems().get(0).getScore(), 0);
     }
 
     @Test
@@ -312,8 +424,7 @@ public class QuickSearchTest {
                 searchInstance.addItem("test3", "one two three"));
 
         assertTrue("Unexpected size",
-                searchInstance.findAugumentedItems("one", 10).getResponseItems().size() == 3
-        );
+                searchInstance.findAugumentedItems("one", 10).getResponseItems().size() == 3);
     }
 
     @Test
@@ -328,8 +439,7 @@ public class QuickSearchTest {
                 searchInstance.addItem("test3", "one two three"));
 
         assertTrue("Unexpected size",
-                searchInstance.findItems("       ", 10).size() == 0
-        );
+                searchInstance.findItems("       ", 10).size() == 0);
     }
 
     @Test
@@ -344,8 +454,7 @@ public class QuickSearchTest {
                 searchInstance.addItem("test3", "one two three"));
 
         assertTrue("Unexpected size",
-                searchInstance.findItems(null, 10).size() == 0
-        );
+                searchInstance.findItems(null, 10).size() == 0);
     }
 
     @Test
@@ -360,8 +469,7 @@ public class QuickSearchTest {
                 searchInstance.addItem("test3", "one two three"));
 
         assertTrue("Unexpected size",
-                searchInstance.findAugumentedItems("       ", 10).getResponseItems().size() == 0
-        );
+                searchInstance.findAugumentedItems("       ", 10).getResponseItems().size() == 0);
     }
 
     @Test
@@ -402,11 +510,11 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void noErrorsInLengthMatcher() throws Exception {
+    public void alternativeScorerFunction() throws Exception {
         QuickSearch<String> alternativeConfig = new QuickSearch<>(
                 QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
                 QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
-                QuickSearch.LENGTH_MATCH_SCORER,
+                (s1, s2) -> (double) (s1.length() * s1.length()),
                 QuickSearch.DEFAULT_MINIMUM_KEYWORD_LENGTH
         );
 
@@ -426,7 +534,7 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void testExpandKeywords() throws Exception {
+    public void expandKeywords() throws Exception {
         String exerciseString = "aquickbrownfoxjumpsoverthelazydog";
 
         for (int i = 0; i < exerciseString.length(); i++) {
@@ -455,7 +563,6 @@ public class QuickSearchTest {
         assertEquals(stats, searchInstance.getStats());
     }
 
-
     @Test
     public void findItemsLimit() throws Exception {
         assertTrue("Failed to add search item",
@@ -472,6 +579,13 @@ public class QuickSearchTest {
 
         assertTrue("Unexpected size",
                 searchInstance.findItems("one", 2).size() == 2);
+
+        assertTrue("Unexpected size",
+                searchInstance.findItems("one", 1).size() == 1);
+
+        assertTrue("Unexpected size",
+                searchInstance.findItems("one", 0).size() == 0);
+
     }
 
     @Test
@@ -496,7 +610,7 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void testDirectMatching() throws Exception {
+    public void directMatching() throws Exception {
         assertTrue("Failed to add search item",
                 searchInstance.addItem("test1", "keyword"));
 
@@ -513,7 +627,7 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void testIntersectionWorks() throws Exception {
+    public void unionWorks() throws Exception {
         assertTrue("Failed to add search item",
                 searchInstance.addItem("test1", "one two"));
 
@@ -521,17 +635,91 @@ public class QuickSearchTest {
                 searchInstance.addItem("test2", "two three"));
 
         assertTrue("Failed to add search item",
-                searchInstance.addItem("test3", "twee onaa"));
+                searchInstance.addItem("test3", "three four"));
 
 
-        List<String> result = searchInstance.findItems("two ", 10);
+        List<String> result = searchInstance.findItems("two three", 10);
 
         assertTrue("Unexpected result size",
-                result.size() == 2);
+                result.size() == 3);
     }
 
     @Test
-    public void testBacktrackMatchingStops() throws Exception {
+    public void intersectionWorks() throws Exception {
+        QuickSearch<String> searchInstance = new QuickSearch<>(
+                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
+                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
+                QuickSearch.DEFAULT_MATCH_SCORER,
+                QuickSearch.DEFAULT_MINIMUM_KEYWORD_LENGTH,
+                BACKTRACKING,
+                INTERSECTION);
+
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test1", "one two"));
+
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test2", "two three"));
+
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test3", "three four"));
+
+
+        assertEquals("Unexpected result size", 1,
+                searchInstance.findItems("two three", 10).size());
+
+        assertEquals("Unexpected result size", 2,
+                searchInstance.findItems("two", 10).size());
+    }
+
+    @Test
+    public void intersectionWorks2() throws Exception {
+        QuickSearch<String> searchInstance = new QuickSearch<>(
+                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
+                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
+                QuickSearch.DEFAULT_MATCH_SCORER,
+                QuickSearch.DEFAULT_MINIMUM_KEYWORD_LENGTH,
+                BACKTRACKING,
+                INTERSECTION);
+
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test1", "one two"));
+
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test2", "two three"));
+
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test3", "three four"));
+
+
+        assertEquals("Unexpected result size", 0,
+                searchInstance.findItems("two four", 10).size());
+    }
+
+    @Test
+    public void intersectionWorks3() throws Exception {
+        QuickSearch<String> searchInstance = new QuickSearch<>(
+                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
+                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
+                QuickSearch.DEFAULT_MATCH_SCORER,
+                QuickSearch.DEFAULT_MINIMUM_KEYWORD_LENGTH,
+                BACKTRACKING,
+                INTERSECTION);
+
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test1", "one two"));
+
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test2", "two three"));
+
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test3", "three four"));
+
+        assertEquals("Unexpected result size", 0,
+                searchInstance.findItems("five six", 10).size());
+    }
+
+    @Test
+    public void backtrackMatchingStops() throws Exception {
         assertTrue("Failed to add search item",
                 searchInstance.addItem("keyword", "keyword"));
 
@@ -548,7 +736,7 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void testBacktrackMatchingContinues() throws Exception {
+    public void backtrackMatchingContinues() throws Exception {
         assertTrue("Failed to add search item",
                 searchInstance.addItem("keyword", "keyword one"));
 
@@ -565,69 +753,27 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void testRemove() throws Exception {
-        assertTrue("Failed to add search item",
-                searchInstance.addItem("test1", "onex two three"));
+    public void exactMatching() throws Exception {
+        QuickSearch<String> searchInstance = new QuickSearch<>(
+                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
+                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
+                QuickSearch.DEFAULT_MATCH_SCORER,
+                QuickSearch.DEFAULT_MINIMUM_KEYWORD_LENGTH,
+                EXACT,
+                UNION
+        );
 
         assertTrue("Failed to add search item",
-                searchInstance.addItem("test2", "onexx two three"));
+                searchInstance.addItem("keyword", "keyword"));
 
         assertTrue("Failed to add search item",
-                searchInstance.addItem("test3", "one two three"));
+                searchInstance.addItem("keyboard", "keyboard"));
+
+
+        List<String> result = searchInstance.findItems("keywZ", 10);
 
         assertTrue("Unexpected result size",
-                searchInstance.findItems("one", 10).size() == 3);
-
-        for (int i = 1; i < 4; i++) {
-            searchInstance.removeItem("test" + i);
-        }
-
-        assertTrue("Unexpected result size",
-                searchInstance.findItems("one", 10).size() == 0);
-    }
-
-    @Test
-    public void testRemoveTwice() throws Exception {
-        assertTrue("Failed to add search item",
-                searchInstance.addItem("test1", "onex two three"));
-
-        assertTrue("Failed to add search item",
-                searchInstance.addItem("test2", "onexx two three"));
-
-        assertTrue("Failed to add search item",
-                searchInstance.addItem("test3", "one two three"));
-
-        assertEquals("Unexpected result size", 3, searchInstance.findItems("one", 10).size());
-
-        for (int i = 1; i < 4; i++) {
-            searchInstance.removeItem("test" + i);
-        }
-
-        for (int i = 1; i < 4; i++) {
-            searchInstance.removeItem("test" + i);
-        }
-
-        assertTrue("Unexpected result size",
-                searchInstance.findItems("one", 10).size() == 0);
-    }
-
-    @Test
-    public void testRemoveNull() {
-        searchInstance.removeItem(null);
-    }
-
-    @Test
-    public void testRemoveNull2() {
-        assertTrue("Failed to add search item",
-                searchInstance.addItem("test1", "onex two three"));
-
-        assertTrue("Failed to add search item",
-                searchInstance.addItem("test2", "onexx two three"));
-
-        assertTrue("Failed to add search item",
-                searchInstance.addItem("test3", "one two three"));
-
-        searchInstance.removeItem(null);
+                result.size() == 0);
     }
 
     @Test
@@ -668,7 +814,7 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void objectTypeExercise() {
+    public void objectsAsItems() {
         List<StoreItem> items = new LinkedList<>();
         String[] categories = new String[]{"Shoes", "Jackets", "Skirts"};
 
@@ -705,7 +851,35 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void testCustomSorting() {
+    public void hashWrapperEquals() {
+        HashWrapper<String> w = new HashWrapper<>("cat");
+
+        assertFalse(w.equals(null));
+        assertFalse(w.equals("test"));
+        assertTrue(w.equals(new HashWrapper<>("cat")));
+        assertFalse(w.equals(new HashWrapper<>("dog")));
+    }
+
+    @Test
+    public void enums() {
+        // Silly to do it like this, but catches last few untouched code paths
+        assertNotNull(QuickSearch.CANDIDATE_ACCUMULATION_POLICY.valueOf("UNION"));
+        assertNotNull(QuickSearch.CANDIDATE_ACCUMULATION_POLICY.valueOf("INTERSECTION"));
+
+        for (QuickSearch.CANDIDATE_ACCUMULATION_POLICY policy : QuickSearch.CANDIDATE_ACCUMULATION_POLICY.values()) {
+            assertNotNull(policy.toString());
+        }
+
+        assertNotNull(QuickSearch.UNMATCHED_POLICY.valueOf("EXACT"));
+        assertNotNull(QuickSearch.UNMATCHED_POLICY.valueOf("BACKTRACKING"));
+
+        for (QuickSearch.UNMATCHED_POLICY policy : QuickSearch.UNMATCHED_POLICY.values()) {
+            assertNotNull(policy.toString());
+        }
+    }
+
+    @Test
+    public void customSorting() {
         List<Double> testSet = new ArrayList<>();
 
         for (int i = 0; i < 100; i++) {
@@ -725,7 +899,7 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void testCustomSortingReverse() {
+    public void customSortingReverse() {
         List<Double> testSet = new ArrayList<>();
 
         for (int i = 0; i < 100; i++) {
@@ -742,6 +916,7 @@ public class QuickSearchTest {
         assertEquals(1, list.size());
     }
 
+    @Ignore
     @Test
     public void customSortingBenchmark() {
         /*
@@ -751,27 +926,28 @@ public class QuickSearchTest {
          */
         List<Double> testList = new LinkedList<>();
 
-        for (int i = 0; i < 100; i++) {
+        int listSize = 100000;
+        for (int i = 0; i < listSize; i++) {
             testList.add((double) i);
         }
 
         Collections.shuffle(testList);
 
         Map<Double, Double> testMap = new LinkedHashMap<>();
-        testList.forEach(d -> testMap.put(d,d));
+        testList.forEach(d -> testMap.put(d, d));
 
-        int iterationsCount = 100;
+        int iterationsCount = 10;
         int topItems = 10;
 
         Comparator<Double> comparator = Comparator.reverseOrder();
-        double topResultShouldBe = 99.0;
+        double topResultShouldBe = (double) listSize - 1;
 
-        runSortingBenchmarks("Warmup: ", testMap.values(), iterationsCount, topItems, comparator, topResultShouldBe);
-        runSortingBenchmarks("Warmer: ", testMap.values(), iterationsCount, topItems, comparator, topResultShouldBe);
-        runSortingBenchmarks("Warm:   ", testMap.values(), iterationsCount, topItems, comparator, topResultShouldBe);
+        sortingBenchmark("Warmup: ", testMap.values(), iterationsCount, topItems, comparator, topResultShouldBe);
+        sortingBenchmark("Warmer: ", testMap.values(), iterationsCount, topItems, comparator, topResultShouldBe);
+        sortingBenchmark("Warm:   ", testMap.values(), iterationsCount, topItems, comparator, topResultShouldBe);
     }
 
-    private void runSortingBenchmarks(String prefix, Collection<Double> testList, int iterationsCount, int topItems, Comparator<Double> comparator, double topResultShouldBe) {
+    private void sortingBenchmark(String prefix, Collection<Double> testList, int iterationsCount, int topItems, Comparator<Double> comparator, double topResultShouldBe) {
         LongSupplier time = System::nanoTime;
         int timeDivisor = 1000;
         String unit = "us";

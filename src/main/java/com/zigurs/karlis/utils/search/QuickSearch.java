@@ -19,9 +19,13 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
+import java.util.function.BiFunction;
+import java.util.function.BinaryOperator;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.zigurs.karlis.utils.search.QuickSearch.CANDIDATE_ACCUMULATION_POLICY.INTERSECTION;
 import static com.zigurs.karlis.utils.search.QuickSearch.CANDIDATE_ACCUMULATION_POLICY.UNION;
 import static com.zigurs.karlis.utils.search.QuickSearch.UNMATCHED_POLICY.BACKTRACKING;
 
@@ -85,38 +89,44 @@ import static com.zigurs.karlis.utils.search.QuickSearch.UNMATCHED_POLICY.BACKTR
  */
 public class QuickSearch<T> {
 
-    public enum UNMATCHED_POLICY {EXACT, BACKTRACKING}
-
-    public enum CANDIDATE_ACCUMULATION_POLICY {UNION, INTERSECTION}
-
     /**
-     * Interface to 'clean up' supplied keyword and user input strings. We assume that the input is
-     * going to be ether free form or malformed, therefore this allows to apply required actions to generate
-     * a 'clean' set of keywords from the input string.
+     * Matching policy to apply to unmatched keywords. In case of EXACT only
+     * exact supplied keyword matches will be considered, in case of BACKTRACKING
+     * any keywords with no matches will be incrementally shortened until first
+     * candidate match is found (e.g. supplied 'terminal' will be shortened until it
+     * reaches 'ter' where it can match against 'terra').
      */
-    public interface KeywordsExtractor {
-
-        /**
-         * Convert the input string into a set of keywords to be used internally.
-         *
-         * @param inputString supplied keywords or search input string
-         * @return Set of extracted keywords, can be empty if no viable keywords could be extracted.
-         */
-        @NotNull
-        Set<String> extract(@NotNull String inputString);
+    public enum UNMATCHED_POLICY {
+        EXACT, BACKTRACKING
     }
 
     /**
-     * Default raw input keywords extractor. Replaces all non-word characters with whitespace and
-     * splits the resulting string on whitespace boundaries.
+     * If multiple keywords are supplied select strategy to accumulate result set.
+     * <p>
+     * UNION will consider all items found for each keyword in the result,
+     * INTERSECTION will consider only items that are matched by all the supplied
+     * keywords.
+     * <p>
+     * INTERSECTION is significantly more performant as it discards
+     * candidates as early as possible.
+     */
+    public enum CANDIDATE_ACCUMULATION_POLICY {
+        UNION, INTERSECTION
+    }
+
+    /**
+     * Function to 'clean up' supplied keyword and user input strings. We assume that the input is
+     * going to be ether free form or malformed, therefore this allows to apply required actions to generate
+     * a 'clean' set of keywords from the input string.
      * <p>
      * In example both "one two,three-four" and "one$two%three^four" as inputs will produce
      * set of 4 strings [one,two,three,four] on the output.
      */
-    public static final KeywordsExtractor DEFAULT_KEYWORDS_EXTRACTOR = (s) -> new HashSet<>(Arrays.asList(s.replaceAll("[^\\w]+", " ").split("[\\s]+")));
+    public static final Function<String, Set<String>> DEFAULT_KEYWORDS_EXTRACTOR =
+            (s) -> Arrays.stream(s.replaceAll("[^\\w]+", " ").split("[\\s]+")).collect(Collectors.toSet());
 
     /**
-     * Interface to sanitize search keywords before using them internally. Applied to both keywords
+     * Function to sanitize search keywords before using them internally. Applied to both keywords
      * supplied with items and to user input before performing search.
      * <p>
      * Rationale is to allow somewhat relaxed free-form text input (e.g. phone devices automatically capitalising
@@ -136,47 +146,18 @@ public class QuickSearch<T> {
      * <tr><td><code>"Россия"</code></td><td><code>"rossiya"</code></td><td>translate cyrilic alphabet to latin</td></tr>
      * </table>
      * <p>
-     * Default implementation assumes that String::toLowerCase() is sufficient.
+     * Default implementation assumes that String.toLowerCase().trim() is sufficient.
      */
-    public interface KeywordNormalizer {
-
-        /**
-         * Called to request a final representation for the supplied keyword to be used internally.
-         *
-         * @param keyword original keyword
-         * @return form to use internally or empty string if this keyword is to be ignored
-         */
-        @NotNull
-        String normalize(@NotNull String keyword);
-    }
-
-    public static final KeywordNormalizer DEFAULT_KEYWORD_NORMALIZER = String::toLowerCase;
+    public static final Function<String, String> DEFAULT_KEYWORD_NORMALIZER = (s) -> s.toLowerCase().trim();
 
     /**
-     * Interface providing scoring of user supplied input against corresponding keywords associated with search items.
+     * Function scoring user supplied input against corresponding keywords associated with search items.
      * <p>
      * An example invocations might request to compare <code><strong>"swe"</strong></code> against
      * <code><strong>"sweater"</strong></code> or <code><strong>"count"</strong></code> aganst
      * <code><strong>"accounting"</strong></code>.
-     */
-    public interface KeywordMatchScorer {
-        /**
-         * Score how well (likely incomplete) user input scores against identified matching item keyword.
-         * <p>
-         * Called multiple times for all user supplied strings against their matching keywords
-         * associated with item and summed up to determine final item rank.
-         *
-         * @param keywordSubstring user supplied (partial) match as recognized internally
-         * @param itemKeyword      full matching keyword associated with the item
-         * @return arbitrary number scoring the match. Higher means closer match.
-         */
-        double score(@NotNull String keywordSubstring, @NotNull String itemKeyword);
-    }
-
-    /**
-     * Default keyword match score implementation.
      * <p>
-     * Returns the ratio between search term and keyword lengths with additional boost
+     * Default implementation returns the ratio between search term and keyword lengths with additional boost
      * if the search term matches beginning of the keyword.
      * <p>
      * In example, while matching user input against known keyword "password", the following will be calculated:
@@ -190,7 +171,7 @@ public class QuickSearch<T> {
      * All keywords supplied by user are scored against all matching keywords associated with a searchable item.
      * Items rank in the results is determined by the sum of all score results.
      */
-    public static final KeywordMatchScorer DEFAULT_MATCH_SCORER = (keywordMatch, keyword) -> {
+    public static final BiFunction<String, String, Double> DEFAULT_MATCH_SCORER = (keywordMatch, keyword) -> {
         double matchScore = (double) keywordMatch.length() / (double) keyword.length(); // reaches maximum if lengths match (both are identical)
 
         // bonus boost for start of term
@@ -199,18 +180,6 @@ public class QuickSearch<T> {
 
         return matchScore;
     };
-
-    /**
-     * Alternative match scorer which strongly prefers longer matches between the candidate and target.
-     */
-    public static final KeywordMatchScorer LENGTH_MATCH_SCORER = ((keywordSubstring, itemKeyword) -> {
-        int score = keywordSubstring.length();
-
-        if (itemKeyword.startsWith(keywordSubstring))
-            score *= 2;
-
-        return score;
-    });
 
     /**
      * Container for augumented search results (including item scores and
@@ -271,71 +240,18 @@ public class QuickSearch<T> {
         }
     }
 
-    private final class ItemHashWrapper {
-        private final T item;
-        private final int hash;
-
-        public ItemHashWrapper(T item) {
-            this.item = item;
-            hash = item.hashCode();
-        }
-
-        public T getItem() {
-            return item;
-        }
-
-        @Override
-        public int hashCode() {
-            return hash;
-        }
-
-        @Override
-        public boolean equals(Object obj) {
-            return item.equals(obj);
-        }
-    }
-
-    private final class ItemScoreWrapper implements Comparable<ItemScoreWrapper> {
-        @NotNull
-        private final T item;
-        private double score;
-
-        ItemScoreWrapper(@NotNull T item, double score) {
-            this.item = item;
-            this.score = score;
-        }
-
-        @NotNull
-        ItemScoreWrapper incrementScoreBy(double add) {
-            score += add;
-            return this;
-        }
-
-        @NotNull
-        T getItem() {
-            return item;
-        }
-
-        double getScore() {
-            return score;
-        }
-
-        @Override
-        public int compareTo(@NotNull ItemScoreWrapper o) {
-            return Double.compare(this.score, o.score);
-        }
-    }
+    private final BinaryOperator<ScoreWrapper<T>> scoreMerger = (s1, s2) -> s1.incrementScoreBy(s2.getScore());
 
     /*
      * Variables
      */
 
     @NotNull
-    private final KeywordMatchScorer keywordMatchScorer;
+    private final BiFunction<String, String, Double> keywordMatchScorer;
     @NotNull
-    private final KeywordNormalizer keywordNormalizer;
+    private final Function<String, String> keywordNormalizer;
     @NotNull
-    private final KeywordsExtractor keywordsExtractor;
+    private final Function<String, Set<String>> keywordsExtractor;
     @NotNull
     private final UNMATCHED_POLICY unmatchedPolicy;
     @NotNull
@@ -347,9 +263,9 @@ public class QuickSearch<T> {
     public static final int DEFAULT_MINIMUM_KEYWORD_LENGTH = 2;
     private final int minimumKeywordLength;
 
-    private final Map<String, Set<T>> keywordsToItemsMap = new HashMap<>();
-    private final Map<String, Set<String>> substringsToKeywordsMap = new HashMap<>();
-    private final Map<T, Set<String>> itemKeywordsMap = new HashMap<>();
+    private final Map<String, Set<String>> substringsToKeywordsMap = new HashMap<>(); // links to
+    private final Map<String, Set<HashWrapper<T>>> keywordsToItemsMap = new HashMap<>(); // links to
+    private final Map<HashWrapper<T>, Set<String>> itemKeywordsMap = new HashMap<>();
 
     /*
      * Constructors
@@ -360,8 +276,7 @@ public class QuickSearch<T> {
      * minimum keyword length.
      */
     public QuickSearch() {
-        this(
-                DEFAULT_KEYWORDS_EXTRACTOR,
+        this(DEFAULT_KEYWORDS_EXTRACTOR,
                 DEFAULT_KEYWORD_NORMALIZER,
                 DEFAULT_MATCH_SCORER,
                 DEFAULT_MINIMUM_KEYWORD_LENGTH);
@@ -371,37 +286,47 @@ public class QuickSearch<T> {
      * Constructs a QuickSearch instance with the provided keyword processing implementations and specified minimum
      * keyword length.
      *
-     * @param keywordsExtractor    Extractor. {@link  KeywordsExtractor}
-     * @param keywordNormalizer    Normalizer. {@link  KeywordNormalizer}
-     * @param keywordMatchScorer   Scorer. {@link  KeywordMatchScorer}
+     * @param keywordsExtractor    Extractor function.
+     * @param keywordNormalizer    Normalizer function.
+     * @param keywordMatchScorer   Scorer function.
      * @param minimumKeywordLength Minimum length for keywords internally. Any keywords shorter than specified will be ignored. Should be at least 1
      */
-    public QuickSearch(
-            @Nullable KeywordsExtractor keywordsExtractor,
-            @Nullable KeywordNormalizer keywordNormalizer,
-            @Nullable KeywordMatchScorer keywordMatchScorer,
-            int minimumKeywordLength) {
-        this(keywordsExtractor, keywordNormalizer, keywordMatchScorer, minimumKeywordLength, BACKTRACKING, UNION);
+    public QuickSearch(@Nullable Function<String, Set<String>> keywordsExtractor,
+                       @Nullable Function<String, String> keywordNormalizer,
+                       @Nullable BiFunction<String, String, Double> keywordMatchScorer,
+                       int minimumKeywordLength) throws IllegalArgumentException {
+        this(keywordsExtractor,
+                keywordNormalizer,
+                keywordMatchScorer,
+                minimumKeywordLength,
+                BACKTRACKING,
+                UNION);
     }
 
     /**
-     * Constructs a QuickSearch instance with the provided keyword processing implementations and specified minimum
-     * keyword length.
+     * Constructs a QuickSearch instance with the provided keyword processing implementations specified minimum
+     * keyword length and specified unmatched and accumulation policies.
      *
-     * @param keywordsExtractor    Extractor. {@link  KeywordsExtractor}
-     * @param keywordNormalizer    Normalizer. {@link  KeywordNormalizer}
-     * @param keywordMatchScorer   Scorer. {@link  KeywordMatchScorer}
-     * @param minimumKeywordLength Minimum length for keywords internally. Any keywords shorter than specified will be ignored. Should be at least 1
+     * @param keywordsExtractor           Extractor function.
+     * @param keywordNormalizer           Normalizer function.
+     * @param keywordMatchScorer          Scorer function.
+     * @param minimumKeywordLength        Minimum length for keywords internally. Any keywords shorter than specified will be ignored. Should be at least 1
+     * @param unmatchedPolicy             Policy to apply to supplied keywords without direct match
+     * @param candidateAccumulationPolicy Policy to generate broad or exact results set
      */
-    public QuickSearch(
-            @Nullable KeywordsExtractor keywordsExtractor,
-            @Nullable KeywordNormalizer keywordNormalizer,
-            @Nullable KeywordMatchScorer keywordMatchScorer,
-            int minimumKeywordLength,
-            @NotNull UNMATCHED_POLICY unmatchedPolicy,
-            @NotNull CANDIDATE_ACCUMULATION_POLICY candidateAccumulationPolicy) {
-        if (keywordsExtractor == null || keywordNormalizer == null || keywordMatchScorer == null || minimumKeywordLength < 1)
-            throw new RuntimeException("Null instances or invalid minimum length supplied.");
+    public QuickSearch(@Nullable Function<String, Set<String>> keywordsExtractor,
+                       @Nullable Function<String, String> keywordNormalizer,
+                       @Nullable BiFunction<String, String, Double> keywordMatchScorer,
+                       int minimumKeywordLength,
+                       @Nullable UNMATCHED_POLICY unmatchedPolicy,
+                       @Nullable CANDIDATE_ACCUMULATION_POLICY candidateAccumulationPolicy) throws IllegalArgumentException {
+        if (keywordsExtractor == null
+                || keywordNormalizer == null
+                || keywordMatchScorer == null
+                || minimumKeywordLength < 1
+                || unmatchedPolicy == null
+                || candidateAccumulationPolicy == null)
+            throw new IllegalArgumentException("Invalid configuration arguments supplied");
 
         this.keywordsExtractor = keywordsExtractor;
         this.keywordNormalizer = keywordNormalizer;
@@ -411,7 +336,6 @@ public class QuickSearch<T> {
         this.unmatchedPolicy = unmatchedPolicy;
         this.candidateAccumulationPolicy = candidateAccumulationPolicy;
     }
-
 
     /*
      * Public interface
@@ -429,7 +353,7 @@ public class QuickSearch<T> {
      * @return True if the item was added, false if no keywords to map against the item were found (therefore item was not added)
      */
     public synchronized boolean addItem(@Nullable T item, @Nullable String keywords) {
-        return addItemImpl(item, prepareKeywords(keywords, true));
+        return !(item == null || keywords == null) && addItemImpl(new HashWrapper<>(item), prepareKeywords(keywords, true));
     }
 
     /**
@@ -439,7 +363,7 @@ public class QuickSearch<T> {
      * @return True if the item was removed, false if no such item was found
      */
     public synchronized boolean removeItem(@Nullable T item) {
-        return item != null && removeItemImpl(item);
+        return item != null && removeItemImpl(new HashWrapper<>(item));
     }
 
     /**
@@ -450,12 +374,15 @@ public class QuickSearch<T> {
      */
     @NotNull
     public synchronized Optional<T> findItem(@Nullable String searchString) {
+        if (searchString == null)
+            return Optional.empty();
+
         return findItems(searchString, 1).stream().findFirst();
     }
 
     /**
      * Find top n items matching the supplied search string. Supplied string will be processed by
-     * {@link KeywordsExtractor} and {@link KeywordNormalizer} before used for search, and any
+     * keyword extracting and normalizing functions before used for search, and any
      * extracted search keywords shorten than the specified minimum keyword length will be ignored.
      *
      * @param searchString     Raw search string, e.g. "new york pizza"
@@ -464,9 +391,12 @@ public class QuickSearch<T> {
      */
     @NotNull
     public synchronized List<T> findItems(@Nullable String searchString, int numberOfTopItems) {
+        if (searchString == null || numberOfTopItems < 1)
+            return Collections.emptyList();
+
         return findItemsImpl(prepareKeywords(searchString, false), numberOfTopItems)
                 .stream()
-                .map(ItemScoreWrapper::getItem)
+                .map(e -> e.unwrap().unwrap())
                 .collect(Collectors.toList());
     }
 
@@ -496,11 +426,9 @@ public class QuickSearch<T> {
             searchString = "";
         }
 
-        Set<String> searchKeywords = prepareKeywords(searchString, false);
-
         List<Response.Item<T>> results = findItemsImpl(prepareKeywords(searchString, false), numberOfTopItems)
                 .stream()
-                .map(i -> new Response.Item<>(i.getItem(), itemKeywordsMap.get(i.getItem()), i.getScore()))
+                .map(i -> new Response.Item<>(i.unwrap().unwrap(), itemKeywordsMap.get(i.unwrap()), i.getScore()))
                 .collect(Collectors.toList());
 
         return new Response<>(searchString, results);
@@ -534,23 +462,21 @@ public class QuickSearch<T> {
      */
 
     @NotNull
-    private List<ItemScoreWrapper> findItemsImpl(@NotNull Set<String> searchKeywords, int maxItemsToList) {
-        // empty list if no matches found
+    private List<ScoreWrapper<T>> findItemsImpl(@NotNull Set<String> searchKeywords, int maxItemsToList) {
         if (searchKeywords.isEmpty() || maxItemsToList < 1)
-            return Collections.emptyList(); //No viable keywords found
+            return Collections.emptyList();
 
         // search itself
-        Collection<ItemScoreWrapper> matchingItems = findAndScoreImpl(searchKeywords);
+        Collection<ScoreWrapper<T>> matchingItems = findAndScoreImpl(searchKeywords);
 
         /*
          * Use custom sort if the candidates list is larger than number of items we
-         * need to report back. On large sets of results this can bring significant
+         * need to report back. On large sets of results this can bring notable
          * improvements in speed when compared to built-in sorting methods.
          */
         if (matchingItems.size() > maxItemsToList) {
             return sortAndLimit(matchingItems, maxItemsToList, Comparator.reverseOrder());
         } else {
-            /* TODO - when to decide to switch to parallel sort? Has benefits for large sets on multicore... */
             return matchingItems.stream()
                     .sorted(Comparator.reverseOrder())
                     .limit(maxItemsToList)
@@ -559,27 +485,32 @@ public class QuickSearch<T> {
     }
 
     @NotNull
-    private Collection<ItemScoreWrapper> findAndScoreImpl(@NotNull Set<String> suppliedFragments) {
-        LinkedHashMap<T, ItemScoreWrapper> matchingItems = new LinkedHashMap<>();
+    private Collection<ScoreWrapper<T>> findAndScoreImpl(@NotNull Set<String> suppliedFragments) {
+        Map<HashWrapper<T>, ScoreWrapper<T>> matchingItems = Collections.emptyMap();
 
-        /*
-         * Scoring happens here. Basic implementation that weights the
-         * length of search term against matching keyword length and adds
-         * a small bonus if the found keyword begins with the search term.
-         */
         boolean firstFragment = true;
         for (String suppliedFragment : suppliedFragments) {
-            LinkedHashMap<T, ItemScoreWrapper> fragmentItems = matchSingleFragment(suppliedFragment);
+            Map<HashWrapper<T>, ScoreWrapper<T>> fragmentItems = matchSingleFragment(suppliedFragment);
 
             if (firstFragment) {
+                if (candidateAccumulationPolicy == INTERSECTION && fragmentItems.size() == 0)
+                    break;
+
                 matchingItems = fragmentItems;
                 firstFragment = false;
             } else {
                 if (candidateAccumulationPolicy == CANDIDATE_ACCUMULATION_POLICY.INTERSECTION) {
                     matchingItems = matchingItems.values().stream()
-                            .filter(e -> fragmentItems.containsKey(e.getItem()))
-                            .map(e -> e.incrementScoreBy(fragmentItems.get(e.getItem()).getScore()))
-                            .collect(Collectors.toMap(ItemScoreWrapper::getItem, e -> e, (v1, v2) -> v1.incrementScoreBy(v2.getScore()), LinkedHashMap::new));
+                            .filter(k -> fragmentItems.containsKey(k.unwrap()))
+                            .map(k -> k.incrementScoreBy(fragmentItems.get(k.unwrap()).getScore()))
+                            .collect(
+                                    Collectors.toMap(
+                                            ScoreWrapper::unwrap,
+                                            v -> v,
+                                            scoreMerger,
+                                            LinkedHashMap::new
+                                    )
+                            );
 
                     /*
                      * If we end up with no items in second or latter iterations we may as well break
@@ -587,7 +518,7 @@ public class QuickSearch<T> {
                      */
                     if (matchingItems.size() == 0)
                         break;
-                } else if (candidateAccumulationPolicy == UNION) {
+                } else { // implied (candidateAccumulationPolicy == UNION)
                     matchingItems = Stream.of(matchingItems, fragmentItems)
                             .map(Map::entrySet)
                             .flatMap(Collection::stream)
@@ -595,20 +526,10 @@ public class QuickSearch<T> {
                                     Collectors.toMap(
                                             Map.Entry::getKey,
                                             Map.Entry::getValue,
-                                            (v1, v2) -> v1.incrementScoreBy(v2.getScore()),
+                                            scoreMerger,
                                             LinkedHashMap::new
                                     )
                             );
-
-//TODO - perf test this
-//                    for (ItemScoreWrapper item : fragmentItems.values()) {
-//                        ItemScoreWrapper existingItem = matchingItems.get(item.getItem());
-//                        if (existingItem != null) {
-//                            existingItem.incrementScoreBy(item.getScore());
-//                        } else {
-//                            matchingItems.put(item.getItem(), item);
-//                        }
-//                    }
                 }
             }
         }
@@ -617,20 +538,20 @@ public class QuickSearch<T> {
     }
 
     @NotNull
-    private LinkedHashMap<T, ItemScoreWrapper> matchSingleFragment(@NotNull String candidateFragment) {
+    private Map<HashWrapper<T>, ScoreWrapper<T>> matchSingleFragment(@NotNull String candidateFragment) {
         Set<String> candidateKeywords = substringsToKeywordsMap.get(candidateFragment);
         if (candidateKeywords == null) {
-            /*
-             * Being smart here, if we have a supplied keyword we don't have a match
-             * for, immediately try to shorten it by a char to see if that yields a result.
-             *
-             * As a result we should be able to match 'termite' against 'terminator'
-             * after two backtracking iterations.
-             */
             if (unmatchedPolicy == BACKTRACKING && candidateFragment.length() > 1) {
+                /*
+                 * If we have a supplied keyword we don't have a match for,
+                 * try to shorten it by a char to see if that yields a result.
+                 *
+                 * As a result we should be able to match 'termite' against 'terminator'
+                 * after two backtracking iterations.
+                 */
                 return matchSingleFragment(candidateFragment.substring(0, candidateFragment.length() - 1));
             } else {
-                return new LinkedHashMap<>();
+                return Collections.emptyMap();
             }
         } else {
             /*
@@ -641,29 +562,28 @@ public class QuickSearch<T> {
     }
 
     @NotNull
-    private LinkedHashMap<T, ItemScoreWrapper> scoreSingleFragment(@NotNull String candidateFragment, @NotNull Set<String> candidateKeywords) {
-        //TODO - can this be made to return underlying maps directly? Perhaps inserting them directly in a supplied map?
-        LinkedHashMap<T, ItemScoreWrapper> itemsForKeywords = new LinkedHashMap<T, ItemScoreWrapper>();
+    private Map<HashWrapper<T>, ScoreWrapper<T>> scoreSingleFragment(@NotNull String candidateFragment, @NotNull Set<String> candidateKeywords) {
+        Map<HashWrapper<T>, ScoreWrapper<T>> fragmentItems = new LinkedHashMap<>();
 
         for (String keyword : candidateKeywords) {
-            double score = keywordMatchScorer.score(candidateFragment, keyword);
-            Set<T> items = keywordsToItemsMap.get(keyword);
+            double score = keywordMatchScorer.apply(candidateFragment, keyword);
+            Set<HashWrapper<T>> items = keywordsToItemsMap.get(keyword);
 
-            for (T i : items) {
-                ItemScoreWrapper w = itemsForKeywords.get(i);
+            for (HashWrapper<T> i : items) {
+                ScoreWrapper<T> w = fragmentItems.get(i);
                 if (w == null) {
-                    itemsForKeywords.put(i, new ItemScoreWrapper(i, score));
+                    fragmentItems.put(i, new ScoreWrapper<>(i, score));
                 } else {
-                    w.incrementScoreBy(score);
+                    w.setIfHigher(score); // only score max match for any particular fragment
                 }
             }
         }
 
-        return itemsForKeywords;
+        return fragmentItems;
     }
 
-    private boolean addItemImpl(@Nullable T item, @NotNull Set<String> suppliedKeywords) {
-        if (item == null || suppliedKeywords.size() == 0) {
+    private boolean addItemImpl(@NotNull HashWrapper<T> item, @NotNull Set<String> suppliedKeywords) {
+        if (suppliedKeywords.size() == 0) {
             return false; // No valid item or keywords found, skip adding
         }
 
@@ -687,7 +607,7 @@ public class QuickSearch<T> {
         return true;
     }
 
-    private boolean removeItemImpl(@NotNull T item) {
+    private boolean removeItemImpl(@NotNull HashWrapper<T> item) {
         if (!itemKeywordsMap.containsKey(item))
             return false;
 
@@ -744,8 +664,8 @@ public class QuickSearch<T> {
         }
     }
 
-    private void addItemToKeywordItemsList(@NotNull T item, @NotNull String keyword) {
-        Set<T> keywordItems = keywordsToItemsMap.get(keyword);
+    private void addItemToKeywordItemsList(@NotNull HashWrapper<T> item, @NotNull String keyword) {
+        Set<HashWrapper<T>> keywordItems = keywordsToItemsMap.get(keyword);
 
         if (keywordItems == null) {
             keywordItems = new HashSet<>();
@@ -755,8 +675,8 @@ public class QuickSearch<T> {
         keywordItems.add(item);
     }
 
-    private void removeItemFromKeywordItemsList(@NotNull T item, @NotNull String keyword) {
-        Set<T> keywordItems = keywordsToItemsMap.get(keyword);
+    private void removeItemFromKeywordItemsList(@NotNull HashWrapper<T> item, @NotNull String keyword) {
+        Set<HashWrapper<T>> keywordItems = keywordsToItemsMap.get(keyword);
 
         keywordItems.remove(item);
 
@@ -766,27 +686,11 @@ public class QuickSearch<T> {
     }
 
     @NotNull
-    private Set<String> prepareKeywords(@Nullable String rawInput, boolean filterShortKeywords) {
-        if (rawInput == null) {
-            return Collections.emptySet();
-        } else {
-            return prepareKeywordsList(keywordsExtractor.extract(rawInput),
-                    filterShortKeywords,
-                    keywordNormalizer,
-                    minimumKeywordLength);
-        }
-    }
-
-    @NotNull
-    private Set<String> prepareKeywordsList(@NotNull Collection<String> keywords,
-                                            boolean filterShorts,
-                                            KeywordNormalizer kwn,
-                                            int minimumKeywordLength) {
-        return keywords.stream()
+    private Set<String> prepareKeywords(@NotNull String keywordsString, boolean filterShortKeywords) {
+        return keywordsExtractor.apply(keywordsString).stream()
                 .filter(kw -> !kw.isEmpty())
-                .map(kwn::normalize)
-                .map(String::trim)
-                .filter(s -> !filterShorts || s.length() >= minimumKeywordLength)
+                .map(keywordNormalizer)
+                .filter(s -> !filterShortKeywords || s.length() >= minimumKeywordLength)
                 .collect(Collectors.toSet());
     }
 
