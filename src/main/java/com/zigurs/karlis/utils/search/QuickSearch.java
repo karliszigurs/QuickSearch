@@ -154,7 +154,7 @@ public class QuickSearch<T> {
      * Function scoring user supplied input against corresponding keywords associated with search items.
      * <p>
      * An example invocations might request to compare <code><strong>"swe"</strong></code> against
-     * <code><strong>"sweater"</strong></code> or <code><strong>"count"</strong></code> aganst
+     * <code><strong>"sweater"</strong></code> or <code><strong>"count"</strong></code> against
      * <code><strong>"accounting"</strong></code>.
      * <p>
      * Default implementation returns the ratio between search term and keyword lengths with additional boost
@@ -189,6 +189,12 @@ public class QuickSearch<T> {
      */
     public static final class Response<T> {
 
+        /**
+         * Container for augumented search result item containing the keywords
+         * associated with the item and the calculated search result score.
+         *
+         * @param <T> wrapped response item type
+         */
         public static final class Item<T> {
             @NotNull
             private final T item;
@@ -197,9 +203,9 @@ public class QuickSearch<T> {
 
             private final double score;
 
-            public Item(@NotNull T item, @NotNull Collection<String> itemKeywords, double score) {
+            private Item(@NotNull T item, @NotNull Set<String> itemKeywords, double score) {
                 this.item = item;
-                this.itemKeywords = new HashSet<>(itemKeywords);
+                this.itemKeywords = Collections.unmodifiableSet(itemKeywords);
                 this.score = score;
             }
 
@@ -224,7 +230,7 @@ public class QuickSearch<T> {
         @NotNull
         private final List<Item<T>> responseItems;
 
-        public Response(@NotNull String searchString, @NotNull List<Item<T>> responseItems) {
+        private Response(@NotNull String searchString, @NotNull List<Item<T>> responseItems) {
             this.searchString = searchString;
             this.responseItems = responseItems;
         }
@@ -285,6 +291,8 @@ public class QuickSearch<T> {
     /**
      * Constructs a QuickSearch instance with the provided keyword processing implementations and specified minimum
      * keyword length.
+     * <p>
+     * Please note that supplied functions will be validated for basic behavior on creating the instance.
      *
      * @param keywordsExtractor    Extractor function.
      * @param keywordNormalizer    Normalizer function.
@@ -306,6 +314,8 @@ public class QuickSearch<T> {
     /**
      * Constructs a QuickSearch instance with the provided keyword processing implementations specified minimum
      * keyword length and specified unmatched and accumulation policies.
+     * <p>
+     * Please note that supplied functions will be validated for basic functionality on creating the instance.
      *
      * @param keywordsExtractor           Extractor function.
      * @param keywordNormalizer           Normalizer function.
@@ -327,6 +337,14 @@ public class QuickSearch<T> {
                 || unmatchedPolicy == null
                 || candidateAccumulationPolicy == null)
             throw new IllegalArgumentException("Invalid configuration arguments supplied");
+
+        /*
+         * Quick sanity check on the supplied functions to ensure
+         * they confirm to behavior expected internally.
+         */
+        testKeywordsExtractorFunction(keywordsExtractor);
+        testKeywordNormalizerFunction(keywordNormalizer);
+        testKeywordMatchScorerFunction(keywordMatchScorer);
 
         this.keywordsExtractor = keywordsExtractor;
         this.keywordNormalizer = keywordNormalizer;
@@ -469,12 +487,12 @@ public class QuickSearch<T> {
         // search itself
         Collection<ScoreWrapper<T>> matchingItems = findAndScoreImpl(searchKeywords);
 
-        /*
-         * Use custom sort if the candidates list is larger than number of items we
-         * need to report back. On large sets of results this can bring notable
-         * improvements in speed when compared to built-in sorting methods.
-         */
         if (matchingItems.size() > maxItemsToList) {
+            /*
+             * Use custom sort if the candidates list is larger than number of items we
+             * need to report back. On large sets of results this can bring notable
+             * improvements in speed when compared to built-in sorting methods.
+             */
             return sortAndLimit(matchingItems, maxItemsToList, Comparator.reverseOrder());
         } else {
             return matchingItems.stream()
@@ -569,6 +587,7 @@ public class QuickSearch<T> {
             double score = keywordMatchScorer.apply(candidateFragment, keyword);
             Set<HashWrapper<T>> items = keywordsToItemsMap.get(keyword);
 
+            //TODO - could easily save two lookups here, investigate merging the sets
             for (HashWrapper<T> i : items) {
                 ScoreWrapper<T> w = fragmentItems.get(i);
                 if (w == null) {
@@ -711,7 +730,7 @@ public class QuickSearch<T> {
      * @param <X>            type of objects to sort
      * @return sorted list consisting of first (up to limitResultsTo) elements in specified comparator order
      */
-    <X> List<X> sortAndLimit(@NotNull Collection<? extends X> input,
+    final <X> List<X> sortAndLimit(@NotNull Collection<? extends X> input,
                              int limitResultsTo,
                              @NotNull Comparator<X> comparator) {
         limitResultsTo = Math.max(limitResultsTo, 0); // Safety check that limit is not negative
@@ -740,5 +759,61 @@ public class QuickSearch<T> {
         }
         // If not added already (and returned), append to end of the list
         result.add(entry);
+    }
+
+    /*
+     * Constructor parameter function tests.
+     * Available as protected if modification of the tests is required.
+     */
+
+    /**
+     * Test keyword extractor function for valid set (can be empty)
+     * returned for empty and present string inputs.
+     *
+     * @param function Extractor function under test
+     * @throws IllegalArgumentException Thrown if there was a null output or an exception while processing test inputs
+     */
+    protected void testKeywordsExtractorFunction(@NotNull Function<String, Set<String>> function) throws IllegalArgumentException {
+        try {
+            if (function.apply("") == null || function.apply("testinput") == null) {
+                throw new IllegalArgumentException("Keywords extractor function failed non-null result test");
+            }
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Exception while testing keywords extractor function", e);
+        }
+    }
+
+    /**
+     * Test keyword normalizer function for non-null string output (can be empty)
+     * returned for empty and present string inputs.
+     *
+     * @param function Normalizer function under test
+     * @throws IllegalArgumentException Thrown if there was a null output or exception during test invocations
+     */
+    protected void testKeywordNormalizerFunction(@NotNull Function<String, String> function) throws IllegalArgumentException {
+        try {
+            if (function.apply("") == null || function.apply("testinput") == null)
+                throw new IllegalArgumentException("Keyword normalizer function failed non-null output test");
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Exception while testing keyword normalizer function", e);
+        }
+    }
+
+    /**
+     * Test supplied scoring function for exceptions during scoring call.
+     *
+     * @param function Function under test
+     * @throws IllegalArgumentException Thrown if there was an exception trying to score example inputs
+     */
+    protected void testKeywordMatchScorerFunction(@NotNull BiFunction<String, String, Double> function) throws IllegalArgumentException {
+        try {
+            function.apply("testinput", "testinput");
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Exception while testing keyword match scorer function", e);
+        }
     }
 }
