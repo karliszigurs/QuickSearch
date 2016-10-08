@@ -15,22 +15,28 @@
  */
 package com.zigurs.karlis.utils.search;
 
+import org.jetbrains.annotations.NotNull;
+
 /**
  * Internal utility class. Package level for testing access.
- *
+ * <p>
  * Internally we want to cache possibly heavy hashCode calculations
  * as we'll be juggling the objects between sets a bit.
  */
 final class HashWrapper<T> {
+
+    @NotNull
     private final T item;
+
     private final int hashCode;
 
-    public HashWrapper(T item) {
+    HashWrapper(@NotNull T item) {
         this.item = item;
         hashCode = item.hashCode();
     }
 
-    public T unwrap() {
+    @NotNull
+    T unwrap() {
         return item;
     }
 

@@ -22,7 +22,8 @@ import org.jetbrains.annotations.NotNull;
  * <p>
  * Track item score during result set generation.
  */
-final class ScoreWrapper<T> implements Comparable<ScoreWrapper<T>> {
+final class ScoreWrapper<T> {
+
     @NotNull
     private final HashWrapper<T> item;
     private double score;
@@ -33,26 +34,11 @@ final class ScoreWrapper<T> implements Comparable<ScoreWrapper<T>> {
     }
 
     @NotNull
-    ScoreWrapper<T> incrementScoreBy(double add) {
-        score += add;
-        return this;
-    }
-
-    void setIfHigher(double candidate) {
-        score = Math.max(score, candidate);
-    }
-
-    @NotNull
     HashWrapper<T> unwrap() {
         return item;
     }
 
     double getScore() {
         return score;
-    }
-
-    @Override
-    public int compareTo(@NotNull ScoreWrapper<T> that) {
-        return Double.compare(this.score, that.score);
     }
 }

@@ -15,17 +15,17 @@
  */
 package com.zigurs.karlis.utils.search;
 
+import com.zigurs.karlis.utils.search.model.Item;
+import com.zigurs.karlis.utils.search.model.Result;
+import com.zigurs.karlis.utils.search.model.Stats;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 import java.util.function.BiFunction;
-import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
-import static com.zigurs.karlis.utils.search.QuickSearch.CANDIDATE_ACCUMULATION_POLICY.INTERSECTION;
 import static com.zigurs.karlis.utils.search.QuickSearch.CANDIDATE_ACCUMULATION_POLICY.UNION;
 import static com.zigurs.karlis.utils.search.QuickSearch.UNMATCHED_POLICY.BACKTRACKING;
 
@@ -182,91 +182,25 @@ public class QuickSearch<T> {
     };
 
     /**
-     * Container for augumented search results (including item scores and
-     * intersect of keywords for all items).
-     *
-     * @param <T> wrapped response item type
+     * Default for minimum keyword length. Any keywords shorter than this will be ignored internally.
      */
-    public static final class Response<T> {
-
-        /**
-         * Container for augumented search result item containing the keywords
-         * associated with the item and the calculated search result score.
-         *
-         * @param <T> wrapped response item type
-         */
-        public static final class Item<T> {
-            @NotNull
-            private final T item;
-            @NotNull
-            private final Set<String> itemKeywords;
-
-            private final double score;
-
-            private Item(@NotNull T item, @NotNull Set<String> itemKeywords, double score) {
-                this.item = item;
-                this.itemKeywords = Collections.unmodifiableSet(itemKeywords);
-                this.score = score;
-            }
-
-            @NotNull
-            public T getItem() {
-                return item;
-            }
-
-            @NotNull
-            public Set<String> getItemKeywords() {
-                return itemKeywords;
-            }
-
-            public double getScore() {
-                return score;
-            }
-        }
-
-        @NotNull
-        private final String searchString;
-
-        @NotNull
-        private final List<Item<T>> responseItems;
-
-        private Response(@NotNull String searchString, @NotNull List<Item<T>> responseItems) {
-            this.searchString = searchString;
-            this.responseItems = responseItems;
-        }
-
-        @NotNull
-        public String getSearchString() {
-            return searchString;
-        }
-
-        @NotNull
-        public List<Item<T>> getResponseItems() {
-            return responseItems;
-        }
-    }
-
-    private final BinaryOperator<ScoreWrapper<T>> scoreMerger = (s1, s2) -> s1.incrementScoreBy(s2.getScore());
-
-    /*
-     * Variables
-     */
-
+    public static final int DEFAULT_MINIMUM_KEYWORD_LENGTH = 2;
     @NotNull
     private final BiFunction<String, String, Double> keywordMatchScorer;
     @NotNull
     private final Function<String, String> keywordNormalizer;
     @NotNull
     private final Function<String, Set<String>> keywordsExtractor;
+
+    /*
+     * Variables
+     */
+
     @NotNull
     private final UNMATCHED_POLICY unmatchedPolicy;
     @NotNull
     private final CANDIDATE_ACCUMULATION_POLICY candidateAccumulationPolicy;
 
-    /**
-     * Default for minimum keyword length. Any keywords shorter than this will be ignored internally.
-     */
-    public static final int DEFAULT_MINIMUM_KEYWORD_LENGTH = 2;
     private final int minimumKeywordLength;
 
     private final Map<String, Set<String>> substringsToKeywordsMap = new HashMap<>(); // links to
@@ -426,7 +360,7 @@ public class QuickSearch<T> {
      * @return Response Response containing search keywords and possibly a single item.
      */
     @NotNull
-    public synchronized Response<T> findAugumentedItem(@Nullable String searchString) {
+    public synchronized Result<T> findAugumentedItem(@Nullable String searchString) {
         return findAugumentedItems(searchString, 1);
     }
 
@@ -439,17 +373,17 @@ public class QuickSearch<T> {
      * @return Response object containing 0 to n top scoring items and corresponding metadata
      */
     @NotNull
-    public synchronized Response<T> findAugumentedItems(@Nullable String searchString, int numberOfTopItems) {
+    public synchronized Result<T> findAugumentedItems(@Nullable String searchString, int numberOfTopItems) {
         if (searchString == null) {
             searchString = "";
         }
 
-        List<Response.Item<T>> results = findItemsImpl(prepareKeywords(searchString, false), numberOfTopItems)
+        List<Item<T>> results = findItemsImpl(prepareKeywords(searchString, false), numberOfTopItems)
                 .stream()
-                .map(i -> new Response.Item<>(i.unwrap().unwrap(), itemKeywordsMap.get(i.unwrap()), i.getScore()))
+                .map(i -> new Item<>(i.unwrap().unwrap(), itemKeywordsMap.get(i.unwrap()), i.getScore()))
                 .collect(Collectors.toList());
 
-        return new Response<>(searchString, results);
+        return new Result<>(searchString, results);
     }
 
     /**
@@ -467,8 +401,8 @@ public class QuickSearch<T> {
      * @return example output: "10 items; 100 keywords; 10000 fragments"
      */
     @NotNull
-    public synchronized String getStats() {
-        return String.format("%d items; %d keywords; %d fragments",
+    public synchronized Stats getStats() {
+        return new Stats(
                 itemKeywordsMap.size(),
                 keywordsToItemsMap.size(),
                 substringsToKeywordsMap.size()
@@ -485,7 +419,7 @@ public class QuickSearch<T> {
             return Collections.emptyList();
 
         // search itself
-        Collection<ScoreWrapper<T>> matchingItems = findAndScoreImpl(searchKeywords);
+        Map<HashWrapper<T>, Double> matchingItems = findAndScoreImpl(searchKeywords);
 
         if (matchingItems.size() > maxItemsToList) {
             /*
@@ -493,70 +427,86 @@ public class QuickSearch<T> {
              * need to report back. On large sets of results this can bring notable
              * improvements in speed when compared to built-in sorting methods.
              */
-            return sortAndLimit(matchingItems, maxItemsToList, Comparator.reverseOrder());
+            return sortAndLimit(matchingItems.entrySet(), maxItemsToList, Map.Entry.comparingByValue(Comparator.reverseOrder())).stream()
+                    .map(e -> new ScoreWrapper<>(e.getKey(), e.getValue()))
+                    .collect(Collectors.toList());
         } else {
-            return matchingItems.stream()
-                    .sorted(Comparator.reverseOrder())
+            return matchingItems.entrySet().stream()
+                    .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
                     .limit(maxItemsToList)
+                    .map(e -> new ScoreWrapper<>(e.getKey(), e.getValue()))
                     .collect(Collectors.toList());
         }
     }
 
     @NotNull
-    private Collection<ScoreWrapper<T>> findAndScoreImpl(@NotNull Set<String> suppliedFragments) {
-        Map<HashWrapper<T>, ScoreWrapper<T>> matchingItems = Collections.emptyMap();
-
-        boolean firstFragment = true;
-        for (String suppliedFragment : suppliedFragments) {
-            Map<HashWrapper<T>, ScoreWrapper<T>> fragmentItems = matchSingleFragment(suppliedFragment);
-
-            if (firstFragment) {
-                if (candidateAccumulationPolicy == INTERSECTION && fragmentItems.size() == 0)
-                    break;
-
-                matchingItems = fragmentItems;
-                firstFragment = false;
-            } else {
-                if (candidateAccumulationPolicy == CANDIDATE_ACCUMULATION_POLICY.INTERSECTION) {
-                    matchingItems = matchingItems.values().stream()
-                            .filter(k -> fragmentItems.containsKey(k.unwrap()))
-                            .map(k -> k.incrementScoreBy(fragmentItems.get(k.unwrap()).getScore()))
-                            .collect(
-                                    Collectors.toMap(
-                                            ScoreWrapper::unwrap,
-                                            v -> v,
-                                            scoreMerger,
-                                            LinkedHashMap::new
-                                    )
-                            );
-
-                    /*
-                     * If we end up with no items in second or latter iterations we may as well break
-                     * as no new results will be permitted through.
-                     */
-                    if (matchingItems.size() == 0)
-                        break;
-                } else { // implied (candidateAccumulationPolicy == UNION)
-                    matchingItems = Stream.of(matchingItems, fragmentItems)
-                            .map(Map::entrySet)
-                            .flatMap(Collection::stream)
-                            .collect(
-                                    Collectors.toMap(
-                                            Map.Entry::getKey,
-                                            Map.Entry::getValue,
-                                            scoreMerger,
-                                            LinkedHashMap::new
-                                    )
-                            );
-                }
-            }
+    private Map<HashWrapper<T>, Double> findAndScoreImpl(@NotNull Set<String> suppliedFragments) {
+        if (candidateAccumulationPolicy == UNION) {
+            return findAndScoreUnionImpl(suppliedFragments);
+        } else { // implied (candidateAccumulationPolicy == INTERSECTION)
+            return findAndScoreIntersectionImpl(suppliedFragments);
         }
-
-        return matchingItems.values();
     }
 
     @NotNull
-    private Map<HashWrapper<T>, ScoreWrapper<T>> matchSingleFragment(@NotNull String candidateFragment) {
+    private Map<HashWrapper<T>, Double> findAndScoreUnionImpl(@NotNull Set<String> suppliedFragments) {
+        Map<HashWrapper<T>, Double> accumulatedItems = new LinkedHashMap<>();
+
+        for (String suppliedFragment : suppliedFragments) {
+            matchSingleFragment(suppliedFragment).forEach((k, v) -> {
+                Double prevVal = accumulatedItems.get(k);
+                accumulatedItems.put(k, prevVal != null ? v + prevVal : v);
+            });
+        }
+
+        return accumulatedItems;
+    }
+
+    @NotNull
+    private Map<HashWrapper<T>, Double> findAndScoreIntersectionImpl(@NotNull Set<String> suppliedFragments) {
+        Map<HashWrapper<T>, Double> accumulatedItems = new LinkedHashMap<>();
+
+        boolean firstFragment = true;
+
+        for (String suppliedFragment : suppliedFragments) {
+            Map<HashWrapper<T>, Double> fragmentItems = matchSingleFragment(suppliedFragment);
+
+            if (firstFragment) {
+                accumulatedItems.putAll(fragmentItems);
+                firstFragment = false;
+            } else {
+                Map<HashWrapper<T>, Double> smallerMap = (accumulatedItems.size() > fragmentItems.size()) ? fragmentItems : accumulatedItems;
+                Map<HashWrapper<T>, Double> largerMap = (smallerMap == accumulatedItems) ? fragmentItems : accumulatedItems;
+
+                accumulatedItems = smallerMap.entrySet().stream()
+                        .filter(k -> largerMap.containsKey(k.getKey()))
+                        .map(e -> {
+                            e.setValue(e.getValue() + largerMap.get(e.getKey())); // Transfer the score
+                            return e;
+                        })
+                        .collect(
+                                Collectors.toMap(
+                                        Map.Entry::getKey,
+                                        Map.Entry::getValue,
+                                        Double::sum, // Technically a no-op as no duplicates will reach here
+                                        LinkedHashMap::new
+                                )
+                        );
+
+                /*
+                 * If we end up with no items in second or latter iterations we may as well break
+                 * as no new results will be permitted through.
+                 */
+                if (accumulatedItems.size() == 0)
+                    break;
+            }
+        }
+
+        return accumulatedItems;
+    }
+
+    @NotNull
+    private Map<HashWrapper<T>, Double> matchSingleFragment(@NotNull String candidateFragment) {
         Set<String> candidateKeywords = substringsToKeywordsMap.get(candidateFragment);
         if (candidateKeywords == null) {
             if (unmatchedPolicy == BACKTRACKING && candidateFragment.length() > 1) {
@@ -580,22 +530,16 @@ public class QuickSearch<T> {
     }
 
     @NotNull
-    private Map<HashWrapper<T>, ScoreWrapper<T>> scoreSingleFragment(@NotNull String candidateFragment, @NotNull Set<String> candidateKeywords) {
-        Map<HashWrapper<T>, ScoreWrapper<T>> fragmentItems = new LinkedHashMap<>();
+    private Map<HashWrapper<T>, Double> scoreSingleFragment(@NotNull String candidateFragment, @NotNull Set<String> candidateKeywords) {
+        Map<HashWrapper<T>, Double> fragmentItems = new LinkedHashMap<>();
 
         for (String keyword : candidateKeywords) {
-            double score = keywordMatchScorer.apply(candidateFragment, keyword);
-            Set<HashWrapper<T>> items = keywordsToItemsMap.get(keyword);
+            Double score = keywordMatchScorer.apply(candidateFragment, keyword);
 
-            //TODO - could easily save two lookups here, investigate merging the sets
-            for (HashWrapper<T> i : items) {
-                ScoreWrapper<T> w = fragmentItems.get(i);
-                if (w == null) {
-                    fragmentItems.put(i, new ScoreWrapper<>(i, score));
-                } else {
-                    w.setIfHigher(score); // only score max match for any particular fragment
-                }
-            }
+            keywordsToItemsMap.get(keyword).forEach(i -> {
+                Double prevScore = fragmentItems.get(i);
+                fragmentItems.put(i, prevScore == null ? score : Math.max(prevScore, score));
+            });
         }
 
         return fragmentItems;
@@ -713,10 +657,6 @@ public class QuickSearch<T> {
                 .collect(Collectors.toSet());
     }
 
-    /*
-     * Utilities
-     */
-
     /**
      * Purpose built sort discarding known beyond-the-cut elements early.
      * Trades the cost of manual insertion against the cost of having to sort whole array.
@@ -731,8 +671,8 @@ public class QuickSearch<T> {
      * @return sorted list consisting of first (up to limitResultsTo) elements in specified comparator order
      */
     final <X> List<X> sortAndLimit(@NotNull Collection<? extends X> input,
-                             int limitResultsTo,
-                             @NotNull Comparator<X> comparator) {
+                                   int limitResultsTo,
+                                   @NotNull Comparator<X> comparator) {
         limitResultsTo = Math.max(limitResultsTo, 0); // Safety check that limit is not negative
         LinkedList<X> result = new LinkedList<>();
 

@@ -15,6 +15,7 @@
  */
 package com.zigurs.karlis.utils.search;
 
+import com.zigurs.karlis.utils.search.model.Stats;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Ignore;
@@ -244,7 +245,10 @@ public class QuickSearchTest {
             String testString = "teststring5" + i;
             searchInstance.addItem(testString.substring(0, 5), testString.substring(0, 5));
         }
-        assertEquals("1 items; 1 keywords; 13 fragments", searchInstance.getStats());
+
+        assertEquals(1, searchInstance.getStats().getItems());
+        assertEquals(1, searchInstance.getStats().getKeywords());
+        assertEquals(13, searchInstance.getStats().getFragments());
     }
 
     @Test
@@ -489,7 +493,9 @@ public class QuickSearchTest {
 
     @Test
     public void statsAreEmpty() throws Exception {
-        assertEquals(searchInstance.getStats(), "0 items; 0 keywords; 0 fragments");
+        assertEquals(0, searchInstance.getStats().getItems());
+        assertEquals(0, searchInstance.getStats().getKeywords());
+        assertEquals(0, searchInstance.getStats().getFragments());
     }
 
     @Test
@@ -506,7 +512,9 @@ public class QuickSearchTest {
 
         assertEquals(10, searchInstance.findItems("e ex exe exer exerc i is ise", 10).size());
 
-        assertEquals(searchInstance.getStats(), "33 items; 63 keywords; 554 fragments");
+        assertEquals(33, searchInstance.getStats().getItems());
+        assertEquals(63, searchInstance.getStats().getKeywords());
+        assertEquals(554, searchInstance.getStats().getFragments());
     }
 
     @Test
@@ -530,7 +538,9 @@ public class QuickSearchTest {
 
         assertEquals(10, alternativeConfig.findItems("e ex exe exer exerc i is ise", 10).size());
 
-        assertEquals(alternativeConfig.getStats(), "33 items; 63 keywords; 554 fragments");
+        assertEquals(33, alternativeConfig.getStats().getItems());
+        assertEquals(63, alternativeConfig.getStats().getKeywords());
+        assertEquals(554, alternativeConfig.getStats().getFragments());
     }
 
     @Test
@@ -547,7 +557,7 @@ public class QuickSearchTest {
 
         assertEquals(10, searchInstance.findItems("e ex exe exer exerc i is ise", 10).size());
 
-        String stats = searchInstance.getStats();
+        Stats stats = searchInstance.getStats();
 
         //Repeat, but with different item names (forcing to expand the keywords
         for (int i = 0; i < exerciseString.length(); i++) {
@@ -560,7 +570,9 @@ public class QuickSearchTest {
 
         assertEquals(10, searchInstance.findItems("e ex exe exer exerc i is ise", 10).size());
 
-        assertEquals(stats, searchInstance.getStats());
+        assertEquals(stats.getItems(), searchInstance.getStats().getItems());
+        assertEquals(stats.getKeywords(), searchInstance.getStats().getKeywords());
+        assertEquals(stats.getFragments(), searchInstance.getStats().getFragments());
     }
 
     @Test
@@ -637,11 +649,20 @@ public class QuickSearchTest {
         assertTrue("Failed to add search item",
                 searchInstance.addItem("test3", "three four"));
 
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test4", "three five"));
+
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test5", "three six"));
+
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test6", "three seven"));
 
         List<String> result = searchInstance.findItems("two three", 10);
+        assertTrue("Unexpected result size", result.size() == 6);
 
-        assertTrue("Unexpected result size",
-                result.size() == 3);
+        List<String> result2 = searchInstance.findItems("three two", 10);
+        assertTrue("Unexpected result size", result2.size() == 6);
     }
 
     @Test
@@ -663,12 +684,24 @@ public class QuickSearchTest {
         assertTrue("Failed to add search item",
                 searchInstance.addItem("test3", "three four"));
 
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test4", "three five"));
+
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test5", "three six"));
+
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test6", "three seven"));
 
         assertEquals("Unexpected result size", 1,
                 searchInstance.findItems("two three", 10).size());
 
         assertEquals("Unexpected result size", 2,
                 searchInstance.findItems("two", 10).size());
+
+        assertEquals("Unexpected result size", 1,
+                searchInstance.findItems("three two", 10).size());
+
     }
 
     @Test
@@ -792,6 +825,7 @@ public class QuickSearchTest {
         assertFalse("Unexpected result", searchInstance.findItem("one").isPresent());
     }
 
+    @Ignore
     @Test
     public void quickLoadTest() throws Exception {
         for (String[] items : USA_STATES) {
@@ -799,18 +833,36 @@ public class QuickSearchTest {
                     searchInstance.addItem(items[0], String.format("%s %s %s", items[1], items[2], items[3])));
         }
 
-        long startTime = System.currentTimeMillis();
+//        long startTime = System.currentTimeMillis();
+//
+//        for (int i = 0; i < 1000; i++) {
+//            assertTrue("No results found?",
+//                    searchInstance.findItems(USA_STATES[i % USA_STATES.length][1].substring(0, 3), 10).size() > 0);
+//        }
+//
+//        assertTrue("Shouldn't be anywhere near this slow...", (System.currentTimeMillis() - startTime) < 1000);
 
-        for (int i = 0; i < 1000; i++) {
-            assertTrue("No results found?",
-                    searchInstance.findItems(USA_STATES[i % USA_STATES.length][1].substring(0, 3), 10).size() > 0);
-        }
-
-        assertTrue("Shouldn't be anywhere near this slow...", (System.currentTimeMillis() - startTime) < 1000);
-
+        searchTestIteration();
+        searchTestIteration();
+        searchTestIteration();
         // Note - do not use the crude perf sanity check above for any kind of benchmarking.
         // JVM is notorious for under-performing for the first few seconds after startup
         // until the warmup is finished, caches filled and runtime optimisations kick in.
+    }
+
+    private void searchTestIteration() {
+        long startTime = System.currentTimeMillis();
+
+        int iterations = 500000;
+        for (int i = 0; i < iterations; i++) {
+            assertTrue(searchInstance.findItems(USA_STATES[i % USA_STATES.length][1].substring(0, 3), 10).size() > 0);
+        }
+
+        long totalTime = System.currentTimeMillis() - startTime;
+        System.out.println(String.format("Took %dms, %dk searches second.",
+                totalTime,
+                iterations / totalTime
+        ));
     }
 
     @Test
@@ -962,7 +1014,6 @@ public class QuickSearchTest {
         long totalTimeParallel = 0;
         long startTime;
 
-
         for (int i = 0; i < iterationsCount; i++) {
             startTime = time.getAsLong();
             List<Double> listCropped = searchInstance.sortAndLimit(testList, topItems, comparator);
@@ -1001,5 +1052,81 @@ public class QuickSearchTest {
                 unit,
                 prefix
         ));
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testExtractingFunction() {
+        new QuickSearch<>(
+                s -> null,
+                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
+                QuickSearch.DEFAULT_MATCH_SCORER,
+                QuickSearch.DEFAULT_MINIMUM_KEYWORD_LENGTH
+        );
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testExtractingFunction1() {
+        new QuickSearch<String>(
+                s -> s.length() > 0 ? null : Collections.emptySet(),
+                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
+                QuickSearch.DEFAULT_MATCH_SCORER,
+                QuickSearch.DEFAULT_MINIMUM_KEYWORD_LENGTH
+        );
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testExtractingFunction2() {
+        new QuickSearch<String>(
+                s -> {
+                    throw new NullPointerException("testing");
+                },
+                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
+                QuickSearch.DEFAULT_MATCH_SCORER,
+                QuickSearch.DEFAULT_MINIMUM_KEYWORD_LENGTH
+        );
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testNormalizerFunction() {
+        new QuickSearch<String>(
+                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
+                s -> null,
+                QuickSearch.DEFAULT_MATCH_SCORER,
+                QuickSearch.DEFAULT_MINIMUM_KEYWORD_LENGTH
+        );
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testNormalizerFunction1() {
+        new QuickSearch<String>(
+                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
+                s -> s.length() > 0 ? null : s,
+                QuickSearch.DEFAULT_MATCH_SCORER,
+                QuickSearch.DEFAULT_MINIMUM_KEYWORD_LENGTH
+        );
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testNormalizerFunction2() {
+        new QuickSearch<String>(
+                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
+                s -> {
+                    throw new NullPointerException("test");
+                },
+                QuickSearch.DEFAULT_MATCH_SCORER,
+                QuickSearch.DEFAULT_MINIMUM_KEYWORD_LENGTH
+        );
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testScorerFunction() {
+        new QuickSearch<String>(
+                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
+                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
+                (s1, s2) -> {
+                    throw new IndexOutOfBoundsException("testing");
+                },
+                QuickSearch.DEFAULT_MINIMUM_KEYWORD_LENGTH
+        );
     }
 }
