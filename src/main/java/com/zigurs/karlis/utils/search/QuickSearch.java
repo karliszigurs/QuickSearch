@@ -22,6 +22,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
+import java.util.concurrent.locks.StampedLock;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -82,7 +83,7 @@ import static com.zigurs.karlis.utils.search.QuickSearch.UNMATCHED_POLICY.BACKTR
  * qs.addItem("Hero", "Walt Kowalksi Jake Blues Shaun");<br>
  * System.out.println(qs.findItem("walk")); // finds "Hero"</code>
  * <p>
- * Concurrency - This class is thread safe (public functions are synchronised). Implementation is completely passive
+ * Concurrency - This class is thread safe. Implementation is completely passive
  * and can be deployed horizontally as identical datasets will produce identical search results.
  *
  * @author Karlis Zigurs, 2016
@@ -203,9 +204,11 @@ public class QuickSearch<T> {
 
     private final int minimumKeywordLength;
 
-    private final Map<String, Set<String>> substringToKeywordsMap = new HashMap<>(); // links to
+    private final Map<String, Set<String>> fragmentToKeywordsMap = new HashMap<>(); // links to
     private final Map<String, Set<HashWrapper<T>>> keywordToItemsMap = new HashMap<>();
     private final Map<HashWrapper<T>, Set<String>> itemKeywordsMap = new HashMap<>();
+
+    private final StampedLock lock = new StampedLock();
 
     /*
      * Constructors
@@ -304,8 +307,16 @@ public class QuickSearch<T> {
      * @param keywords Arbitrary list of keywords separated by space, comma, special characters, freeform text...
      * @return True if the item was added, false if no keywords to map against the item were found (therefore item was not added)
      */
-    public synchronized boolean addItem(@Nullable T item, @Nullable String keywords) {
-        return !(item == null || keywords == null) && addItemImpl(new HashWrapper<>(item), prepareKeywords(keywords, true));
+    public boolean addItem(@Nullable T item, @Nullable String keywords) {
+        if (item == null || keywords == null || keywords.isEmpty())
+            return false;
+
+        long writeLock = acquireWriteLock();
+        try {
+            return addItemImpl(new HashWrapper<>(item), prepareKeywords(keywords, true));
+        } finally {
+            releaseWriteLock(writeLock);
+        }
     }
 
     /**
@@ -314,8 +325,16 @@ public class QuickSearch<T> {
      * @param item Item to remove
      * @return True if the item was removed, false if no such item was found
      */
-    public synchronized boolean removeItem(@Nullable T item) {
-        return item != null && removeItemImpl(new HashWrapper<>(item));
+    public boolean removeItem(@Nullable T item) {
+        if (item == null)
+            return false;
+
+        long writeLock = acquireWriteLock();
+        try {
+            return removeItemImpl(new HashWrapper<>(item));
+        } finally {
+            releaseWriteLock(writeLock);
+        }
     }
 
     /**
@@ -325,11 +344,18 @@ public class QuickSearch<T> {
      * @return Optional containing (or not) the top scoring item
      */
     @NotNull
-    public synchronized Optional<T> findItem(@Nullable String searchString) {
+    public Optional<T> findItem(@Nullable String searchString) {
         if (searchString == null || searchString.isEmpty())
             return Optional.empty();
 
-        List<ScoreWrapper<T>> results = findItemsImpl(prepareKeywords(searchString, false), 1);
+        List<ScoreWrapper<T>> results;
+
+        long readLock = acquireReadLock();
+        try {
+            results = findItemsImpl(prepareKeywords(searchString, false), 1);
+        } finally {
+            releaseReadLock(readLock);
+        }
 
         if (results.isEmpty()) {
             return Optional.empty();
@@ -348,17 +374,23 @@ public class QuickSearch<T> {
      * @return List of 0 to numberOfTopItems elements
      */
     @NotNull
-    public synchronized List<T> findItems(@Nullable String searchString, int numberOfTopItems) {
+    public List<T> findItems(@Nullable String searchString, int numberOfTopItems) {
         if (searchString == null || searchString.isEmpty() || numberOfTopItems < 1)
             return Collections.emptyList();
 
-        List<ScoreWrapper<T>> results = findItemsImpl(prepareKeywords(searchString, false), numberOfTopItems);
+        List<ScoreWrapper<T>> results;
+
+        long readLock = acquireReadLock();
+        try {
+            results = findItemsImpl(prepareKeywords(searchString, false), numberOfTopItems);
+        } finally {
+            releaseReadLock(readLock);
+        }
 
         if (results.isEmpty()) {
             return Collections.emptyList();
         } else {
-            return findItemsImpl(prepareKeywords(searchString, false), numberOfTopItems)
-                    .stream()
+            return results.stream()
                     .map(e -> e.unwrap().unwrap())
                     .collect(Collectors.toList());
         }
@@ -369,10 +401,10 @@ public class QuickSearch<T> {
      * wrapped in the augumented response object.
      *
      * @param searchString Raw search string
-     * @return Response Response containing search keywords and possibly a single item.
+     * @return Result containing search keywords and possibly a single item.
      */
     @NotNull
-    public synchronized Result<T> findAugumentedItem(@Nullable String searchString) {
+    public Result<T> findItemWithDetail(@Nullable String searchString) {
         return findAugumentedItems(searchString, 1);
     }
 
@@ -385,32 +417,43 @@ public class QuickSearch<T> {
      * @return Response object containing 0 to n top scoring items and corresponding metadata
      */
     @NotNull
-    public synchronized Result<T> findAugumentedItems(@Nullable String searchString, int numberOfTopItems) {
-        if (searchString == null || searchString.isEmpty()) {
+    public Result<T> findAugumentedItems(@Nullable String searchString, int numberOfTopItems) {
+        if (searchString == null || searchString.isEmpty() || numberOfTopItems < 1) {
             return new Result<>("", Collections.emptyList());
         }
 
-        List<ScoreWrapper<T>> results = findItemsImpl(prepareKeywords(searchString, false), numberOfTopItems);
+        long readLock = acquireReadLock();
+        try {
+            List<ScoreWrapper<T>> results = findItemsImpl(prepareKeywords(searchString, false), numberOfTopItems);
 
-        if (results.isEmpty()) {
-            return new Result<>(searchString, Collections.emptyList());
-        } else {
-            return new Result<>(
-                    searchString,
-                    results.stream()
-                            .map(i -> new Item<>(i.unwrap().unwrap(), itemKeywordsMap.get(i.unwrap()), i.getScore()))
-                            .collect(Collectors.toList())
-            );
+            if (results.isEmpty()) {
+                return new Result<>(searchString, Collections.emptyList());
+            } else {
+                // Could be moved out of locked block if it wasn't for the keywords lookup...
+                return new Result<>(
+                        searchString,
+                        results.stream()
+                                .map(i -> new Item<>(i.unwrap().unwrap(), itemKeywordsMap.get(i.unwrap()), i.getScore()))
+                                .collect(Collectors.toList())
+                );
+            }
+        } finally {
+            releaseReadLock(readLock);
         }
     }
 
     /**
      * Clear the search database.
      */
-    public synchronized void clear() {
-        keywordToItemsMap.clear();
-        substringToKeywordsMap.clear();
-        itemKeywordsMap.clear();
+    public void clear() {
+        long writeLock = acquireWriteLock();
+        try {
+            keywordToItemsMap.clear();
+            fragmentToKeywordsMap.clear();
+            itemKeywordsMap.clear();
+        } finally {
+            releaseWriteLock(writeLock);
+        }
     }
 
     /**
@@ -419,12 +462,51 @@ public class QuickSearch<T> {
      * @return example output: "10 items; 100 keywords; 10000 fragments"
      */
     @NotNull
-    public synchronized Stats getStats() {
-        return new Stats(
-                itemKeywordsMap.size(),
-                keywordToItemsMap.size(),
-                substringToKeywordsMap.size()
-        );
+    public Stats getStats() {
+        Stats stats;
+
+        long readLock = acquireReadLock();
+        try {
+            stats = new Stats(itemKeywordsMap.size(), keywordToItemsMap.size(), fragmentToKeywordsMap.size());
+        } finally {
+            releaseReadLock(readLock);
+        }
+
+        return stats;
+    }
+
+    /*
+     * Lock helpers
+     */
+
+    private long acquireReadLock() {
+        long readLock = lock.tryReadLock();
+
+        /*
+         * Small concurrency magic here. By default stampedlock is very
+         * agressive to attain the lock. Here we make an assumption that
+         * if we are unable to acquire the read lock outright, our best
+         * course of action is to kick thread back in the scheduler pool
+         * and try to acquire it with blocking later (leaving more
+         * resources to the write action in progress).
+         */
+        if (readLock == 0) {
+            Thread.yield();
+            readLock = lock.readLock();
+        }
+        return readLock;
+    }
+
+    private void releaseReadLock(long readLock) {
+        lock.unlockRead(readLock);
+    }
+
+    private long acquireWriteLock() {
+        return lock.writeLock();
+    }
+
+    private void releaseWriteLock(long writeLock) {
+        lock.unlockWrite(writeLock);
     }
 
     /*
@@ -529,7 +611,7 @@ public class QuickSearch<T> {
 
     @NotNull
     private Map<HashWrapper<T>, Double> matchSingleFragment(@NotNull String candidateFragment) {
-        Set<String> candidateKeywords = substringToKeywordsMap.get(candidateFragment);
+        Set<String> candidateKeywords = fragmentToKeywordsMap.get(candidateFragment);
         if (candidateKeywords == null) {
             if (unmatchedPolicy == BACKTRACKING && candidateFragment.length() > 1) {
                 /*
@@ -624,24 +706,24 @@ public class QuickSearch<T> {
     }
 
     private void mapSingleKeywordSubstring(@NotNull String keyword, @NotNull String keywordSubstring) {
-        Set<String> substringKeywordsList = substringToKeywordsMap.get(keywordSubstring);
+        Set<String> substringKeywordsList = fragmentToKeywordsMap.get(keywordSubstring);
 
         if (substringKeywordsList == null) {
             substringKeywordsList = new LinkedHashSet<>();
-            substringToKeywordsMap.put(keywordSubstring, substringKeywordsList);
+            fragmentToKeywordsMap.put(keywordSubstring, substringKeywordsList);
         }
 
         substringKeywordsList.add(keyword);
     }
 
     private void unmapSingleKeywordSubstring(@NotNull String keyword, @NotNull String keywordSubstring) {
-        Set<String> substringKeywordsList = substringToKeywordsMap.get(keywordSubstring);
+        Set<String> substringKeywordsList = fragmentToKeywordsMap.get(keywordSubstring);
 
         if (substringKeywordsList != null) {
             substringKeywordsList.remove(keyword);
 
             if (substringKeywordsList.isEmpty()) {
-                substringToKeywordsMap.remove(keywordSubstring);
+                fragmentToKeywordsMap.remove(keywordSubstring);
             }
         }
     }
