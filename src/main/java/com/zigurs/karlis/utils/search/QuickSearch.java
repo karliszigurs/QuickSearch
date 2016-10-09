@@ -401,11 +401,33 @@ public class QuickSearch<T> {
      * wrapped in the augumented response object.
      *
      * @param searchString Raw search string
-     * @return Result containing search keywords and possibly a single item.
+     * @return Possibly empty Optional wrapping item, keywords and score
      */
     @NotNull
-    public Result<T> findItemWithDetail(@Nullable String searchString) {
-        return findAugumentedItems(searchString, 1);
+    public Optional<Item<T>> findItemWithDetail(@Nullable String searchString) {
+        if (searchString == null || searchString.isEmpty()) {
+            return Optional.empty();
+        }
+
+        long readLock = acquireReadLock();
+        try {
+            List<ScoreWrapper<T>> results = findItemsImpl(prepareKeywords(searchString, false), 1);
+
+            if (results.isEmpty()) {
+                return Optional.empty();
+            } else {
+                ScoreWrapper<T> w = results.get(0);
+                return Optional.of(
+                        new Item<>(
+                                w.unwrap().unwrap(),
+                                itemKeywordsMap.get(w.unwrap()),
+                                w.getScore()
+                        )
+                );
+            }
+        } finally {
+            releaseReadLock(readLock);
+        }
     }
 
     /**
@@ -414,10 +436,10 @@ public class QuickSearch<T> {
      *
      * @param searchString     Raw search string, e.g. "new york pizza"
      * @param numberOfTopItems Number of items the result should be limited to
-     * @return Response object containing 0 to n top scoring items and corresponding metadata
+     * @return Result object containing 0 to n top scoring items and corresponding metadata
      */
     @NotNull
-    public Result<T> findAugumentedItems(@Nullable String searchString, int numberOfTopItems) {
+    public Result<T> findItemsWithDetail(@Nullable String searchString, int numberOfTopItems) {
         if (searchString == null || searchString.isEmpty() || numberOfTopItems < 1) {
             return new Result<>("", Collections.emptyList());
         }

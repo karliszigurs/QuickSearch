@@ -22,6 +22,8 @@ import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.*;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.function.LongSupplier;
 import java.util.stream.Collectors;
 
@@ -342,18 +344,9 @@ public class QuickSearchTest {
         assertTrue("Failed to add search item",
                 searchInstance.addItem("test", "one two three"));
 
-        assertEquals(1,
-                searchInstance.findAugumentedItem("one").getResponseItems().size());
+        assertTrue(searchInstance.findItemWithDetail("one").isPresent());
 
-        assertEquals("test",
-                searchInstance.findAugumentedItem("one").getResponseItems().get(0).getItem());
-
-        assertEquals(new HashSet<>(Arrays.asList("one", "two", "three")),
-                searchInstance.findAugumentedItem("one").getResponseItems().get(0).getItemKeywords());
-
-        assertEquals("one",
-                searchInstance.findAugumentedItem("one").getSearchString());
-
+        assertEquals("test", searchInstance.findItemWithDetail("one").get().getItem());
     }
 
     @Test
@@ -361,8 +354,7 @@ public class QuickSearchTest {
         assertTrue("Failed to add search item",
                 searchInstance.addItem("test", "one two three"));
 
-        assertEquals(0,
-                searchInstance.findAugumentedItem(null).getResponseItems().size());
+        assertFalse(searchInstance.findItemWithDetail(null).isPresent());
     }
 
     @Test
@@ -370,8 +362,7 @@ public class QuickSearchTest {
         assertTrue("Failed to add search item",
                 searchInstance.addItem("test", "one two three test"));
 
-        assertEquals(0,
-                searchInstance.findAugumentedItems("test", 0).getResponseItems().size());
+        assertEquals(0, searchInstance.findItemsWithDetail("test", 0).getResponseItems().size());
     }
 
     @Test
@@ -380,7 +371,7 @@ public class QuickSearchTest {
                 searchInstance.addItem("test", "one two three"));
 
         assertEquals(0,
-                searchInstance.findAugumentedItems("search engine", 0).getResponseItems().size());
+                searchInstance.findItemsWithDetail("search engine", 0).getResponseItems().size());
     }
 
     @Test
@@ -410,10 +401,10 @@ public class QuickSearchTest {
         assertTrue("Failed to add search item",
                 searchInstance.addItem("test3", "one three"));
 
-        assertEquals(2.0, searchInstance.findAugumentedItem("two").getResponseItems().get(0).getScore(), 0);
-        assertEquals(4.0, searchInstance.findAugumentedItem("two three").getResponseItems().get(0).getScore(), 0);
-        assertEquals(4.5, searchInstance.findAugumentedItem("two three ecting").getResponseItems().get(0).getScore(), 0);
-        assertEquals(5.5, searchInstance.findAugumentedItem("two three inters").getResponseItems().get(0).getScore(), 0);
+        assertEquals(2.0, searchInstance.findItemWithDetail("two").get().getScore(), 0);
+        assertEquals(4.0, searchInstance.findItemWithDetail("two three").get().getScore(), 0);
+        assertEquals(4.5, searchInstance.findItemWithDetail("two three ecting").get().getScore(), 0);
+        assertEquals(5.5, searchInstance.findItemWithDetail("two three inters").get().getScore(), 0);
     }
 
     @Test
@@ -428,7 +419,7 @@ public class QuickSearchTest {
                 searchInstance.addItem("test3", "one two three"));
 
         assertTrue("Unexpected size",
-                searchInstance.findAugumentedItems("one", 10).getResponseItems().size() == 3);
+                searchInstance.findItemsWithDetail("one", 10).getResponseItems().size() == 3);
     }
 
     @Test
@@ -473,7 +464,7 @@ public class QuickSearchTest {
                 searchInstance.addItem("test3", "one two three"));
 
         assertTrue("Unexpected size",
-                searchInstance.findAugumentedItems("       ", 10).getResponseItems().size() == 0);
+                searchInstance.findItemsWithDetail("       ", 10).getResponseItems().size() == 0);
     }
 
     @Test
@@ -842,18 +833,40 @@ public class QuickSearchTest {
 //
 //        assertTrue("Shouldn't be anywhere near this slow...", (System.currentTimeMillis() - startTime) < 1000);
 
-        searchTestIteration();
-        searchTestIteration();
-        searchTestIteration();
-        // Note - do not use the crude perf sanity check above for any kind of benchmarking.
-        // JVM is notorious for under-performing for the first few seconds after startup
-        // until the warmup is finished, caches filled and runtime optimisations kick in.
+        int threads = 8;
+        int iterationsPerThread = 50000;
+        CountDownLatch latch = new CountDownLatch(threads);
+
+        // Writing thread
+        new Thread(() -> {
+            int i = 0;
+            while (latch.getCount() > 0) {
+                searchInstance.addItem("new item" + i, "few new keywords" + i++);
+                try {
+                    Thread.sleep(1);
+                } catch (InterruptedException e) {
+                }
+            }
+        }).start();
+
+        Long startTime = System.currentTimeMillis();
+
+        // Reading threads
+        for (int i = 0; i < threads; i++) {
+            new Thread(() -> {
+                searchTestIteration(iterationsPerThread);
+                latch.countDown();
+            }).start();
+        }
+
+        latch.await(60, TimeUnit.SECONDS);
+        long totalTime = System.currentTimeMillis() - startTime;
+        System.out.println("Aggregate throughput: " + ((iterationsPerThread / totalTime) * threads) + "k per second");
     }
 
-    private void searchTestIteration() {
+    private void searchTestIteration(final int iterations) {
         long startTime = System.currentTimeMillis();
 
-        int iterations = 500000;
         for (int i = 0; i < iterations; i++) {
             assertTrue(searchInstance.findItems(USA_STATES[i % USA_STATES.length][1].substring(0, 3), 10).size() > 0);
         }
