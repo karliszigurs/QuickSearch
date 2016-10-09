@@ -326,10 +326,16 @@ public class QuickSearch<T> {
      */
     @NotNull
     public synchronized Optional<T> findItem(@Nullable String searchString) {
-        if (searchString == null)
+        if (searchString == null || searchString.isEmpty())
             return Optional.empty();
 
-        return findItems(searchString, 1).stream().findFirst();
+        List<ScoreWrapper<T>> results = findItemsImpl(prepareKeywords(searchString, false), 1);
+
+        if (results.size() == 0) {
+            return Optional.empty();
+        } else {
+            return Optional.of(results.get(0).unwrap().unwrap());
+        }
     }
 
     /**
@@ -343,13 +349,19 @@ public class QuickSearch<T> {
      */
     @NotNull
     public synchronized List<T> findItems(@Nullable String searchString, int numberOfTopItems) {
-        if (searchString == null || numberOfTopItems < 1)
+        if (searchString == null || searchString.isEmpty() || numberOfTopItems < 1)
             return Collections.emptyList();
 
-        return findItemsImpl(prepareKeywords(searchString, false), numberOfTopItems)
-                .stream()
-                .map(e -> e.unwrap().unwrap())
-                .collect(Collectors.toList());
+        List<ScoreWrapper<T>> results = findItemsImpl(prepareKeywords(searchString, false), numberOfTopItems);
+
+        if (results.size() == 0) {
+            return Collections.emptyList();
+        } else {
+            return findItemsImpl(prepareKeywords(searchString, false), numberOfTopItems)
+                    .stream()
+                    .map(e -> e.unwrap().unwrap())
+                    .collect(Collectors.toList());
+        }
     }
 
     /**
@@ -374,16 +386,22 @@ public class QuickSearch<T> {
      */
     @NotNull
     public synchronized Result<T> findAugumentedItems(@Nullable String searchString, int numberOfTopItems) {
-        if (searchString == null) {
-            searchString = "";
+        if (searchString == null || searchString.isEmpty()) {
+            return new Result<>("", Collections.emptyList());
         }
 
-        List<Item<T>> results = findItemsImpl(prepareKeywords(searchString, false), numberOfTopItems)
-                .stream()
-                .map(i -> new Item<>(i.unwrap().unwrap(), itemKeywordsMap.get(i.unwrap()), i.getScore()))
-                .collect(Collectors.toList());
+        List<ScoreWrapper<T>> results = findItemsImpl(prepareKeywords(searchString, false), numberOfTopItems);
 
-        return new Result<>(searchString, results);
+        if (results.size() == 0) {
+            return new Result<>(searchString, Collections.emptyList());
+        } else {
+            return new Result<>(
+                    searchString,
+                    results.stream()
+                            .map(i -> new Item<>(i.unwrap().unwrap(), itemKeywordsMap.get(i.unwrap()), i.getScore()))
+                            .collect(Collectors.toList())
+            );
+        }
     }
 
     /**
