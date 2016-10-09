@@ -23,6 +23,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 import java.util.concurrent.locks.StampedLock;
+import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -670,13 +671,13 @@ public class QuickSearch<T> {
 
     private boolean addItemImpl(@NotNull HashWrapper<T> item, @NotNull Set<String> suppliedKeywords) {
         if (suppliedKeywords.isEmpty()) {
-            return false; // No valid item or keywords found, skip adding
+            return false; // No valid keywords found, skip adding
         }
 
         // Populate search maps
         for (String keyword : suppliedKeywords) {
             addItemToKeywordItemsList(item, keyword);
-            mapKeywordSubstrings(keyword);
+            forAllPossibleSubstrings(keyword, this::mapSingleKeywordSubstring);
         }
 
         // Keep track of all the various keywords item has been assigned with (needed for item removal)
@@ -698,77 +699,73 @@ public class QuickSearch<T> {
             return false;
 
         //  all known keywords for the item
-        Set<String> knownKeywords = itemKeywordsMap.get(item);
+        Set<String> itemKeywords = itemKeywordsMap.get(item);
 
-        // remove search term mappings
-        for (String keyword : knownKeywords) {
-            unmapKeywordSubstrings(keyword);
-            removeItemFromKeywordItemsList(item, keyword);
-        }
+        /*
+         * Only unmap the substrings if the keyword is no longer in use after
+         * removing this associated item.
+         */
+        itemKeywords.stream()
+                .filter(keyword -> removeItemFromKeywordItemsList(item, keyword))
+                .forEach(keyword -> forAllPossibleSubstrings(keyword, this::unmapSingleKeywordSubstring));
 
         // forget about the item
         itemKeywordsMap.remove(item);
         return true;
     }
 
-    private void mapKeywordSubstrings(@NotNull String keyword) {
+    private void forAllPossibleSubstrings(@NotNull String keyword, @NotNull BiConsumer<String, String> function) {
         for (int i = 0; i < keyword.length(); i++) {
             for (int y = i + 1; y <= keyword.length(); y++) {
-                mapSingleKeywordSubstring(keyword, keyword.substring(i, y));
-            }
-        }
-    }
-
-    private void unmapKeywordSubstrings(@NotNull String keyword) {
-        for (int i = 0; i < keyword.length(); i++) {
-            for (int y = i + 1; y <= keyword.length(); y++) {
-                unmapSingleKeywordSubstring(keyword, keyword.substring(i, y));
+                function.accept(keyword, keyword.substring(i, y));
             }
         }
     }
 
     private void mapSingleKeywordSubstring(@NotNull String keyword, @NotNull String keywordSubstring) {
-        Set<String> substringKeywordsList = fragmentToKeywordsMap.get(keywordSubstring);
+        Set<String> fragmentKeywordsSet = fragmentToKeywordsMap.get(keywordSubstring);
 
-        if (substringKeywordsList == null) {
-            substringKeywordsList = new LinkedHashSet<>();
-            fragmentToKeywordsMap.put(keywordSubstring, substringKeywordsList);
+        if (fragmentKeywordsSet == null) {
+            fragmentKeywordsSet = new LinkedHashSet<>();
+            fragmentToKeywordsMap.put(keywordSubstring, fragmentKeywordsSet);
         }
 
-        substringKeywordsList.add(keyword);
+        fragmentKeywordsSet.add(keyword);
     }
 
     private void unmapSingleKeywordSubstring(@NotNull String keyword, @NotNull String keywordSubstring) {
-        Set<String> substringKeywordsList = fragmentToKeywordsMap.get(keywordSubstring);
+        Set<String> fragmentKeywordsSet = fragmentToKeywordsMap.get(keywordSubstring);
 
-        if (substringKeywordsList != null) {
-            substringKeywordsList.remove(keyword);
+        if (fragmentKeywordsSet != null) {
+            fragmentKeywordsSet.remove(keyword);
 
-            if (substringKeywordsList.isEmpty()) {
+            if (fragmentKeywordsSet.isEmpty()) {
                 fragmentToKeywordsMap.remove(keywordSubstring);
             }
         }
     }
 
     private void addItemToKeywordItemsList(@NotNull HashWrapper<T> item, @NotNull String keyword) {
-        Set<HashWrapper<T>> keywordItems = keywordToItemsMap.get(keyword);
+        Set<HashWrapper<T>> keywordItemsSet = keywordToItemsMap.get(keyword);
 
-        if (keywordItems == null) {
-            keywordItems = new LinkedHashSet<>();
-            keywordToItemsMap.put(keyword, keywordItems);
+        if (keywordItemsSet == null) {
+            keywordItemsSet = new LinkedHashSet<>();
+            keywordToItemsMap.put(keyword, keywordItemsSet);
         }
 
-        keywordItems.add(item);
+        keywordItemsSet.add(item);
     }
 
-    private void removeItemFromKeywordItemsList(@NotNull HashWrapper<T> item, @NotNull String keyword) {
-        Set<HashWrapper<T>> keywordItems = keywordToItemsMap.get(keyword);
+    private boolean removeItemFromKeywordItemsList(@NotNull HashWrapper<T> item, @NotNull String keyword) {
+        Set<HashWrapper<T>> keywordItemsSet = keywordToItemsMap.get(keyword);
 
-        keywordItems.remove(item);
+        keywordItemsSet.remove(item);
 
-        if (keywordItems.isEmpty()) {
+        if (keywordItemsSet.isEmpty()) {
             keywordToItemsMap.remove(keyword);
+            return true;
         }
+        return false;
     }
 
     @NotNull
