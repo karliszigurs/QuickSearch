@@ -24,6 +24,7 @@ import org.junit.Test;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongSupplier;
 import java.util.stream.Collectors;
 
@@ -833,17 +834,27 @@ public class QuickSearchTest {
 //
 //        assertTrue("Shouldn't be anywhere near this slow...", (System.currentTimeMillis() - startTime) < 1000);
 
-        int threads = 8;
-        int iterationsPerThread = 50000;
+        // Warmup
+        multiThreadedIteration();
+
+        // Warmed up
+        multiThreadedIteration();
+    }
+
+    private void multiThreadedIteration() throws InterruptedException {
+        int threads = 4;
+        int iterationsPerThread = 1000000;
         CountDownLatch latch = new CountDownLatch(threads);
+        AtomicLong wrote = new AtomicLong(0L);
 
         // Writing thread
         new Thread(() -> {
             int i = 0;
             while (latch.getCount() > 0) {
                 searchInstance.addItem("new item" + i, "few new keywords" + i++);
+                wrote.incrementAndGet();
                 try {
-                    Thread.sleep(1);
+                    Thread.sleep(50);
                 } catch (InterruptedException e) {
                 }
             }
@@ -853,15 +864,17 @@ public class QuickSearchTest {
 
         // Reading threads
         for (int i = 0; i < threads; i++) {
-            new Thread(() -> {
+            Thread t = new Thread(() -> {
                 searchTestIteration(iterationsPerThread);
                 latch.countDown();
-            }).start();
+            });
+            t.setPriority(Thread.MAX_PRIORITY);
+            t.start();
         }
 
         latch.await(60, TimeUnit.SECONDS);
         long totalTime = System.currentTimeMillis() - startTime;
-        System.out.println("Aggregate throughput: " + ((iterationsPerThread / totalTime) * threads) + "k per second");
+        System.out.println("Aggregate throughput: " + ((iterationsPerThread / totalTime) * threads) + "k per second, " + wrote.get() + " writes");
     }
 
     private void searchTestIteration(final int iterations) {
@@ -873,6 +886,58 @@ public class QuickSearchTest {
 
         long totalTime = System.currentTimeMillis() - startTime;
         System.out.println(String.format("Took %dms, %dk searches second.",
+                totalTime,
+                iterations / totalTime
+        ));
+    }
+
+
+    @Ignore
+    @Test
+    public void quickOpsTest() throws Exception {
+        for (String[] items : USA_STATES) {
+            assertTrue("Failed to add item",
+                    searchInstance.addItem(items[0], String.format("%s %s %s", items[1], items[2], items[3])));
+        }
+
+        // Warmup
+        multiThreadedOpsIteration();
+
+        // Warmed up
+        multiThreadedOpsIteration();
+    }
+
+    private void multiThreadedOpsIteration() throws InterruptedException {
+        int threads = 1;
+        int iterationsPerThread = 100000;
+        CountDownLatch latch = new CountDownLatch(threads);
+
+        // ops threads
+        Long startTime = System.currentTimeMillis();
+        for (int i = 0; i < threads; i++) {
+            Thread t = new Thread(() -> {
+                opsTestIteration(iterationsPerThread);
+                latch.countDown();
+            });
+            t.setPriority(Thread.MAX_PRIORITY);
+            t.start();
+        }
+
+        latch.await(60, TimeUnit.SECONDS);
+        long totalTime = System.currentTimeMillis() - startTime;
+        System.out.println("Aggregate throughput: " + ((iterationsPerThread / totalTime) * threads) + "k ops per second");
+    }
+
+    private void opsTestIteration(final int iterations) {
+        long startTime = System.currentTimeMillis();
+
+        for (int i = 0; i < iterations; i++) {
+            assertTrue(searchInstance.addItem(USA_STATES[i % USA_STATES.length][1].substring(0, 3), USA_STATES[i % USA_STATES.length][0] + " " + USA_STATES[i % USA_STATES.length][2]));
+            searchInstance.removeItem(USA_STATES[i % USA_STATES.length][1].substring(0, 3));
+        }
+
+        long totalTime = System.currentTimeMillis() - startTime;
+        System.out.println(String.format("Took %dms, %dk ops second.",
                 totalTime,
                 iterations / totalTime
         ));

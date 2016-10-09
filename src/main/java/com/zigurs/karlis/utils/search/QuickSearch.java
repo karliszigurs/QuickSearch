@@ -26,6 +26,7 @@ import java.util.concurrent.locks.StampedLock;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import static com.zigurs.karlis.utils.search.QuickSearch.CANDIDATE_ACCUMULATION_POLICY.UNION;
@@ -312,11 +313,11 @@ public class QuickSearch<T> {
         if (item == null || keywords == null || keywords.isEmpty())
             return false;
 
-        long writeLock = acquireWriteLock();
+        long writeLock = lock.writeLock();
         try {
             return addItemImpl(new HashWrapper<>(item), prepareKeywords(keywords, true));
         } finally {
-            releaseWriteLock(writeLock);
+            lock.unlockWrite(writeLock);
         }
     }
 
@@ -330,11 +331,11 @@ public class QuickSearch<T> {
         if (item == null)
             return false;
 
-        long writeLock = acquireWriteLock();
+        long writeLock = lock.writeLock();
         try {
             return removeItemImpl(new HashWrapper<>(item));
         } finally {
-            releaseWriteLock(writeLock);
+            lock.unlockWrite(writeLock);
         }
     }
 
@@ -351,11 +352,11 @@ public class QuickSearch<T> {
 
         List<ScoreWrapper<T>> results;
 
-        long readLock = acquireReadLock();
+        long readLock = lock.readLock();
         try {
             results = findItemsImpl(prepareKeywords(searchString, false), 1);
         } finally {
-            releaseReadLock(readLock);
+            lock.unlockRead(readLock);
         }
 
         if (results.isEmpty()) {
@@ -381,11 +382,11 @@ public class QuickSearch<T> {
 
         List<ScoreWrapper<T>> results;
 
-        long readLock = acquireReadLock();
+        long readLock = lock.readLock();
         try {
             results = findItemsImpl(prepareKeywords(searchString, false), numberOfTopItems);
         } finally {
-            releaseReadLock(readLock);
+            lock.unlockRead(readLock);
         }
 
         if (results.isEmpty()) {
@@ -410,7 +411,7 @@ public class QuickSearch<T> {
             return Optional.empty();
         }
 
-        long readLock = acquireReadLock();
+        long readLock = lock.readLock();
         try {
             List<ScoreWrapper<T>> results = findItemsImpl(prepareKeywords(searchString, false), 1);
 
@@ -427,7 +428,7 @@ public class QuickSearch<T> {
                 );
             }
         } finally {
-            releaseReadLock(readLock);
+            lock.unlockRead(readLock);
         }
     }
 
@@ -445,7 +446,7 @@ public class QuickSearch<T> {
             return new Result<>("", Collections.emptyList());
         }
 
-        long readLock = acquireReadLock();
+        long readLock = lock.readLock();
         try {
             List<ScoreWrapper<T>> results = findItemsImpl(prepareKeywords(searchString, false), numberOfTopItems);
 
@@ -461,7 +462,7 @@ public class QuickSearch<T> {
                 );
             }
         } finally {
-            releaseReadLock(readLock);
+            lock.unlockRead(readLock);
         }
     }
 
@@ -469,13 +470,13 @@ public class QuickSearch<T> {
      * Clear the search database.
      */
     public void clear() {
-        long writeLock = acquireWriteLock();
+        long writeLock = lock.writeLock();
         try {
             keywordToItemsMap.clear();
             fragmentToKeywordsMap.clear();
             itemKeywordsMap.clear();
         } finally {
-            releaseWriteLock(writeLock);
+            lock.unlockWrite(writeLock);
         }
     }
 
@@ -488,48 +489,14 @@ public class QuickSearch<T> {
     public Stats getStats() {
         Stats stats;
 
-        long readLock = acquireReadLock();
+        long readLock = lock.readLock();
         try {
             stats = new Stats(itemKeywordsMap.size(), keywordToItemsMap.size(), fragmentToKeywordsMap.size());
         } finally {
-            releaseReadLock(readLock);
+            lock.unlockRead(readLock);
         }
 
         return stats;
-    }
-
-    /*
-     * Lock helpers
-     */
-
-    private long acquireReadLock() {
-        long readLock = lock.tryReadLock();
-
-        /*
-         * Small concurrency magic here. By default stampedlock is very
-         * agressive to attain the lock. Here we make an assumption that
-         * if we are unable to acquire the read lock outright, our best
-         * course of action is to kick thread back in the scheduler pool
-         * and try to acquire it with blocking later (leaving more
-         * resources to the write action in progress).
-         */
-        if (readLock == 0) {
-            Thread.yield();
-            readLock = lock.readLock();
-        }
-        return readLock;
-    }
-
-    private void releaseReadLock(long readLock) {
-        lock.unlockRead(readLock);
-    }
-
-    private long acquireWriteLock() {
-        return lock.writeLock();
-    }
-
-    private void releaseWriteLock(long writeLock) {
-        lock.unlockWrite(writeLock);
     }
 
     /*
@@ -674,22 +641,22 @@ public class QuickSearch<T> {
             return false; // No valid keywords found, skip adding
         }
 
-        // Populate search maps
+        // Populate maps
         for (String keyword : suppliedKeywords) {
-            addItemToKeywordItemsList(item, keyword);
-            forAllPossibleSubstrings(keyword, this::mapSingleKeywordSubstring);
+
+            // If it's a previously unknown keyword, populate fragments to keywords map
+            if (!keywordToItemsMap.containsKey(keyword)) {
+                forAllPossibleSubstrings(
+                        keyword,
+                        (kw, substring) -> addToSetInMap(fragmentToKeywordsMap, substring, kw, LinkedHashSet::new)
+                );
+            }
+            // Then populate keyword -> items link
+            addToSetInMap(keywordToItemsMap, keyword, item, LinkedHashSet::new);
+
+            // and then make sure to store known keywords for item (needed on removal)
+            addToSetInMap(itemKeywordsMap, item, keyword, LinkedHashSet::new);
         }
-
-        // Keep track of all the various keywords item has been assigned with (needed for item removal)
-        Set<String> knownKeywords = itemKeywordsMap.get(item);
-
-        if (knownKeywords == null) {
-            knownKeywords = new LinkedHashSet<>();
-            itemKeywordsMap.put(item, knownKeywords);
-        }
-
-        // Add keywords (or add keywords not already known if item already exists)
-        suppliedKeywords.forEach(knownKeywords::add);
 
         return true;
     }
@@ -706,66 +673,52 @@ public class QuickSearch<T> {
          * removing this associated item.
          */
         itemKeywords.stream()
-                .filter(keyword -> removeItemFromKeywordItemsList(item, keyword))
-                .forEach(keyword -> forAllPossibleSubstrings(keyword, this::unmapSingleKeywordSubstring));
+                .filter(keyword -> removeFromSetInMap(keywordToItemsMap, keyword, item)) // if this was final item for keyword proceed to unlink keyword too
+                .forEach(keyword -> forAllPossibleSubstrings(keyword, (kw, fragment) -> removeFromSetInMap(fragmentToKeywordsMap, fragment, kw)));
 
         // forget about the item
         itemKeywordsMap.remove(item);
         return true;
     }
 
+    private <K, V, X extends V> void addToSetInMap(@NotNull Map<K, Set<V>> map,
+                                                   @NotNull K key,
+                                                   @NotNull X value,
+                                                   @NotNull Supplier<Set<V>> supplier) {
+        Set<V> set = map.get(key);
+
+        if (set == null) {
+            set = supplier.get();
+            map.put(key, set);
+        }
+
+        set.add(value);
+    }
+
+    private <K, V, X extends V> boolean removeFromSetInMap(@NotNull Map<K, Set<V>> map,
+                                                           @NotNull K key,
+                                                           @NotNull X value) {
+        Set<V> set = map.get(key);
+
+        assert set != null;
+        set.remove(value);
+
+        if (set.isEmpty()) {
+            map.remove(key);
+            return true; //was last item
+        }
+
+        return false; // still items remaining
+    }
+
     private void forAllPossibleSubstrings(@NotNull String keyword, @NotNull BiConsumer<String, String> function) {
+        Set<String> uniques = new LinkedHashSet<>();
         for (int i = 0; i < keyword.length(); i++) {
             for (int y = i + 1; y <= keyword.length(); y++) {
-                function.accept(keyword, keyword.substring(i, y));
+                uniques.add(keyword.substring(i, y));
             }
         }
-    }
-
-    private void mapSingleKeywordSubstring(@NotNull String keyword, @NotNull String keywordSubstring) {
-        Set<String> fragmentKeywordsSet = fragmentToKeywordsMap.get(keywordSubstring);
-
-        if (fragmentKeywordsSet == null) {
-            fragmentKeywordsSet = new LinkedHashSet<>();
-            fragmentToKeywordsMap.put(keywordSubstring, fragmentKeywordsSet);
-        }
-
-        fragmentKeywordsSet.add(keyword);
-    }
-
-    private void unmapSingleKeywordSubstring(@NotNull String keyword, @NotNull String keywordSubstring) {
-        Set<String> fragmentKeywordsSet = fragmentToKeywordsMap.get(keywordSubstring);
-
-        if (fragmentKeywordsSet != null) {
-            fragmentKeywordsSet.remove(keyword);
-
-            if (fragmentKeywordsSet.isEmpty()) {
-                fragmentToKeywordsMap.remove(keywordSubstring);
-            }
-        }
-    }
-
-    private void addItemToKeywordItemsList(@NotNull HashWrapper<T> item, @NotNull String keyword) {
-        Set<HashWrapper<T>> keywordItemsSet = keywordToItemsMap.get(keyword);
-
-        if (keywordItemsSet == null) {
-            keywordItemsSet = new LinkedHashSet<>();
-            keywordToItemsMap.put(keyword, keywordItemsSet);
-        }
-
-        keywordItemsSet.add(item);
-    }
-
-    private boolean removeItemFromKeywordItemsList(@NotNull HashWrapper<T> item, @NotNull String keyword) {
-        Set<HashWrapper<T>> keywordItemsSet = keywordToItemsMap.get(keyword);
-
-        keywordItemsSet.remove(item);
-
-        if (keywordItemsSet.isEmpty()) {
-            keywordToItemsMap.remove(keyword);
-            return true;
-        }
-        return false;
+        uniques.forEach(substring -> function.accept(keyword, substring));
     }
 
     @NotNull
@@ -774,7 +727,7 @@ public class QuickSearch<T> {
                 .filter(kw -> !kw.isEmpty())
                 .map(keywordNormalizer)
                 .filter(s -> !filterShortKeywords || s.length() >= minimumKeywordLength)
-                .collect(Collectors.toSet());
+                .collect(Collectors.toSet()); // implies distinct
     }
 
     /**
