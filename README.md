@@ -2,8 +2,8 @@
 
 Simple and lightweight in-memory search library for Java 8 web and desktop applications. Single 20KB jar. 100% test coverage.
 
-QuickSearch provides near-instant incremental search over arbitrary items and keywords preloaded in-memory.
-This is achieved by adding items to search index and pre-calculating corresponding matching keywords and their
+QuickSearch provides pretty instant incremental search over arbitrary items and their keywords.
+This is achieved by adding items and pre-calculating corresponding matching keywords and their
 fragments that are then matched against users input during search.
 
 It is well suited for small to medium datasets (e.g. up to a few tens of thousands items) that can fit into memory, e.g.
@@ -16,12 +16,22 @@ It is well suited for small to medium datasets (e.g. up to a few tens of thousan
 
 ## Performance and footprint
 
-Circa 500k - 1 million searches per second on a commodity server. Search request processing times
+Circa 500k - 1 million lookups per second on a commodity server. Search request processing times
 in single digit microsecond range. Less than 50MB of heap required for 100'000 unique items. Thread safe.
 
 ## Demo
 
-Live demo to play around with is available at http://zigurs.com/quicksearch.html.
+Live demo available at http://zigurs.com/quicksearch.html (instance of https://github.com/karliszigurs/QuickSearchServer).
+
+## Include it in your project
+
+```Maven
+<dependency>
+    <groupId>com.zigurs.karlis.utils.search</groupId>
+    <artifactId>quicksearch</artifactId>
+    <version>LATEST</version>
+</dependency>
+```
 
 ## Use example
 
@@ -49,7 +59,7 @@ quickSearchInstance.clear();
 
 ## Caveats
 
-As all internal data structures are pre-calculated and reside in memory the following should be taken into account:
+All internal data structures are pre-calculated and reside in memory. Following considerations apply:
 
   * Searchable items should be relatively lightweight as they will be long lived.
     If you want to search over heavyweight items (e.g. pictures or ORM) it is best
@@ -62,7 +72,7 @@ As all internal data structures are pre-calculated and reside in memory the foll
 ## Future features
 
   * [ ] .js version
-  * [ ] web service and quick search API
+  * [X] web service and quick search API (https://github.com/karliszigurs/QuickSearchServer)
   * [ ] fuzzy text matching
 
 ## Credits
