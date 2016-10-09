@@ -331,7 +331,7 @@ public class QuickSearch<T> {
 
         List<ScoreWrapper<T>> results = findItemsImpl(prepareKeywords(searchString, false), 1);
 
-        if (results.size() == 0) {
+        if (results.isEmpty()) {
             return Optional.empty();
         } else {
             return Optional.of(results.get(0).unwrap().unwrap());
@@ -354,7 +354,7 @@ public class QuickSearch<T> {
 
         List<ScoreWrapper<T>> results = findItemsImpl(prepareKeywords(searchString, false), numberOfTopItems);
 
-        if (results.size() == 0) {
+        if (results.isEmpty()) {
             return Collections.emptyList();
         } else {
             return findItemsImpl(prepareKeywords(searchString, false), numberOfTopItems)
@@ -392,7 +392,7 @@ public class QuickSearch<T> {
 
         List<ScoreWrapper<T>> results = findItemsImpl(prepareKeywords(searchString, false), numberOfTopItems);
 
-        if (results.size() == 0) {
+        if (results.isEmpty()) {
             return new Result<>(searchString, Collections.emptyList());
         } else {
             return new Result<>(
@@ -487,6 +487,7 @@ public class QuickSearch<T> {
 
         for (String suppliedFragment : suppliedFragments) {
             Map<HashWrapper<T>, Double> fragmentItems = matchSingleFragment(suppliedFragment);
+            if (fragmentItems.isEmpty()) return fragmentItems; // Can fail early
 
             if (firstFragment) {
                 accumulatedItems = fragmentItems;
@@ -515,7 +516,7 @@ public class QuickSearch<T> {
              * If we end up with no items while iterating we may
              * as well break as no new results will be permitted through.
              */
-            if (accumulatedItems.size() == 0)
+            if (accumulatedItems.isEmpty())
                 return accumulatedItems;
         }
 
@@ -564,7 +565,7 @@ public class QuickSearch<T> {
     }
 
     private boolean addItemImpl(@NotNull HashWrapper<T> item, @NotNull Set<String> suppliedKeywords) {
-        if (suppliedKeywords.size() == 0) {
+        if (suppliedKeywords.isEmpty()) {
             return false; // No valid item or keywords found, skip adding
         }
 
@@ -639,7 +640,7 @@ public class QuickSearch<T> {
         if (substringKeywordsList != null) {
             substringKeywordsList.remove(keyword);
 
-            if (substringKeywordsList.size() == 0) {
+            if (substringKeywordsList.isEmpty()) {
                 substringToKeywordsMap.remove(keywordSubstring);
             }
         }
@@ -661,7 +662,7 @@ public class QuickSearch<T> {
 
         keywordItems.remove(item);
 
-        if (keywordItems.size() == 0) {
+        if (keywordItems.isEmpty()) {
             keywordToItemsMap.remove(keyword);
         }
     }
