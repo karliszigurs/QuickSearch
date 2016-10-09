@@ -185,17 +185,17 @@ public class QuickSearch<T> {
      * Default for minimum keyword length. Any keywords shorter than this will be ignored internally.
      */
     public static final int DEFAULT_MINIMUM_KEYWORD_LENGTH = 2;
+
+    /*
+     * Instance properties
+     */
+
     @NotNull
     private final BiFunction<String, String, Double> keywordMatchScorer;
     @NotNull
     private final Function<String, String> keywordNormalizer;
     @NotNull
     private final Function<String, Set<String>> keywordsExtractor;
-
-    /*
-     * Variables
-     */
-
     @NotNull
     private final UNMATCHED_POLICY unmatchedPolicy;
     @NotNull
@@ -203,8 +203,8 @@ public class QuickSearch<T> {
 
     private final int minimumKeywordLength;
 
-    private final Map<String, Set<String>> substringsToKeywordsMap = new HashMap<>(); // links to
-    private final Map<String, Set<HashWrapper<T>>> keywordsToItemsMap = new HashMap<>(); // links to
+    private final Map<String, Set<String>> substringToKeywordsMap = new HashMap<>(); // links to
+    private final Map<String, Set<HashWrapper<T>>> keywordToItemsMap = new HashMap<>();
     private final Map<HashWrapper<T>, Set<String>> itemKeywordsMap = new HashMap<>();
 
     /*
@@ -390,8 +390,8 @@ public class QuickSearch<T> {
      * Clear the search database.
      */
     public synchronized void clear() {
-        keywordsToItemsMap.clear();
-        substringsToKeywordsMap.clear();
+        keywordToItemsMap.clear();
+        substringToKeywordsMap.clear();
         itemKeywordsMap.clear();
     }
 
@@ -404,8 +404,8 @@ public class QuickSearch<T> {
     public synchronized Stats getStats() {
         return new Stats(
                 itemKeywordsMap.size(),
-                keywordsToItemsMap.size(),
-                substringsToKeywordsMap.size()
+                keywordToItemsMap.size(),
+                substringToKeywordsMap.size()
         );
     }
 
@@ -454,8 +454,7 @@ public class QuickSearch<T> {
 
         for (String suppliedFragment : suppliedFragments) {
             matchSingleFragment(suppliedFragment).forEach((k, v) -> {
-                Double prevVal = accumulatedItems.get(k);
-                accumulatedItems.put(k, prevVal != null ? v + prevVal : v);
+                accumulatedItems.merge(k, v, (d1, d2) -> d1 + d2);
             });
         }
 
@@ -464,7 +463,7 @@ public class QuickSearch<T> {
 
     @NotNull
     private Map<HashWrapper<T>, Double> findAndScoreIntersectionImpl(@NotNull Set<String> suppliedFragments) {
-        Map<HashWrapper<T>, Double> accumulatedItems = new LinkedHashMap<>();
+        Map<HashWrapper<T>, Double> accumulatedItems = null;
 
         boolean firstFragment = true;
 
@@ -472,9 +471,10 @@ public class QuickSearch<T> {
             Map<HashWrapper<T>, Double> fragmentItems = matchSingleFragment(suppliedFragment);
 
             if (firstFragment) {
-                accumulatedItems.putAll(fragmentItems);
+                accumulatedItems = fragmentItems;
                 firstFragment = false;
             } else {
+                // Intersect using smaller of the maps (known so far or current iteration) as the base
                 Map<HashWrapper<T>, Double> smallerMap = (accumulatedItems.size() > fragmentItems.size()) ? fragmentItems : accumulatedItems;
                 Map<HashWrapper<T>, Double> largerMap = (smallerMap == accumulatedItems) ? fragmentItems : accumulatedItems;
 
@@ -492,22 +492,25 @@ public class QuickSearch<T> {
                                         LinkedHashMap::new
                                 )
                         );
-
-                /*
-                 * If we end up with no items in second or latter iterations we may as well break
-                 * as no new results will be permitted through.
-                 */
-                if (accumulatedItems.size() == 0)
-                    break;
             }
+            /*
+             * If we end up with no items while iterating we may
+             * as well break as no new results will be permitted through.
+             */
+            if (accumulatedItems.size() == 0)
+                return accumulatedItems;
         }
 
-        return accumulatedItems;
+        if (accumulatedItems == null) {
+            return Collections.emptyMap();
+        } else {
+            return accumulatedItems;
+        }
     }
 
     @NotNull
     private Map<HashWrapper<T>, Double> matchSingleFragment(@NotNull String candidateFragment) {
-        Set<String> candidateKeywords = substringsToKeywordsMap.get(candidateFragment);
+        Set<String> candidateKeywords = substringToKeywordsMap.get(candidateFragment);
         if (candidateKeywords == null) {
             if (unmatchedPolicy == BACKTRACKING && candidateFragment.length() > 1) {
                 /*
@@ -535,11 +538,8 @@ public class QuickSearch<T> {
 
         for (String keyword : candidateKeywords) {
             Double score = keywordMatchScorer.apply(candidateFragment, keyword);
-
-            keywordsToItemsMap.get(keyword).forEach(i -> {
-                Double prevScore = fragmentItems.get(i);
-                fragmentItems.put(i, prevScore == null ? score : Math.max(prevScore, score));
-            });
+            // Not using Math::max here due to unboxing->compare->boxing scenario.
+            keywordToItemsMap.get(keyword).forEach(i -> fragmentItems.merge(i, score, (d1, d2) -> (d1 > d2) ? d1 : d2));
         }
 
         return fragmentItems;
@@ -560,7 +560,7 @@ public class QuickSearch<T> {
         Set<String> knownKeywords = itemKeywordsMap.get(item);
 
         if (knownKeywords == null) {
-            knownKeywords = new HashSet<>();
+            knownKeywords = new LinkedHashSet<>();
             itemKeywordsMap.put(item, knownKeywords);
         }
 
@@ -605,46 +605,46 @@ public class QuickSearch<T> {
     }
 
     private void mapSingleKeywordSubstring(@NotNull String keyword, @NotNull String keywordSubstring) {
-        Set<String> substringKeywordsList = substringsToKeywordsMap.get(keywordSubstring);
+        Set<String> substringKeywordsList = substringToKeywordsMap.get(keywordSubstring);
 
         if (substringKeywordsList == null) {
             substringKeywordsList = new LinkedHashSet<>();
-            substringsToKeywordsMap.put(keywordSubstring, substringKeywordsList);
+            substringToKeywordsMap.put(keywordSubstring, substringKeywordsList);
         }
 
         substringKeywordsList.add(keyword);
     }
 
     private void unmapSingleKeywordSubstring(@NotNull String keyword, @NotNull String keywordSubstring) {
-        Set<String> substringKeywordsList = substringsToKeywordsMap.get(keywordSubstring);
+        Set<String> substringKeywordsList = substringToKeywordsMap.get(keywordSubstring);
 
         if (substringKeywordsList != null) {
             substringKeywordsList.remove(keyword);
 
             if (substringKeywordsList.size() == 0) {
-                substringsToKeywordsMap.remove(keywordSubstring);
+                substringToKeywordsMap.remove(keywordSubstring);
             }
         }
     }
 
     private void addItemToKeywordItemsList(@NotNull HashWrapper<T> item, @NotNull String keyword) {
-        Set<HashWrapper<T>> keywordItems = keywordsToItemsMap.get(keyword);
+        Set<HashWrapper<T>> keywordItems = keywordToItemsMap.get(keyword);
 
         if (keywordItems == null) {
-            keywordItems = new HashSet<>();
-            keywordsToItemsMap.put(keyword, keywordItems);
+            keywordItems = new LinkedHashSet<>();
+            keywordToItemsMap.put(keyword, keywordItems);
         }
 
         keywordItems.add(item);
     }
 
     private void removeItemFromKeywordItemsList(@NotNull HashWrapper<T> item, @NotNull String keyword) {
-        Set<HashWrapper<T>> keywordItems = keywordsToItemsMap.get(keyword);
+        Set<HashWrapper<T>> keywordItems = keywordToItemsMap.get(keyword);
 
         keywordItems.remove(item);
 
         if (keywordItems.size() == 0) {
-            keywordsToItemsMap.remove(keyword);
+            keywordToItemsMap.remove(keyword);
         }
     }
 
