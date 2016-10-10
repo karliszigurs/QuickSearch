@@ -332,6 +332,70 @@ public class QuickSearchTest {
     }
 
     @Test
+    public void itemNotFound() throws Exception {
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test", "one two three"));
+
+        assertFalse("Search item not found",
+                searchInstance.findItem("").isPresent());
+    }
+
+    @Test
+    public void itemNotFound1() throws Exception {
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test", "one two three"));
+
+        assertTrue("Search item not found",
+                searchInstance.findItems("", 1).isEmpty());
+    }
+
+    @Test
+    public void itemNotFound2() throws Exception {
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test", "one two three"));
+
+        assertFalse("Search item not found",
+                searchInstance.findItemWithDetail("").isPresent());
+    }
+
+    @Test
+    public void itemNotFound3() throws Exception {
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test", "one two three"));
+
+        assertTrue("Search item not found",
+                searchInstance.findItemsWithDetail("", 1).getResponseItems().isEmpty());
+    }
+
+    @Test
+    public void itemNotFound4() throws Exception {
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test", "one two three"));
+
+        assertTrue("Search item not found",
+                searchInstance.findItemsWithDetail("", 0).getResponseItems().isEmpty());
+    }
+
+    @Test
+    public void itemNotFound5() throws Exception {
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test", "one two three"));
+
+        assertTrue("Search item not found",
+                searchInstance.findItemsWithDetail(null, 1).getResponseItems().isEmpty());
+    }
+
+    @Test
+    public void itemNotFound6() throws Exception {
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test", "one two three"));
+
+        assertFalse("Search item not found",
+                searchInstance.findItemWithDetail("London").isPresent());
+    }
+
+
+    @Test
     public void nullItemNotFound() throws Exception {
         assertTrue("Failed to add search item",
                 searchInstance.addItem("test", "one two three"));
@@ -685,6 +749,9 @@ public class QuickSearchTest {
         assertTrue("Failed to add search item",
                 searchInstance.addItem("test6", "three seven"));
 
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test7", "zebra cat"));
+
         assertEquals("Unexpected result size", 1,
                 searchInstance.findItems("two three", 10).size());
 
@@ -694,6 +761,42 @@ public class QuickSearchTest {
         assertEquals("Unexpected result size", 1,
                 searchInstance.findItems("three two", 10).size());
 
+        assertEquals("Unexpected result size", 0,
+                searchInstance.findItems("three cat two zebra", 10).size());
+
+        System.out.println("---");
+        assertEquals("Unexpected result size", 0,
+                searchInstance.findItems("cat three two", 10).size());
+    }
+
+    @Test
+    public void intersectionWorks1() throws Exception {
+        QuickSearch<String> searchInstance = new QuickSearch<>(
+                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
+                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
+                QuickSearch.DEFAULT_MATCH_SCORER,
+                QuickSearch.DEFAULT_MINIMUM_KEYWORD_LENGTH,
+                BACKTRACKING,
+                INTERSECTION);
+
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test1", "one two"));
+
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test2", "two three"));
+
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test3", "three four"));
+
+        assertTrue("Failed to add search item",
+                searchInstance.addItem("test7", "four cat"));
+
+        assertEquals("Unexpected result size", 0,
+                searchInstance.findItems("cat three", 10).size());
+
+        System.out.println("---");
+        assertEquals("Unexpected result size", 0,
+                searchInstance.findItems("cat three two", 10).size());
     }
 
     @Test
@@ -817,132 +920,6 @@ public class QuickSearchTest {
         assertFalse("Unexpected result", searchInstance.findItem("one").isPresent());
     }
 
-    @Ignore
-    @Test
-    public void quickLoadTest() throws Exception {
-        for (String[] items : USA_STATES) {
-            assertTrue("Failed to add item",
-                    searchInstance.addItem(items[0], String.format("%s %s %s", items[1], items[2], items[3])));
-        }
-
-//        long startTime = System.currentTimeMillis();
-//
-//        for (int i = 0; i < 1000; i++) {
-//            assertTrue("No results found?",
-//                    searchInstance.findItems(USA_STATES[i % USA_STATES.length][1].substring(0, 3), 10).size() > 0);
-//        }
-//
-//        assertTrue("Shouldn't be anywhere near this slow...", (System.currentTimeMillis() - startTime) < 1000);
-
-        // Warmup
-        multiThreadedIteration();
-
-        // Warmed up
-        multiThreadedIteration();
-    }
-
-    private void multiThreadedIteration() throws InterruptedException {
-        int threads = 4;
-        int iterationsPerThread = 1000000;
-        CountDownLatch latch = new CountDownLatch(threads);
-        AtomicLong wrote = new AtomicLong(0L);
-
-        // Writing thread
-        new Thread(() -> {
-            int i = 0;
-            while (latch.getCount() > 0) {
-                searchInstance.addItem("new item" + i, "few new keywords" + i++);
-                wrote.incrementAndGet();
-                try {
-                    Thread.sleep(50);
-                } catch (InterruptedException e) {
-                }
-            }
-        }).start();
-
-        Long startTime = System.currentTimeMillis();
-
-        // Reading threads
-        for (int i = 0; i < threads; i++) {
-            Thread t = new Thread(() -> {
-                searchTestIteration(iterationsPerThread);
-                latch.countDown();
-            });
-            t.setPriority(Thread.MAX_PRIORITY);
-            t.start();
-        }
-
-        latch.await(60, TimeUnit.SECONDS);
-        long totalTime = System.currentTimeMillis() - startTime;
-        System.out.println("Aggregate throughput: " + ((iterationsPerThread / totalTime) * threads) + "k per second, " + wrote.get() + " writes");
-    }
-
-    private void searchTestIteration(final int iterations) {
-        long startTime = System.currentTimeMillis();
-
-        for (int i = 0; i < iterations; i++) {
-            assertTrue(searchInstance.findItems(USA_STATES[i % USA_STATES.length][1].substring(0, 3), 10).size() > 0);
-        }
-
-        long totalTime = System.currentTimeMillis() - startTime;
-        System.out.println(String.format("Took %dms, %dk searches second.",
-                totalTime,
-                iterations / totalTime
-        ));
-    }
-
-
-    @Ignore
-    @Test
-    public void quickOpsTest() throws Exception {
-        for (String[] items : USA_STATES) {
-            assertTrue("Failed to add item",
-                    searchInstance.addItem(items[0], String.format("%s %s %s", items[1], items[2], items[3])));
-        }
-
-        // Warmup
-        multiThreadedOpsIteration();
-
-        // Warmed up
-        multiThreadedOpsIteration();
-    }
-
-    private void multiThreadedOpsIteration() throws InterruptedException {
-        int threads = 1;
-        int iterationsPerThread = 100000;
-        CountDownLatch latch = new CountDownLatch(threads);
-
-        // ops threads
-        Long startTime = System.currentTimeMillis();
-        for (int i = 0; i < threads; i++) {
-            Thread t = new Thread(() -> {
-                opsTestIteration(iterationsPerThread);
-                latch.countDown();
-            });
-            t.setPriority(Thread.MAX_PRIORITY);
-            t.start();
-        }
-
-        latch.await(60, TimeUnit.SECONDS);
-        long totalTime = System.currentTimeMillis() - startTime;
-        System.out.println("Aggregate throughput: " + ((iterationsPerThread / totalTime) * threads) + "k ops per second");
-    }
-
-    private void opsTestIteration(final int iterations) {
-        long startTime = System.currentTimeMillis();
-
-        for (int i = 0; i < iterations; i++) {
-            assertTrue(searchInstance.addItem(USA_STATES[i % USA_STATES.length][1].substring(0, 3), USA_STATES[i % USA_STATES.length][0] + " " + USA_STATES[i % USA_STATES.length][2]));
-            searchInstance.removeItem(USA_STATES[i % USA_STATES.length][1].substring(0, 3));
-        }
-
-        long totalTime = System.currentTimeMillis() - startTime;
-        System.out.println(String.format("Took %dms, %dk ops second.",
-                totalTime,
-                iterations / totalTime
-        ));
-    }
-
     @Test
     public void objectsAsItems() {
         List<StoreItem> items = new LinkedList<>();
@@ -1046,92 +1023,6 @@ public class QuickSearchTest {
         assertEquals(1, list.size());
     }
 
-    @Ignore
-    @Test
-    public void customSortingBenchmark() {
-        /*
-         * Microbenchmarking caveats apply. Make sure the number of iterations is
-         * large enough and JVM is given a chance to warm up and apply the
-         * optimisations on the code exercised.
-         */
-        List<Double> testList = new LinkedList<>();
-
-        int listSize = 100000;
-        for (int i = 0; i < listSize; i++) {
-            testList.add((double) i);
-        }
-
-        Collections.shuffle(testList);
-
-        Map<Double, Double> testMap = new LinkedHashMap<>();
-        testList.forEach(d -> testMap.put(d, d));
-
-        int iterationsCount = 10;
-        int topItems = 10;
-
-        Comparator<Double> comparator = Comparator.reverseOrder();
-        double topResultShouldBe = (double) listSize - 1;
-
-        sortingBenchmark("Warmup: ", testMap.values(), iterationsCount, topItems, comparator, topResultShouldBe);
-        sortingBenchmark("Warmer: ", testMap.values(), iterationsCount, topItems, comparator, topResultShouldBe);
-        sortingBenchmark("Warm:   ", testMap.values(), iterationsCount, topItems, comparator, topResultShouldBe);
-    }
-
-    private void sortingBenchmark(String prefix, Collection<Double> testList, int iterationsCount, int topItems, Comparator<Double> comparator, double topResultShouldBe) {
-        LongSupplier time = System::nanoTime;
-        int timeDivisor = 1000;
-        String unit = "us";
-
-//        LongSupplier time = System::currentTimeMillis;
-//        int timeDivisor = 1;
-//        String unit = "ms";
-
-        long totalTimeCropped = 0;
-        long totalTimeCollections = 0;
-        long totalTimeStreamed = 0;
-        long totalTimeParallel = 0;
-        long startTime;
-
-        for (int i = 0; i < iterationsCount; i++) {
-            startTime = time.getAsLong();
-            List<Double> listCropped = searchInstance.sortAndLimit(testList, topItems, comparator);
-            assertEquals(topResultShouldBe, listCropped.get(0), 0);
-            totalTimeCropped += time.getAsLong() - startTime;
-
-            List<Double> listRepresentation = new LinkedList<>(testList);
-            Collections.shuffle(listRepresentation);
-            startTime = time.getAsLong();
-            Collections.sort(listRepresentation, comparator);
-            assertEquals(topResultShouldBe, listRepresentation.get(0), 0);
-            totalTimeCollections += time.getAsLong() - startTime;
-
-            startTime = time.getAsLong();
-            List<Double> listStreamed = testList.stream()
-                    .sorted(comparator)
-                    .limit(topItems)
-                    .collect(Collectors.toList());
-            assertEquals(topResultShouldBe, listStreamed.get(0), 0);
-            totalTimeStreamed += time.getAsLong() - startTime;
-
-            startTime = time.getAsLong();
-            List<Double> listParallel = testList.parallelStream()
-                    .sorted(comparator)
-                    .limit(topItems)
-                    .collect(Collectors.toList());
-            assertEquals(topResultShouldBe, listParallel.get(0), 0);
-            totalTimeParallel += time.getAsLong() - startTime;
-        }
-
-        System.out.println(String.format("%6$s %1$d%5$s cropped, %2$d%5$s collections, %3$d%5$s streamed, %4$d%5$s parallel on average",
-                (totalTimeCropped / iterationsCount) / timeDivisor,
-                (totalTimeCollections / iterationsCount) / timeDivisor,
-                (totalTimeStreamed / iterationsCount) / timeDivisor,
-                (totalTimeParallel / iterationsCount) / timeDivisor,
-                unit,
-                prefix
-        ));
-    }
-
     @Test(expected = IllegalArgumentException.class)
     public void testExtractingFunction() {
         new QuickSearch<>(
@@ -1206,5 +1097,256 @@ public class QuickSearchTest {
                 },
                 QuickSearch.DEFAULT_MINIMUM_KEYWORD_LENGTH
         );
+    }
+
+    /*
+     * Scaffold tests below.
+     */
+
+    @Ignore
+    @Test
+    public void intersectionBench() throws Exception {
+        QuickSearch<String> searchInstance = new QuickSearch<>(
+                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
+                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
+                QuickSearch.DEFAULT_MATCH_SCORER,
+                QuickSearch.DEFAULT_MINIMUM_KEYWORD_LENGTH,
+                BACKTRACKING,
+                INTERSECTION);
+
+        long st = System.currentTimeMillis();
+        for (int i = 0; i < 3000; i++) {
+            String[] items = USA_STATES[i % USA_STATES.length];
+            assertTrue("Failed to add item",
+                    searchInstance.addItem(items[0] + "-" + i, String.format("%s %s %s %s", items[0], items[1], items[2], items[3])));
+        }
+
+        for (String[] items : USA_STATES) {
+            assertTrue("Failed to add item",
+                    searchInstance.addItem(items[0], String.format("%s %s %s %s", items[0], items[1], items[2], items[3])));
+        }
+        System.out.println("Loaded in " + (System.currentTimeMillis() - st) + "ms");
+
+        int iterations = 5000;
+        long startTime = System.currentTimeMillis();
+        for (int i = 0; i < iterations; i++) {
+//            assertTrue(searchInstance.findItem("a b c d e g h i l m n p r s u v y").isPresent());
+            assertTrue(searchInstance.findItems("w a s", 10).size() > 0);
+        }
+
+        long totalTime = System.currentTimeMillis() - startTime;
+
+        System.out.println(String.format("%f k/sec", (double) iterations / totalTime));
+    }
+
+    @Ignore
+    @Test
+    public void sortBench() {
+        /*
+         * Microbenchmarking caveats apply. Make sure the number of iterations is
+         * large enough and JVM is given a chance to warm up and apply the
+         * optimisations on the code exercised.
+         */
+        List<Double> testList = new LinkedList<>();
+
+        int listSize = 100000;
+        for (int i = 0; i < listSize; i++) {
+            testList.add((double) i);
+        }
+
+        Collections.shuffle(testList);
+
+        Map<Double, Double> testMap = new LinkedHashMap<>();
+        testList.forEach(d -> testMap.put(d, d));
+
+        int iterationsCount = 10;
+        int topItems = 10;
+
+        Comparator<Double> comparator = Comparator.reverseOrder();
+        double topResultShouldBe = (double) listSize - 1;
+
+        sortBench("Warmup: ", testMap.values(), iterationsCount, topItems, comparator, topResultShouldBe);
+        sortBench("Warmer: ", testMap.values(), iterationsCount, topItems, comparator, topResultShouldBe);
+        sortBench("Warm:   ", testMap.values(), iterationsCount, topItems, comparator, topResultShouldBe);
+    }
+
+    private void sortBench(String prefix, Collection<Double> testList, int iterationsCount, int topItems, Comparator<Double> comparator, double topResultShouldBe) {
+        LongSupplier time = System::nanoTime;
+        int timeDivisor = 1000;
+        String unit = "us";
+
+//        LongSupplier time = System::currentTimeMillis;
+//        int timeDivisor = 1;
+//        String unit = "ms";
+
+        long totalTimeCropped = 0;
+        long totalTimeCollections = 0;
+        long totalTimeStreamed = 0;
+        long totalTimeParallel = 0;
+        long startTime;
+
+        for (int i = 0; i < iterationsCount; i++) {
+            startTime = time.getAsLong();
+            List<Double> listCropped = searchInstance.sortAndLimit(testList, topItems, comparator);
+            assertEquals(topResultShouldBe, listCropped.get(0), 0);
+            totalTimeCropped += time.getAsLong() - startTime;
+
+            List<Double> listRepresentation = new LinkedList<>(testList);
+            Collections.shuffle(listRepresentation);
+            startTime = time.getAsLong();
+            Collections.sort(listRepresentation, comparator);
+            assertEquals(topResultShouldBe, listRepresentation.get(0), 0);
+            totalTimeCollections += time.getAsLong() - startTime;
+
+            startTime = time.getAsLong();
+            List<Double> listStreamed = testList.stream()
+                    .sorted(comparator)
+                    .limit(topItems)
+                    .collect(Collectors.toList());
+            assertEquals(topResultShouldBe, listStreamed.get(0), 0);
+            totalTimeStreamed += time.getAsLong() - startTime;
+
+            startTime = time.getAsLong();
+            List<Double> listParallel = testList.parallelStream()
+                    .sorted(comparator)
+                    .limit(topItems)
+                    .collect(Collectors.toList());
+            assertEquals(topResultShouldBe, listParallel.get(0), 0);
+            totalTimeParallel += time.getAsLong() - startTime;
+        }
+
+        System.out.println(String.format("%6$s %1$d%5$s cropped, %2$d%5$s collections, %3$d%5$s streamed, %4$d%5$s parallel on average",
+                (totalTimeCropped / iterationsCount) / timeDivisor,
+                (totalTimeCollections / iterationsCount) / timeDivisor,
+                (totalTimeStreamed / iterationsCount) / timeDivisor,
+                (totalTimeParallel / iterationsCount) / timeDivisor,
+                unit,
+                prefix
+        ));
+    }
+
+    @Ignore
+    @Test
+    public void mtBench() throws Exception {
+        for (String[] items : USA_STATES) {
+            assertTrue("Failed to add item",
+                    searchInstance.addItem(items[0], String.format("%s %s %s", items[1], items[2], items[3])));
+        }
+
+//        long startTime = System.currentTimeMillis();
+//
+//        for (int i = 0; i < 1000; i++) {
+//            assertTrue("No results found?",
+//                    searchInstance.findItems(USA_STATES[i % USA_STATES.length][1].substring(0, 3), 10).size() > 0);
+//        }
+//
+//        assertTrue("Shouldn't be anywhere near this slow...", (System.currentTimeMillis() - startTime) < 1000);
+
+        // Warmup
+        mtIteration();
+
+        // Warmed up
+        mtIteration();
+    }
+
+    private void mtIteration() throws InterruptedException {
+        int threads = 4;
+        int iterationsPerThread = 1000000;
+        CountDownLatch latch = new CountDownLatch(threads);
+        AtomicLong wrote = new AtomicLong(0L);
+
+        // Writing thread
+        new Thread(() -> {
+            int i = 0;
+            while (latch.getCount() > 0) {
+                searchInstance.addItem("new item" + i, "few new keywords" + i++);
+                wrote.incrementAndGet();
+                try {
+                    Thread.sleep(50);
+                } catch (InterruptedException e) {
+                }
+            }
+        }).start();
+
+        Long startTime = System.currentTimeMillis();
+
+        // Reading threads
+        for (int i = 0; i < threads; i++) {
+            Thread t = new Thread(() -> {
+                mtThreadIteration(iterationsPerThread);
+                latch.countDown();
+            });
+            t.setPriority(Thread.MAX_PRIORITY);
+            t.start();
+        }
+
+        latch.await(60, TimeUnit.SECONDS);
+        long totalTime = System.currentTimeMillis() - startTime;
+        System.out.println("Aggregate throughput: " + ((iterationsPerThread / totalTime) * threads) + "k per second, " + wrote.get() + " writes");
+    }
+
+    private void mtThreadIteration(final int iterations) {
+        long startTime = System.currentTimeMillis();
+
+        for (int i = 0; i < iterations; i++) {
+            assertTrue(searchInstance.findItems(USA_STATES[i % USA_STATES.length][1].substring(0, 3), 10).size() > 0);
+        }
+
+        long totalTime = System.currentTimeMillis() - startTime;
+        System.out.println(String.format("Took %dms, %dk searches second.",
+                totalTime,
+                iterations / totalTime
+        ));
+    }
+
+    @Ignore
+    @Test
+    public void opsBench() throws Exception {
+        for (String[] items : USA_STATES) {
+            assertTrue("Failed to add item",
+                    searchInstance.addItem(items[0], String.format("%s %s %s", items[1], items[2], items[3])));
+        }
+
+        // Warmup
+        mtOpsBench();
+
+        // Warmed up
+        mtOpsBench();
+    }
+
+    private void mtOpsBench() throws InterruptedException {
+        int threads = 1;
+        int iterationsPerThread = 100000;
+        CountDownLatch latch = new CountDownLatch(threads);
+
+        // ops threads
+        Long startTime = System.currentTimeMillis();
+        for (int i = 0; i < threads; i++) {
+            Thread t = new Thread(() -> {
+                mtOpsIteration(iterationsPerThread);
+                latch.countDown();
+            });
+            t.setPriority(Thread.MAX_PRIORITY);
+            t.start();
+        }
+
+        latch.await(60, TimeUnit.SECONDS);
+        long totalTime = System.currentTimeMillis() - startTime;
+        System.out.println("Aggregate throughput: " + ((iterationsPerThread / totalTime) * threads) + "k ops per second");
+    }
+
+    private void mtOpsIteration(final int iterations) {
+        long startTime = System.currentTimeMillis();
+
+        for (int i = 0; i < iterations; i++) {
+            assertTrue(searchInstance.addItem(USA_STATES[i % USA_STATES.length][1].substring(0, 3), USA_STATES[i % USA_STATES.length][0] + " " + USA_STATES[i % USA_STATES.length][2]));
+            searchInstance.removeItem(USA_STATES[i % USA_STATES.length][1].substring(0, 3));
+        }
+
+        long totalTime = System.currentTimeMillis() - startTime;
+        System.out.println(String.format("Took %dms, %dk ops second.",
+                totalTime,
+                iterations / totalTime
+        ));
     }
 }

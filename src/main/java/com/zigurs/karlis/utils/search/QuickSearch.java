@@ -481,9 +481,9 @@ public class QuickSearch<T> {
     }
 
     /**
-     * Returns human-readable statistics string of current in-memory arrays.
+     * Returns an overview of contained maps sizes.
      *
-     * @return example output: "10 items; 100 keywords; 10000 fragments"
+     * @return stats listing number of items, keywords and fragments known
      */
     @NotNull
     public Stats getStats() {
@@ -505,23 +505,23 @@ public class QuickSearch<T> {
 
     @NotNull
     private List<ScoreWrapper<T>> findItemsImpl(@NotNull Set<String> searchKeywords, int maxItemsToList) {
-        if (searchKeywords.isEmpty() || maxItemsToList < 1)
+        if (searchKeywords.isEmpty())
             return Collections.emptyList();
 
         // search itself
-        Map<HashWrapper<T>, Double> matchingItems = findAndScoreImpl(searchKeywords);
+        Map<HashWrapper<T>, Double> matches = findAndScoreImpl(searchKeywords);
 
-        if (matchingItems.size() > maxItemsToList) {
+        if (matches.size() > maxItemsToList) {
             /*
              * Use custom sort if the candidates list is larger than number of items we
              * need to report back. On large sets of results this can bring notable
              * improvements in speed when compared to built-in sorting methods.
              */
-            return sortAndLimit(matchingItems.entrySet(), maxItemsToList, Map.Entry.comparingByValue(Comparator.reverseOrder())).stream()
+            return sortAndLimit(matches.entrySet(), maxItemsToList, Map.Entry.comparingByValue(Comparator.reverseOrder())).stream()
                     .map(e -> new ScoreWrapper<>(e.getKey(), e.getValue()))
                     .collect(Collectors.toList());
         } else {
-            return matchingItems.entrySet().stream()
+            return matches.entrySet().stream()
                     .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
                     .limit(maxItemsToList)
                     .map(e -> new ScoreWrapper<>(e.getKey(), e.getValue()))
@@ -539,11 +539,11 @@ public class QuickSearch<T> {
     }
 
     @NotNull
-    private Map<HashWrapper<T>, Double> findAndScoreUnionImpl(@NotNull Set<String> suppliedFragments) {
+    private Map<HashWrapper<T>, Double> findAndScoreUnionImpl(@NotNull Set<String> searchFragments) {
         Map<HashWrapper<T>, Double> accumulatedItems = new LinkedHashMap<>();
 
-        for (String suppliedFragment : suppliedFragments) {
-            matchSingleFragment(suppliedFragment).forEach((k, v) -> {
+        for (String suppliedFragment : searchFragments) {
+            matchSingleFragment(suppliedFragment, null).forEach((k, v) -> {
                 accumulatedItems.merge(k, v, (d1, d2) -> d1 + d2);
             });
         }
@@ -558,49 +558,25 @@ public class QuickSearch<T> {
         boolean firstFragment = true;
 
         for (String suppliedFragment : suppliedFragments) {
-            Map<HashWrapper<T>, Double> fragmentItems = matchSingleFragment(suppliedFragment);
-            if (fragmentItems.isEmpty()) return fragmentItems; // Can fail early
+            Map<HashWrapper<T>, Double> fragmentItems = matchSingleFragment(suppliedFragment, accumulatedItems);
+            if (fragmentItems.isEmpty())
+                return fragmentItems; // Can fail early
 
             if (firstFragment) {
                 accumulatedItems = fragmentItems;
                 firstFragment = false;
             } else {
-                // Intersect using smaller of the maps (known so far or current iteration) as the base
-                Map<HashWrapper<T>, Double> smallerMap = (accumulatedItems.size() > fragmentItems.size()) ? fragmentItems : accumulatedItems;
-                Map<HashWrapper<T>, Double> largerMap = (smallerMap == accumulatedItems) ? fragmentItems : accumulatedItems;
-
-                accumulatedItems = smallerMap.entrySet().stream()
-                        .filter(k -> largerMap.containsKey(k.getKey()))
-                        .map(e -> {
-                            e.setValue(e.getValue() + largerMap.get(e.getKey())); // Transfer the score
-                            return e;
-                        })
-                        .collect(
-                                Collectors.toMap(
-                                        Map.Entry::getKey,
-                                        Map.Entry::getValue,
-                                        Double::sum, // Technically a no-op as no duplicates will reach here
-                                        LinkedHashMap::new
-                                )
-                        );
+                accumulatedItems.keySet().retainAll(fragmentItems.keySet());
+                accumulatedItems.entrySet().forEach(e -> e.setValue(e.getValue() + fragmentItems.get(e.getKey())));
             }
-            /*
-             * If we end up with no items while iterating we may
-             * as well break as no new results will be permitted through.
-             */
-            if (accumulatedItems.isEmpty())
-                return accumulatedItems;
         }
 
-        if (accumulatedItems == null) {
-            return Collections.emptyMap();
-        } else {
-            return accumulatedItems;
-        }
+        //noinspection ConstantConditions
+        return accumulatedItems;
     }
 
     @NotNull
-    private Map<HashWrapper<T>, Double> matchSingleFragment(@NotNull String candidateFragment) {
+    private Map<HashWrapper<T>, Double> matchSingleFragment(@NotNull String candidateFragment, Map<HashWrapper<T>, Double> whiteList) {
         Set<String> candidateKeywords = fragmentToKeywordsMap.get(candidateFragment);
         if (candidateKeywords == null) {
             if (unmatchedPolicy == BACKTRACKING && candidateFragment.length() > 1) {
@@ -611,7 +587,7 @@ public class QuickSearch<T> {
                  * As a result we should be able to match 'termite' against 'terminator'
                  * after two backtracking iterations.
                  */
-                return matchSingleFragment(candidateFragment.substring(0, candidateFragment.length() - 1));
+                return matchSingleFragment(candidateFragment.substring(0, candidateFragment.length() - 1), whiteList);
             } else {
                 return Collections.emptyMap();
             }
@@ -619,18 +595,25 @@ public class QuickSearch<T> {
             /*
              * Otherwise proceed with normal 1:1 matching.
              */
-            return scoreSingleFragment(candidateFragment, candidateKeywords);
+            return scoreSingleFragment(candidateFragment, candidateKeywords, whiteList);
         }
     }
 
     @NotNull
-    private Map<HashWrapper<T>, Double> scoreSingleFragment(@NotNull String candidateFragment, @NotNull Set<String> candidateKeywords) {
+    private Map<HashWrapper<T>, Double> scoreSingleFragment(@NotNull String candidateFragment,
+                                                            @NotNull Set<String> candidateKeywords,
+                                                            @Nullable Map<HashWrapper<T>, Double> whitelist) {
         Map<HashWrapper<T>, Double> fragmentItems = new LinkedHashMap<>();
 
         for (String keyword : candidateKeywords) {
             Double score = keywordMatchScorer.apply(candidateFragment, keyword);
+
             // Not using Math::max here due to unboxing->compare->boxing scenario.
-            keywordToItemsMap.get(keyword).forEach(i -> fragmentItems.merge(i, score, (d1, d2) -> (d1 > d2) ? d1 : d2));
+            keywordToItemsMap.get(keyword).forEach(item -> {
+                if (whitelist == null || whitelist.containsKey(item)) {
+                    fragmentItems.merge(item, score, (d1, d2) -> (d1 > d2) ? d1 : d2);
+                }
+            });
         }
 
         return fragmentItems;
@@ -700,12 +683,11 @@ public class QuickSearch<T> {
                                                            @NotNull X value) {
         Set<V> set = map.get(key);
 
-        assert set != null;
         set.remove(value);
 
         if (set.isEmpty()) {
             map.remove(key);
-            return true; //was last item
+            return true; // was last item
         }
 
         return false; // still items remaining
@@ -724,7 +706,6 @@ public class QuickSearch<T> {
     @NotNull
     private Set<String> prepareKeywords(@NotNull String keywordsString, boolean filterShortKeywords) {
         return keywordsExtractor.apply(keywordsString).stream()
-                .filter(kw -> !kw.isEmpty())
                 .map(keywordNormalizer)
                 .filter(s -> !filterShortKeywords || s.length() >= minimumKeywordLength)
                 .collect(Collectors.toSet()); // implies distinct
