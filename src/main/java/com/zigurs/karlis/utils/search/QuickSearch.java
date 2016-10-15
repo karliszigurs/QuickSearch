@@ -443,7 +443,7 @@ public class QuickSearch<T> {
     @NotNull
     public Result<T> findItemsWithDetail(@Nullable String searchString, int numberOfTopItems) {
         if (searchString == null || searchString.isEmpty() || numberOfTopItems < 1) {
-            return new Result<>("", Collections.emptyList());
+            return new Result<>(searchString, Collections.emptyList());
         }
 
         long readLock = lock.readLock();
