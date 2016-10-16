@@ -278,8 +278,7 @@ public class QuickSearchTest {
     @Test
     public void itemAdded() throws Exception {
         addItem("item", "one two three");
-
-        checkStats(1, 3, 23);
+        checkStats(23, 23, 23);
     }
 
     @Test
@@ -314,7 +313,7 @@ public class QuickSearchTest {
             addItem(testString.substring(0, 5), testString.substring(0, 5));
         }
 
-        checkStats(1, 1, 13);
+        checkStats(13, 13, 13);
     }
 
     @Test
@@ -574,7 +573,8 @@ public class QuickSearchTest {
         String exerciseString = "aquickbrownfoxjumpsoverthelazydog";
 
         for (int i = 2; i < exerciseString.length(); i++) {
-            addItem("test" + i, exerciseString.substring(0, i));
+            String kw = exerciseString.substring(0, i);
+            addItem("test" + i, kw);
         }
 
         for (int i = 0; i < exerciseString.length() - 1; i++) {
@@ -582,7 +582,12 @@ public class QuickSearchTest {
         }
 
         assertEquals(10, searchInstance.findItems("e ex exe exer exerc i is ise", 10).size());
-        checkStats(33, 63, 554);
+        checkStats(554, 554, 554);
+    }
+
+    @Test
+    public void singleItem() throws Exception {
+        addItem("test", "abra");
     }
 
     @Test
@@ -605,7 +610,7 @@ public class QuickSearchTest {
 
         assertEquals(10, alternativeConfig.findItems("e ex exe exer exerc i is ise", 10).size());
 
-        checkStats(alternativeConfig.getStats(), 33, 65, 554);
+        checkStats(alternativeConfig.getStats(), 554, 554, 554);
     }
 
     @Test
@@ -1126,7 +1131,7 @@ public class QuickSearchTest {
         new Thread(() -> {
             int i = 0;
             while (latch.getCount() > 0) {
-                addItem("new item" + i, "few new keywords" + i++);
+//                addItem("new item" + i, "few new keywords" + i++);
                 wrote.incrementAndGet();
 
                 //noinspection EmptyCatchBlock
@@ -1232,19 +1237,23 @@ public class QuickSearchTest {
             addItem(items[0] + "-" + i, String.format("%s %s %s %s", items[0], items[1], items[2], items[3]));
         }
 
-//        searchInstance.goImmutable();
-
         MemoryMeter meter = new MemoryMeter().withGuessing(MemoryMeter.Guess.ALWAYS_UNSAFE);
         long measured = meter.measureDeep(searchInstance);
-        System.out.println("Memory consumption measured at " + measured);
 
+        System.out.println("Memory consumption is " + measured);
+
+        /*
+         * Measured on Java 1.8.0_102
+         */
         final long JDK_COLLECTIONS_TARGET = 117_416_608;
         final long GUAVA_MULTIMAP_TARGET = 104_140_960;
-        final long GUAVA_MULTIMAP_IMMUTABLE_TARGET = 54_848_672;
+        final long CUSTOM_TREE_TARGET = 54_249_488;
 
-        assertTrue("Calculated size exceeds JDK Collections target", measured < (JDK_COLLECTIONS_TARGET * 1.1));
+
+        assertTrue("Calculated size exceeds target", measured < (CUSTOM_TREE_TARGET * 1.1));
     }
 
+    @Ignore
     @Test
     public void measureQueryMicrobench() {
         searchInstance = new QuickSearch<>(
@@ -1254,28 +1263,29 @@ public class QuickSearchTest {
                 BACKTRACKING,
                 INTERSECTION);
 
+        long startTime = System.currentTimeMillis();
         for (int i = 0; i < 100_000; i++) {
             String[] items = USA_STATES[i % USA_STATES.length];
             addItem(items[0] + "-" + i, String.format("%s %s %s %s", items[0], items[1], items[2], items[3]));
         }
+        System.out.println("Added in " + (System.currentTimeMillis() - startTime));
 
-//        searchInstance.goImmutable();
-
-        long startTime = System.currentTimeMillis();
+        startTime = System.currentTimeMillis();
 
         for (int i = 0; i < 10_000; i++) {
             String searchString = USA_STATES[i % USA_STATES.length][0];
             assertFalse("No results found", searchInstance.findItems(searchString, 10).isEmpty());
         }
 
-        final long JDK_COLLECTIONS_TARGET = 12100;
-        final long GUAVA_MULTIMAP_TARGET = 19600;
-        final long GUAVA_MULTIMAP_IMMUTABLE_TARGET = 13100;
+        /*
+         * Comparable only on my machine, therefore no assert.
+         */
+        final long JDK_COLLECTIONS_TARGET = 13000;
+        final long GUAVA_MULTIMAP_TARGET = 20000;
+        final long CUSTOM_TREE_TARGET = 13000;
 
-        System.out.println("Time taken: " + (System.currentTimeMillis() - startTime));
+        System.out.println("Time taken " + (System.currentTimeMillis() - startTime));
     }
-
-
 
     /*
      * Tests boilerplate

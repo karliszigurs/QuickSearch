@@ -15,7 +15,6 @@
  */
 package com.zigurs.karlis.utils.search.model;
 
-import com.google.common.collect.ImmutableSet;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Set;
@@ -44,7 +43,7 @@ public class Item<T> {
      */
     public Item(@NotNull T item, @NotNull Set<String> itemKeywords, double score) {
         this.item = item;
-        this.itemKeywords = ImmutableSet.copyOf(itemKeywords);
+        this.itemKeywords = itemKeywords;
         this.score = score;
     }
 

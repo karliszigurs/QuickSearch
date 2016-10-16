@@ -15,10 +15,6 @@
  */
 package com.zigurs.karlis.utils.search;
 
-import com.google.common.collect.HashMultimap;
-import com.google.common.collect.ImmutableMultimap;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Multimap;
 import com.zigurs.karlis.utils.search.model.Item;
 import com.zigurs.karlis.utils.search.model.Result;
 import com.zigurs.karlis.utils.search.model.Stats;
@@ -27,7 +23,6 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 import java.util.concurrent.locks.StampedLock;
-import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -202,15 +197,9 @@ public class QuickSearch<T> {
     @NotNull
     private final CANDIDATE_ACCUMULATION_POLICY candidateAccumulationPolicy;
 
-    private Multimap<String, String> fragmentToKeywordsMap = HashMultimap.create();
-    private Multimap<String, HashWrapper<T>> keywordToItemsMap = HashMultimap.create();
-    private Multimap<HashWrapper<T>, String> itemKeywordsMap = HashMultimap.create();
+    private Map<String, GraphNode<String, HashWrapper<T>>> fragmentsItemsTree = new HashMap<>();
 
-    public void goImmutable() {
-        fragmentToKeywordsMap = ImmutableMultimap.copyOf(fragmentToKeywordsMap);
-        keywordToItemsMap = ImmutableMultimap.copyOf(keywordToItemsMap);
-        itemKeywordsMap = ImmutableMultimap.copyOf(itemKeywordsMap);
-    }
+    private Map<HashWrapper<T>, ReadOnlySet<String>> itemKeywordsMap = new HashMap<>();
 
     private final StampedLock lock = new StampedLock();
 
@@ -436,7 +425,7 @@ public class QuickSearch<T> {
                 return Optional.of(
                         new Item<>(
                                 w.unwrap().unwrap(),
-                                ImmutableSet.copyOf(itemKeywordsMap.get(w.unwrap())),
+                                itemKeywordsMap.get(w.unwrap()).safeCopy(),
                                 w.getScore()
                         )
                 );
@@ -478,7 +467,7 @@ public class QuickSearch<T> {
                         results.stream()
                                 .map(i -> new Item<>(
                                         i.unwrap().unwrap(),
-                                        ImmutableSet.copyOf(itemKeywordsMap.get(i.unwrap())),
+                                        itemKeywordsMap.get(i.unwrap()).safeCopy(),
                                         i.getScore())
                                 )
                                 .collect(Collectors.toList())
@@ -495,9 +484,7 @@ public class QuickSearch<T> {
     public void clear() {
         long writeLock = lock.writeLock();
         try {
-            keywordToItemsMap.clear();
-            fragmentToKeywordsMap.clear();
-            itemKeywordsMap.clear();
+            fragmentsItemsTree.clear();
         } finally {
             lock.unlockWrite(writeLock);
         }
@@ -515,9 +502,9 @@ public class QuickSearch<T> {
         long readLock = lock.readLock();
         try {
             stats = new Stats(
-                    itemKeywordsMap.keySet().size(),
-                    keywordToItemsMap.keySet().size(),
-                    fragmentToKeywordsMap.keySet().size()
+                    fragmentsItemsTree.size(),
+                    fragmentsItemsTree.size(),
+                    fragmentsItemsTree.size()
             );
         } finally {
             lock.unlockRead(readLock);
@@ -571,8 +558,7 @@ public class QuickSearch<T> {
         Map<HashWrapper<T>, Double> accumulatedItems = new LinkedHashMap<>();
 
         for (String suppliedFragment : searchFragments) {
-            matchSingleFragment(suppliedFragment, null)
-                    .forEach((k, v) -> accumulatedItems.merge(k, v, (d1, d2) -> d1 + d2));
+            walkAndScore(suppliedFragment, null).forEach((k, v) -> accumulatedItems.merge(k, v, (d1, d2) -> d1 + d2));
         }
 
         return accumulatedItems;
@@ -585,7 +571,7 @@ public class QuickSearch<T> {
         boolean firstFragment = true;
 
         for (String suppliedFragment : suppliedFragments) {
-            Map<HashWrapper<T>, Double> fragmentItems = matchSingleFragment(suppliedFragment, accumulatedItems);
+            Map<HashWrapper<T>, Double> fragmentItems = walkAndScore(suppliedFragment, accumulatedItems);
             if (fragmentItems.isEmpty())
                 return fragmentItems; // Can fail early
 
@@ -602,104 +588,60 @@ public class QuickSearch<T> {
         return accumulatedItems;
     }
 
-    @NotNull
-    private Map<HashWrapper<T>, Double> matchSingleFragment(@NotNull String candidateFragment, Map<HashWrapper<T>, Double> whiteList) {
-        Collection<String> candidateKeywords = fragmentToKeywordsMap.get(candidateFragment);
-        if (candidateKeywords.isEmpty()) {
-            if (unmatchedPolicy == BACKTRACKING && candidateFragment.length() > 1) {
-                /*
-                 * If we have a supplied keyword we don't have a match for,
-                 * try to shorten it by a char to see if that yields a result.
-                 *
-                 * As a result we should be able to match 'termite' against 'terminator'
-                 * after two backtracking iterations.
-                 */
-                return matchSingleFragment(candidateFragment.substring(0, candidateFragment.length() - 1), whiteList);
+    private Map<HashWrapper<T>, Double> walkAndScore(String fragment, Map<HashWrapper<T>, Double> whiteList) {
+        GraphNode<String, HashWrapper<T>> root = fragmentsItemsTree.get(fragment);
+
+        if (root == null) {
+            if (unmatchedPolicy == BACKTRACKING && fragment.length() > 1) {
+                return walkAndScore(fragment.substring(0, fragment.length() - 1), whiteList);
             } else {
                 return Collections.emptyMap();
             }
-        } else {
-            /*
-             * Otherwise proceed with normal 1:1 matching.
-             */
-            return scoreSingleFragment(candidateFragment, candidateKeywords, whiteList);
         }
+
+        return walkAndScore(fragment, root, new HashMap<>(), whiteList, new HashSet<>());
     }
 
-    @NotNull
-    private Map<HashWrapper<T>, Double> scoreSingleFragment(@NotNull String candidateFragment,
-                                                            @NotNull Collection<String> candidateKeywords,
-                                                            @Nullable Map<HashWrapper<T>, Double> whitelist) {
-        Map<HashWrapper<T>, Double> fragmentItems = new LinkedHashMap<>();
+    private Map<HashWrapper<T>, Double> walkAndScore(String originalFragment,
+                                                     GraphNode<String, HashWrapper<T>> node,
+                                                     Map<HashWrapper<T>, Double> accumulated,
+                                                     Map<HashWrapper<T>, Double> whiteList,
+                                                     Set<String> visited) {
+        visited.add(node.getIdentity());
 
-        for (String keyword : candidateKeywords) {
-            Double score = keywordMatchScorer.apply(candidateFragment, keyword);
+        if (!node.getItems().isEmpty()) {
+            Double score = keywordMatchScorer.apply(originalFragment, node.getIdentity());
 
-            // Not using Math::max here due to unboxing->compare->boxing scenario.
-            keywordToItemsMap.get(keyword).forEach(item -> {
-                if (whitelist == null || whitelist.containsKey(item)) {
-                    fragmentItems.merge(item, score, (d1, d2) -> (d1 > d2) ? d1 : d2);
+            node.getItems().forEach((item) -> {
+                if (whiteList == null || whiteList.containsKey(item)) {
+                    accumulated.merge(item, score, (d1, d2) -> d1 > d2 ? d1 : d2);
                 }
             });
         }
 
-        return fragmentItems;
+        node.getParents().forEach((parent) -> {
+            if (!visited.contains(parent.getIdentity())) {
+                walkAndScore(originalFragment, parent, accumulated, whiteList, visited);
+            }
+        });
+
+        return accumulated;
     }
 
     private void addItemImpl(@NotNull HashWrapper<T> item, @NotNull Set<String> suppliedKeywords) {
-        // Populate maps
-        for (String keyword : suppliedKeywords) {
+        registerItem(item, suppliedKeywords);
 
-            // If it's a previously unknown keyword, populate fragments to keywords map
-            if (!keywordToItemsMap.containsKey(keyword)) {
-                forAllPossibleSubstrings(
-                        keyword,
-                        (kw, substring) -> {
-                            fragmentToKeywordsMap.put(substring, keyword);
-                        }
-                );
-            }
-            // Then populate keyword -> items link
-            keywordToItemsMap.put(keyword, item);
-
-            // and then make sure to store known keywords for item (needed on removal)
-            itemKeywordsMap.put(item, keyword);
+        if (itemKeywordsMap.containsKey(item)) {
+            itemKeywordsMap.put(item, ReadOnlySet.fromCollections(itemKeywordsMap.get(item), suppliedKeywords));
+        } else {
+            itemKeywordsMap.put(item, ReadOnlySet.fromCollection(suppliedKeywords));
         }
     }
 
     private boolean removeItemImpl(@NotNull HashWrapper<T> item) {
-        if (!itemKeywordsMap.containsKey(item))
-            return false;
-
-        //  all known keywords for the item
-        Collection<String> itemKeywords = itemKeywordsMap.get(item);
-
-        /*
-         * Only unmap the substrings if the keyword is no longer in use after
-         * removing this associated item.
-         */
-        itemKeywords.stream()
-                .filter(keyword -> {
-                    keywordToItemsMap.remove(keyword, item);
-                    return keywordToItemsMap.get(keyword).isEmpty();
-                }) // if this was final item for keyword proceed to unlink keyword too
-                .forEach(keyword -> forAllPossibleSubstrings(keyword, (kw, fragment) -> {
-                    fragmentToKeywordsMap.remove(fragment, kw);
-                }));
-
-        // forget about the item
-        itemKeywordsMap.removeAll(item);
-        return true;
-    }
-
-    private void forAllPossibleSubstrings(@NotNull String keyword, @NotNull BiConsumer<String, String> function) {
-        Set<String> uniques = new LinkedHashSet<>();
-        for (int i = 0; i < keyword.length(); i++) {
-            for (int y = i + 1; y <= keyword.length(); y++) {
-                uniques.add(keyword.substring(i, y));
-            }
-        }
-        uniques.forEach(substring -> function.accept(keyword, substring));
+        boolean removed = unregisterItem(item);
+        itemKeywordsMap.remove(item);
+        return removed;
     }
 
     @NotNull
@@ -807,6 +749,83 @@ public class QuickSearch<T> {
             function.apply("testinput", "testinput");
         } catch (Exception e) {
             throw new IllegalArgumentException("Exception while testing keyword match scorer function", e);
+        }
+    }
+
+    /*
+     * Tree/graph of keyword fragments
+     */
+
+    private void registerItem(HashWrapper<T> item, Set<String> keywords) {
+        for (String keyword : keywords) {
+            GraphNode<String, HashWrapper<T>> node = fragmentsItemsTree.get(keyword);
+
+            if (node == null) {
+                node = new GraphNode<>(keyword);
+                fragmentsItemsTree.put(keyword, node);
+                node.addItem(item);
+
+                if (keyword.length() > 1) {
+                    addNode(node, keyword.substring(0, keyword.length() - 1));
+                    addNode(node, keyword.substring(1));
+                }
+            } else {
+                node.addItem(item);
+            }
+        }
+    }
+
+    private void addNode(GraphNode<String, HashWrapper<T>> parent, String identity) {
+        GraphNode<String, HashWrapper<T>> node = fragmentsItemsTree.get(identity);
+
+        if (node == null) {
+            node = new GraphNode<>(identity);
+            fragmentsItemsTree.put(identity, node);
+
+            // And proceed to add child nodes
+            if (node.getIdentity().length() > 1) {
+                addNode(node, identity.substring(0, identity.length() - 1));
+                addNode(node, identity.substring(1));
+            }
+        }
+
+        node.addParent(parent);
+    }
+
+    private boolean unregisterItem(@NotNull HashWrapper<T> item) {
+        int removed = 0;
+
+        if (itemKeywordsMap.containsKey(item)) {
+            for (String keyword : itemKeywordsMap.get(item)) {
+                GraphNode<String, HashWrapper<T>> keywordNode = fragmentsItemsTree.get(keyword);
+
+                keywordNode.removeItem(item);
+                removed++;
+
+                if (keywordNode.getItems().isEmpty()) {
+                    tearDownNode(keywordNode, null);
+                }
+            }
+        }
+        return removed > 0;
+    }
+
+    private void tearDownNode(GraphNode<String, HashWrapper<T>> node, GraphNode<String, HashWrapper<T>> parent) {
+        if (node == null) //already removed
+            return;
+
+        if (parent != null) {
+            node.removeParent(parent);
+        }
+
+        // No getParents or getItems means that there's nothing here to find
+        if (node.getParents().isEmpty() && node.getItems().isEmpty()) {
+            fragmentsItemsTree.remove(node.getIdentity());
+
+            if (node.getIdentity().length() > 1) {
+                tearDownNode(fragmentsItemsTree.get(node.getIdentity().substring(0, node.getIdentity().length() - 1)), node);
+                tearDownNode(fragmentsItemsTree.get(node.getIdentity().substring(1)), node);
+            }
         }
     }
 }
