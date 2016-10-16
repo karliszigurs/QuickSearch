@@ -26,7 +26,7 @@ final class ScoreWrapper<T> {
 
     @NotNull
     private final HashWrapper<T> item;
-    private double score;
+    private final double score;
 
     ScoreWrapper(@NotNull HashWrapper<T> item, double score) {
         this.item = item;

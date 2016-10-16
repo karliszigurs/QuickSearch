@@ -149,9 +149,9 @@ public class QuickSearch<T> {
      * <tr><td><code>"Россия"</code></td><td><code>"rossiya"</code></td><td>translate cyrilic alphabet to latin</td></tr>
      * </table>
      * <p>
-     * Default implementation assumes that String.toLowerCase().trim() is sufficient.
+     * Default implementation assumes that String.trim().toLowerCase() is sufficient.
      */
-    public static final Function<String, String> DEFAULT_KEYWORD_NORMALIZER = (s) -> s.toLowerCase().trim();
+    public static final Function<String, String> DEFAULT_KEYWORD_NORMALIZER = (s) -> s.trim().toLowerCase();
 
     /**
      * Function scoring user supplied input against corresponding keywords associated with search items.
@@ -184,11 +184,6 @@ public class QuickSearch<T> {
         return matchScore;
     };
 
-    /**
-     * Default for minimum keyword length. Any keywords shorter than this will be ignored internally.
-     */
-    public static final int DEFAULT_MINIMUM_KEYWORD_LENGTH = 2;
-
     /*
      * Instance properties
      */
@@ -204,8 +199,6 @@ public class QuickSearch<T> {
     @NotNull
     private final CANDIDATE_ACCUMULATION_POLICY candidateAccumulationPolicy;
 
-    private final int minimumKeywordLength;
-
     private final Map<String, Set<String>> fragmentToKeywordsMap = new HashMap<>(); // links to
     private final Map<String, Set<HashWrapper<T>>> keywordToItemsMap = new HashMap<>();
     private final Map<HashWrapper<T>, Set<String>> itemKeywordsMap = new HashMap<>();
@@ -217,62 +210,54 @@ public class QuickSearch<T> {
      */
 
     /**
-     * Constructs a QuickSearch instance using defaults for keywords extractor, normaliser, match scorer and
-     * minimum keyword length.
+     * Constructs a QuickSearch instance using defaults for keywords extractor, normaliser and match scorer functions.
      */
     public QuickSearch() {
         this(DEFAULT_KEYWORDS_EXTRACTOR,
                 DEFAULT_KEYWORD_NORMALIZER,
-                DEFAULT_MATCH_SCORER,
-                DEFAULT_MINIMUM_KEYWORD_LENGTH);
+                DEFAULT_MATCH_SCORER);
     }
 
     /**
-     * Constructs a QuickSearch instance with the provided keyword processing implementations and specified minimum
-     * keyword length.
+     * Constructs a QuickSearch instance with the provided keyword handling functions.
      * <p>
      * Please note that supplied functions will be validated for basic behavior on creating the instance.
      *
      * @param keywordsExtractor    Extractor function.
      * @param keywordNormalizer    Normalizer function.
      * @param keywordMatchScorer   Scorer function.
-     * @param minimumKeywordLength Minimum length for keywords internally. Any keywords shorter than specified will be ignored. Should be at least 1
      */
     public QuickSearch(@Nullable Function<String, Set<String>> keywordsExtractor,
                        @Nullable Function<String, String> keywordNormalizer,
-                       @Nullable BiFunction<String, String, Double> keywordMatchScorer,
-                       int minimumKeywordLength) throws IllegalArgumentException {
+                       @Nullable BiFunction<String, String, Double> keywordMatchScorer)
+            throws IllegalArgumentException {
         this(keywordsExtractor,
                 keywordNormalizer,
                 keywordMatchScorer,
-                minimumKeywordLength,
                 BACKTRACKING,
                 UNION);
     }
 
     /**
-     * Constructs a QuickSearch instance with the provided keyword processing implementations specified minimum
-     * keyword length and specified unmatched and accumulation policies.
+     * Constructs a QuickSearch instance with the provided keyword handling functions
+     * and specified unmatched and accumulation policies.
      * <p>
      * Please note that supplied functions will be validated for basic functionality on creating the instance.
      *
      * @param keywordsExtractor           Extractor function.
      * @param keywordNormalizer           Normalizer function.
      * @param keywordMatchScorer          Scorer function.
-     * @param minimumKeywordLength        Minimum length for keywords internally. Any keywords shorter than specified will be ignored. Should be at least 1
      * @param unmatchedPolicy             Policy to apply to supplied keywords without direct match
      * @param candidateAccumulationPolicy Policy to generate broad or exact results set
      */
     public QuickSearch(@Nullable Function<String, Set<String>> keywordsExtractor,
                        @Nullable Function<String, String> keywordNormalizer,
                        @Nullable BiFunction<String, String, Double> keywordMatchScorer,
-                       int minimumKeywordLength,
                        @Nullable UNMATCHED_POLICY unmatchedPolicy,
                        @Nullable CANDIDATE_ACCUMULATION_POLICY candidateAccumulationPolicy) throws IllegalArgumentException {
         if (keywordsExtractor == null
                 || keywordNormalizer == null
                 || keywordMatchScorer == null
-                || minimumKeywordLength < 1
                 || unmatchedPolicy == null
                 || candidateAccumulationPolicy == null)
             throw new IllegalArgumentException("Invalid configuration arguments supplied");
@@ -288,7 +273,6 @@ public class QuickSearch<T> {
         this.keywordsExtractor = keywordsExtractor;
         this.keywordNormalizer = keywordNormalizer;
         this.keywordMatchScorer = keywordMatchScorer;
-        this.minimumKeywordLength = minimumKeywordLength;
 
         this.unmatchedPolicy = unmatchedPolicy;
         this.candidateAccumulationPolicy = candidateAccumulationPolicy;
@@ -313,9 +297,15 @@ public class QuickSearch<T> {
         if (item == null || keywords == null || keywords.isEmpty())
             return false;
 
+        Set<String> keywordsSet = prepareKeywords(keywords);
+
+        if (keywordsSet.isEmpty())
+            return false;
+
         long writeLock = lock.writeLock();
         try {
-            return addItemImpl(new HashWrapper<>(item), prepareKeywords(keywords, true));
+            addItemImpl(new HashWrapper<>(item), keywordsSet);
+            return true;
         } finally {
             lock.unlockWrite(writeLock);
         }
@@ -347,14 +337,19 @@ public class QuickSearch<T> {
      */
     @NotNull
     public Optional<T> findItem(@Nullable String searchString) {
-        if (searchString == null || searchString.isEmpty())
+        if (isVoidRequest(searchString, 1))
+            return Optional.empty();
+
+        Set<String> searchKeywords = prepareKeywords(searchString);
+
+        if (searchKeywords.isEmpty())
             return Optional.empty();
 
         List<ScoreWrapper<T>> results;
 
         long readLock = lock.readLock();
         try {
-            results = findItemsImpl(prepareKeywords(searchString, false), 1);
+            results = findItemsImpl(searchKeywords, 1);
         } finally {
             lock.unlockRead(readLock);
         }
@@ -368,8 +363,7 @@ public class QuickSearch<T> {
 
     /**
      * Find top n items matching the supplied search string. Supplied string will be processed by
-     * keyword extracting and normalizing functions before used for search, and any
-     * extracted search keywords shorten than the specified minimum keyword length will be ignored.
+     * keyword extracting and normalizing functions before used for search.
      *
      * @param searchString     Raw search string, e.g. "new york pizza"
      * @param numberOfTopItems Number of items the returned result should be limited to
@@ -377,14 +371,19 @@ public class QuickSearch<T> {
      */
     @NotNull
     public List<T> findItems(@Nullable String searchString, int numberOfTopItems) {
-        if (searchString == null || searchString.isEmpty() || numberOfTopItems < 1)
+        if (isVoidRequest(searchString, numberOfTopItems))
+            return Collections.emptyList();
+
+        Set<String> searchKeywords = prepareKeywords(searchString);
+
+        if (searchKeywords.isEmpty())
             return Collections.emptyList();
 
         List<ScoreWrapper<T>> results;
 
         long readLock = lock.readLock();
         try {
-            results = findItemsImpl(prepareKeywords(searchString, false), numberOfTopItems);
+            results = findItemsImpl(searchKeywords, numberOfTopItems);
         } finally {
             lock.unlockRead(readLock);
         }
@@ -407,13 +406,19 @@ public class QuickSearch<T> {
      */
     @NotNull
     public Optional<Item<T>> findItemWithDetail(@Nullable String searchString) {
-        if (searchString == null || searchString.isEmpty()) {
+        if (isVoidRequest(searchString, 1)) {
             return Optional.empty();
         }
 
+        Set<String> searchKeywords = prepareKeywords(searchString);
+
+        if (searchKeywords.isEmpty())
+            return Optional.empty();
+
+
         long readLock = lock.readLock();
         try {
-            List<ScoreWrapper<T>> results = findItemsImpl(prepareKeywords(searchString, false), 1);
+            List<ScoreWrapper<T>> results = findItemsImpl(searchKeywords, 1);
 
             if (results.isEmpty()) {
                 return Optional.empty();
@@ -442,13 +447,18 @@ public class QuickSearch<T> {
      */
     @NotNull
     public Result<T> findItemsWithDetail(@Nullable String searchString, int numberOfTopItems) {
-        if (searchString == null || searchString.isEmpty() || numberOfTopItems < 1) {
-            return new Result<>(searchString, Collections.emptyList());
+        if (isVoidRequest(searchString, numberOfTopItems)) {
+            return new Result<>(searchString != null ? searchString : "", Collections.emptyList());
         }
+
+        Set<String> searchKeywords = prepareKeywords(searchString);
+
+        if (searchKeywords.isEmpty())
+            return new Result<>(searchString, Collections.emptyList());
 
         long readLock = lock.readLock();
         try {
-            List<ScoreWrapper<T>> results = findItemsImpl(prepareKeywords(searchString, false), numberOfTopItems);
+            List<ScoreWrapper<T>> results = findItemsImpl(searchKeywords, numberOfTopItems);
 
             if (results.isEmpty()) {
                 return new Result<>(searchString, Collections.emptyList());
@@ -503,11 +513,12 @@ public class QuickSearch<T> {
      * Implementation methods
      */
 
+    private boolean isVoidRequest(@Nullable String searchString, int numItems) {
+        return searchString == null || searchString.isEmpty() || numItems < 1;
+    }
+
     @NotNull
     private List<ScoreWrapper<T>> findItemsImpl(@NotNull Set<String> searchKeywords, int maxItemsToList) {
-        if (searchKeywords.isEmpty())
-            return Collections.emptyList();
-
         // search itself
         Map<HashWrapper<T>, Double> matches = findAndScoreImpl(searchKeywords);
 
@@ -543,9 +554,8 @@ public class QuickSearch<T> {
         Map<HashWrapper<T>, Double> accumulatedItems = new LinkedHashMap<>();
 
         for (String suppliedFragment : searchFragments) {
-            matchSingleFragment(suppliedFragment, null).forEach((k, v) -> {
-                accumulatedItems.merge(k, v, (d1, d2) -> d1 + d2);
-            });
+            matchSingleFragment(suppliedFragment, null)
+                    .forEach((k, v) -> accumulatedItems.merge(k, v, (d1, d2) -> d1 + d2));
         }
 
         return accumulatedItems;
@@ -619,11 +629,7 @@ public class QuickSearch<T> {
         return fragmentItems;
     }
 
-    private boolean addItemImpl(@NotNull HashWrapper<T> item, @NotNull Set<String> suppliedKeywords) {
-        if (suppliedKeywords.isEmpty()) {
-            return false; // No valid keywords found, skip adding
-        }
-
+    private void addItemImpl(@NotNull HashWrapper<T> item, @NotNull Set<String> suppliedKeywords) {
         // Populate maps
         for (String keyword : suppliedKeywords) {
 
@@ -640,8 +646,6 @@ public class QuickSearch<T> {
             // and then make sure to store known keywords for item (needed on removal)
             addToSetInMap(itemKeywordsMap, item, keyword, LinkedHashSet::new);
         }
-
-        return true;
     }
 
     private boolean removeItemImpl(@NotNull HashWrapper<T> item) {
@@ -704,10 +708,10 @@ public class QuickSearch<T> {
     }
 
     @NotNull
-    private Set<String> prepareKeywords(@NotNull String keywordsString, boolean filterShortKeywords) {
+    private Set<String> prepareKeywords(@NotNull String keywordsString) {
         return keywordsExtractor.apply(keywordsString).stream()
                 .map(keywordNormalizer)
-                .filter(s -> !filterShortKeywords || s.length() >= minimumKeywordLength)
+                .filter(s -> !s.isEmpty())
                 .collect(Collectors.toSet()); // implies distinct
     }
 

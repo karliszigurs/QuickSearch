@@ -148,8 +148,7 @@ public class QuickSearchTest {
         QuickSearch<String> qs = new QuickSearch<>(
                 null,
                 QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
-                QuickSearch.DEFAULT_MATCH_SCORER,
-                1
+                QuickSearch.DEFAULT_MATCH_SCORER
         );
         assertNotNull(qs.getStats());
     }
@@ -159,8 +158,7 @@ public class QuickSearchTest {
         QuickSearch<String> qs = new QuickSearch<>(
                 QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
                 null,
-                QuickSearch.DEFAULT_MATCH_SCORER,
-                1
+                QuickSearch.DEFAULT_MATCH_SCORER
         );
         assertNotNull(qs.getStats());
     }
@@ -170,30 +168,7 @@ public class QuickSearchTest {
         QuickSearch<String> qs = new QuickSearch<>(
                 QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
                 QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
-                null,
-                1
-        );
-        assertNotNull(qs.getStats());
-    }
-
-    @Test(expected = IllegalArgumentException.class)
-    public void invalidMinimumLength() {
-        QuickSearch<String> qs = new QuickSearch<>(
-                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
-                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
-                QuickSearch.DEFAULT_MATCH_SCORER,
-                0
-        );
-        assertNotNull(qs.getStats());
-    }
-
-    @Test
-    public void validMinimumLength() {
-        QuickSearch<String> qs = new QuickSearch<>(
-                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
-                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
-                QuickSearch.DEFAULT_MATCH_SCORER,
-                1
+                null
         );
         assertNotNull(qs.getStats());
     }
@@ -204,7 +179,6 @@ public class QuickSearchTest {
                 QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
                 QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
                 QuickSearch.DEFAULT_MATCH_SCORER,
-                1,
                 null,
                 QuickSearch.CANDIDATE_ACCUMULATION_POLICY.UNION
         );
@@ -217,21 +191,105 @@ public class QuickSearchTest {
                 QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
                 QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
                 QuickSearch.DEFAULT_MATCH_SCORER,
-                1,
                 QuickSearch.UNMATCHED_POLICY.EXACT,
                 null
         );
         assertNotNull(qs.getStats());
     }
 
+    @Test(expected = IllegalArgumentException.class)
+    public void testExtractingFunction() {
+        new QuickSearch<>(
+                s -> null,
+                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
+                QuickSearch.DEFAULT_MATCH_SCORER
+        );
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testExtractingFunction1() {
+        new QuickSearch<String>(
+                s -> s.length() > 0 ? null : Collections.emptySet(),
+                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
+                QuickSearch.DEFAULT_MATCH_SCORER
+        );
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testExtractingFunction2() {
+        new QuickSearch<String>(
+                s -> {
+                    throw new NullPointerException("testing");
+                },
+                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
+                QuickSearch.DEFAULT_MATCH_SCORER
+        );
+    }
+
+    @Test
+    public void testKeywordsFiltering() {
+        new QuickSearch<String>(
+                s -> new HashSet<>(Arrays.asList(s.split(","))),
+                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
+                QuickSearch.DEFAULT_MATCH_SCORER
+        ).findItem("red,black,,blue");
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testNormalizerFunction() {
+        new QuickSearch<String>(
+                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
+                s -> null,
+                QuickSearch.DEFAULT_MATCH_SCORER
+        );
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testNormalizerFunction1() {
+        new QuickSearch<String>(
+                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
+                s -> s.length() > 0 ? null : s,
+                QuickSearch.DEFAULT_MATCH_SCORER
+        );
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testNormalizerFunction2() {
+        new QuickSearch<String>(
+                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
+                s -> {
+                    throw new NullPointerException("test");
+                },
+                QuickSearch.DEFAULT_MATCH_SCORER
+        );
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testScorerFunction() {
+        new QuickSearch<String>(
+                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
+                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
+                (s1, s2) -> {
+                    throw new IndexOutOfBoundsException("testing");
+                }
+        );
+    }
+
     @Test
     public void itemAdded() throws Exception {
         addItem("item", "one two three");
+
+        checkStats(1, 3, 23);
     }
 
     @Test
     public void missingKeywords() throws Exception {
         assertFalse("Add a new search item with no keywords?", searchInstance.addItem("item", ""));
+    }
+
+    @Test
+    public void missingKeywords2() throws Exception {
+        assertFalse("Add a new search item with no keywords?", searchInstance.addItem("item", "    "));
     }
 
     @Test
@@ -256,9 +314,7 @@ public class QuickSearchTest {
             addItem(testString.substring(0, 5), testString.substring(0, 5));
         }
 
-        assertEquals(1, searchInstance.getStats().getItems());
-        assertEquals(1, searchInstance.getStats().getKeywords());
-        assertEquals(13, searchInstance.getStats().getFragments());
+        checkStats(1, 1, 13);
     }
 
     @Test
@@ -291,9 +347,7 @@ public class QuickSearchTest {
 
         assertTrue("Unexpected result size", searchInstance.findItems("one", 10).size() == 0);
 
-        assertEquals(0, searchInstance.getStats().getItems());
-        assertEquals(0, searchInstance.getStats().getKeywords());
-        assertEquals(0, searchInstance.getStats().getFragments());
+        checkStats(0, 0, 0);
     }
 
     @Test
@@ -328,6 +382,12 @@ public class QuickSearchTest {
     }
 
     @Test
+    public void itemNotFound8() throws Exception {
+        addItem("test", "one two three");
+        assertFalse("Search item not found", searchInstance.findItem("   ").isPresent());
+    }
+
+    @Test
     public void itemNotFound1() throws Exception {
         addItem("test", "one two three");
         assertTrue("Search item not found", searchInstance.findItems("", 1).isEmpty());
@@ -337,6 +397,18 @@ public class QuickSearchTest {
     public void itemNotFound2() throws Exception {
         addItem("test", "one two three");
         assertFalse("Search item not found", searchInstance.findItemWithDetail("").isPresent());
+    }
+
+    @Test
+    public void itemNotFound10() throws Exception {
+        addItem("test", "one two three");
+        assertFalse("Search item not found", searchInstance.findItemWithDetail("    ").isPresent());
+    }
+
+    @Test
+    public void itemNotFound9() throws Exception {
+        addItem("test", "one two three");
+        assertTrue("Search item not found", searchInstance.findItemsWithDetail("    ", 1).getResponseItems().isEmpty());
     }
 
     @Test
@@ -361,6 +433,12 @@ public class QuickSearchTest {
     public void itemNotFound6() throws Exception {
         addItem("test", "one two three");
         assertFalse("Search item not found", searchInstance.findItemWithDetail("London").isPresent());
+    }
+
+    @Test
+    public void itemNotFound7() throws Exception {
+        addItem("test", "one two three");
+        assertTrue("Search item not found", searchInstance.findItemsWithDetail("four five", 1).getResponseItems().isEmpty());
     }
 
     @Test
@@ -402,6 +480,24 @@ public class QuickSearchTest {
         addItem("test3", "one two three");
 
         assertTrue("Unexpected size", searchInstance.findItems("one", 10).size() == 3);
+    }
+
+    @Test
+    public void itemsFoundInOrder() throws Exception {
+        addItem("test1", "onex two three");
+        addItem("test2", "one two three");
+        addItem("test3", "onexx two three");
+        addItem("test4", "onexxx two three");
+        addItem("test5", "onexxxx two three");
+        addItem("test6", "onexxxxx two three");
+        addItem("test7", "onexxxxxx two three");
+        addItem("test8", "onexxxxxxx two three");
+
+        List<String> results = searchInstance.findItems("one", 3);
+        assertEquals("Unexpected size", 3, results.size());
+        assertEquals("test2", results.get(0));
+        assertEquals("test1", results.get(1));
+        assertEquals("test3", results.get(2));
     }
 
     @Test
@@ -470,9 +566,7 @@ public class QuickSearchTest {
 
     @Test
     public void statsAreEmpty() throws Exception {
-        assertEquals(0, searchInstance.getStats().getItems());
-        assertEquals(0, searchInstance.getStats().getKeywords());
-        assertEquals(0, searchInstance.getStats().getFragments());
+        checkStats(0, 0, 0);
     }
 
     @Test
@@ -488,9 +582,7 @@ public class QuickSearchTest {
         }
 
         assertEquals(10, searchInstance.findItems("e ex exe exer exerc i is ise", 10).size());
-        assertEquals(33, searchInstance.getStats().getItems());
-        assertEquals(63, searchInstance.getStats().getKeywords());
-        assertEquals(554, searchInstance.getStats().getFragments());
+        checkStats(33, 63, 554);
     }
 
     @Test
@@ -498,8 +590,7 @@ public class QuickSearchTest {
         QuickSearch<String> alternativeConfig = new QuickSearch<>(
                 QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
                 QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
-                (s1, s2) -> (double) (s1.length() * s1.length()),
-                QuickSearch.DEFAULT_MINIMUM_KEYWORD_LENGTH
+                (s1, s2) -> (double) (s1.length() * s1.length())
         );
 
         String exerciseString = "aquickbrownfoxjumpsoverthelazydog";
@@ -514,9 +605,7 @@ public class QuickSearchTest {
 
         assertEquals(10, alternativeConfig.findItems("e ex exe exer exerc i is ise", 10).size());
 
-        assertEquals(33, alternativeConfig.getStats().getItems());
-        assertEquals(63, alternativeConfig.getStats().getKeywords());
-        assertEquals(554, alternativeConfig.getStats().getFragments());
+        checkStats(alternativeConfig.getStats(), 33, 65, 554);
     }
 
     @Test
@@ -626,7 +715,6 @@ public class QuickSearchTest {
                 QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
                 QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
                 QuickSearch.DEFAULT_MATCH_SCORER,
-                QuickSearch.DEFAULT_MINIMUM_KEYWORD_LENGTH,
                 BACKTRACKING,
                 INTERSECTION);
 
@@ -651,7 +739,6 @@ public class QuickSearchTest {
                 QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
                 QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
                 QuickSearch.DEFAULT_MATCH_SCORER,
-                QuickSearch.DEFAULT_MINIMUM_KEYWORD_LENGTH,
                 BACKTRACKING,
                 INTERSECTION);
 
@@ -670,7 +757,6 @@ public class QuickSearchTest {
                 QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
                 QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
                 QuickSearch.DEFAULT_MATCH_SCORER,
-                QuickSearch.DEFAULT_MINIMUM_KEYWORD_LENGTH,
                 BACKTRACKING,
                 INTERSECTION);
 
@@ -687,7 +773,6 @@ public class QuickSearchTest {
                 QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
                 QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
                 QuickSearch.DEFAULT_MATCH_SCORER,
-                QuickSearch.DEFAULT_MINIMUM_KEYWORD_LENGTH,
                 BACKTRACKING,
                 INTERSECTION);
 
@@ -704,7 +789,6 @@ public class QuickSearchTest {
                 QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
                 QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
                 QuickSearch.DEFAULT_MATCH_SCORER,
-                QuickSearch.DEFAULT_MINIMUM_KEYWORD_LENGTH,
                 BACKTRACKING,
                 INTERSECTION);
 
@@ -748,7 +832,6 @@ public class QuickSearchTest {
                 QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
                 QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
                 QuickSearch.DEFAULT_MATCH_SCORER,
-                QuickSearch.DEFAULT_MINIMUM_KEYWORD_LENGTH,
                 EXACT,
                 UNION
         );
@@ -769,9 +852,7 @@ public class QuickSearchTest {
 
         searchInstance.clear();
 
-        assertEquals(0, searchInstance.getStats().getItems());
-        assertEquals(0, searchInstance.getStats().getKeywords());
-        assertEquals(0, searchInstance.getStats().getFragments());
+        checkStats(0, 0, 0);
 
         assertFalse("Unexpected result", searchInstance.findItem("one").isPresent());
     }
@@ -886,82 +967,6 @@ public class QuickSearchTest {
         assertEquals(1, list.size());
     }
 
-    @Test(expected = IllegalArgumentException.class)
-    public void testExtractingFunction() {
-        new QuickSearch<>(
-                s -> null,
-                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
-                QuickSearch.DEFAULT_MATCH_SCORER,
-                QuickSearch.DEFAULT_MINIMUM_KEYWORD_LENGTH
-        );
-    }
-
-    @Test(expected = IllegalArgumentException.class)
-    public void testExtractingFunction1() {
-        new QuickSearch<String>(
-                s -> s.length() > 0 ? null : Collections.emptySet(),
-                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
-                QuickSearch.DEFAULT_MATCH_SCORER,
-                QuickSearch.DEFAULT_MINIMUM_KEYWORD_LENGTH
-        );
-    }
-
-    @Test(expected = IllegalArgumentException.class)
-    public void testExtractingFunction2() {
-        new QuickSearch<String>(
-                s -> {
-                    throw new NullPointerException("testing");
-                },
-                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
-                QuickSearch.DEFAULT_MATCH_SCORER,
-                QuickSearch.DEFAULT_MINIMUM_KEYWORD_LENGTH
-        );
-    }
-
-    @Test(expected = IllegalArgumentException.class)
-    public void testNormalizerFunction() {
-        new QuickSearch<String>(
-                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
-                s -> null,
-                QuickSearch.DEFAULT_MATCH_SCORER,
-                QuickSearch.DEFAULT_MINIMUM_KEYWORD_LENGTH
-        );
-    }
-
-    @Test(expected = IllegalArgumentException.class)
-    public void testNormalizerFunction1() {
-        new QuickSearch<String>(
-                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
-                s -> s.length() > 0 ? null : s,
-                QuickSearch.DEFAULT_MATCH_SCORER,
-                QuickSearch.DEFAULT_MINIMUM_KEYWORD_LENGTH
-        );
-    }
-
-    @Test(expected = IllegalArgumentException.class)
-    public void testNormalizerFunction2() {
-        new QuickSearch<String>(
-                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
-                s -> {
-                    throw new NullPointerException("test");
-                },
-                QuickSearch.DEFAULT_MATCH_SCORER,
-                QuickSearch.DEFAULT_MINIMUM_KEYWORD_LENGTH
-        );
-    }
-
-    @Test(expected = IllegalArgumentException.class)
-    public void testScorerFunction() {
-        new QuickSearch<String>(
-                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
-                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
-                (s1, s2) -> {
-                    throw new IndexOutOfBoundsException("testing");
-                },
-                QuickSearch.DEFAULT_MINIMUM_KEYWORD_LENGTH
-        );
-    }
-
     /*
      * microbenchmarks and utilities
      */
@@ -973,7 +978,6 @@ public class QuickSearchTest {
                 QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
                 QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
                 QuickSearch.DEFAULT_MATCH_SCORER,
-                QuickSearch.DEFAULT_MINIMUM_KEYWORD_LENGTH,
                 BACKTRACKING,
                 INTERSECTION);
 
@@ -1124,6 +1128,8 @@ public class QuickSearchTest {
             while (latch.getCount() > 0) {
                 addItem("new item" + i, "few new keywords" + i++);
                 wrote.incrementAndGet();
+
+                //noinspection EmptyCatchBlock
                 try {
                     Thread.sleep(50);
                 } catch (InterruptedException e) {
@@ -1219,5 +1225,15 @@ public class QuickSearchTest {
     private void addItem(QuickSearch<String> instance, String item, String keywords) {
         assertTrue("Failed to add item", instance.addItem(item, keywords));
 
+    }
+
+    private void checkStats(int items, int keywords, int fragments) {
+        checkStats(searchInstance.getStats(), items, keywords, fragments);
+    }
+
+    private void checkStats(Stats stats, int items, int keywords, int fragments) {
+        assertEquals(items, stats.getItems());
+        assertEquals(keywords, stats.getKeywords());
+        assertEquals(fragments, stats.getFragments());
     }
 }
