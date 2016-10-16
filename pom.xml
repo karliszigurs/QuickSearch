@@ -19,6 +19,19 @@
     </properties>
 
     <dependencies>
+        <!--TODO move to 305?-->
+        <dependency>
+            <groupId>org.jetbrains</groupId>
+            <artifactId>annotations</artifactId>
+            <version>15.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>19.0</version>
+        </dependency>
+
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
@@ -27,9 +40,10 @@
         </dependency>
 
         <dependency>
-            <groupId>org.jetbrains</groupId>
-            <artifactId>annotations</artifactId>
-            <version>15.0</version>
+            <groupId>com.github.jbellis</groupId>
+            <artifactId>jamm</artifactId>
+            <version>0.3.1</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 

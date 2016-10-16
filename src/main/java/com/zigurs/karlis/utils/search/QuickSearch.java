@@ -15,6 +15,10 @@
  */
 package com.zigurs.karlis.utils.search;
 
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.ImmutableMultimap;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Multimap;
 import com.zigurs.karlis.utils.search.model.Item;
 import com.zigurs.karlis.utils.search.model.Result;
 import com.zigurs.karlis.utils.search.model.Stats;
@@ -26,7 +30,6 @@ import java.util.concurrent.locks.StampedLock;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import static com.zigurs.karlis.utils.search.QuickSearch.CANDIDATE_ACCUMULATION_POLICY.UNION;
@@ -199,9 +202,15 @@ public class QuickSearch<T> {
     @NotNull
     private final CANDIDATE_ACCUMULATION_POLICY candidateAccumulationPolicy;
 
-    private final Map<String, Set<String>> fragmentToKeywordsMap = new HashMap<>(); // links to
-    private final Map<String, Set<HashWrapper<T>>> keywordToItemsMap = new HashMap<>();
-    private final Map<HashWrapper<T>, Set<String>> itemKeywordsMap = new HashMap<>();
+    private Multimap<String, String> fragmentToKeywordsMap = HashMultimap.create();
+    private Multimap<String, HashWrapper<T>> keywordToItemsMap = HashMultimap.create();
+    private Multimap<HashWrapper<T>, String> itemKeywordsMap = HashMultimap.create();
+
+    public void goImmutable() {
+        fragmentToKeywordsMap = ImmutableMultimap.copyOf(fragmentToKeywordsMap);
+        keywordToItemsMap = ImmutableMultimap.copyOf(keywordToItemsMap);
+        itemKeywordsMap = ImmutableMultimap.copyOf(itemKeywordsMap);
+    }
 
     private final StampedLock lock = new StampedLock();
 
@@ -223,9 +232,9 @@ public class QuickSearch<T> {
      * <p>
      * Please note that supplied functions will be validated for basic behavior on creating the instance.
      *
-     * @param keywordsExtractor    Extractor function.
-     * @param keywordNormalizer    Normalizer function.
-     * @param keywordMatchScorer   Scorer function.
+     * @param keywordsExtractor  Extractor function.
+     * @param keywordNormalizer  Normalizer function.
+     * @param keywordMatchScorer Scorer function.
      */
     public QuickSearch(@Nullable Function<String, Set<String>> keywordsExtractor,
                        @Nullable Function<String, String> keywordNormalizer,
@@ -427,7 +436,7 @@ public class QuickSearch<T> {
                 return Optional.of(
                         new Item<>(
                                 w.unwrap().unwrap(),
-                                itemKeywordsMap.get(w.unwrap()),
+                                ImmutableSet.copyOf(itemKeywordsMap.get(w.unwrap())),
                                 w.getScore()
                         )
                 );
@@ -467,7 +476,11 @@ public class QuickSearch<T> {
                 return new Result<>(
                         searchString,
                         results.stream()
-                                .map(i -> new Item<>(i.unwrap().unwrap(), itemKeywordsMap.get(i.unwrap()), i.getScore()))
+                                .map(i -> new Item<>(
+                                        i.unwrap().unwrap(),
+                                        ImmutableSet.copyOf(itemKeywordsMap.get(i.unwrap())),
+                                        i.getScore())
+                                )
                                 .collect(Collectors.toList())
                 );
             }
@@ -501,7 +514,11 @@ public class QuickSearch<T> {
 
         long readLock = lock.readLock();
         try {
-            stats = new Stats(itemKeywordsMap.size(), keywordToItemsMap.size(), fragmentToKeywordsMap.size());
+            stats = new Stats(
+                    itemKeywordsMap.keySet().size(),
+                    keywordToItemsMap.keySet().size(),
+                    fragmentToKeywordsMap.keySet().size()
+            );
         } finally {
             lock.unlockRead(readLock);
         }
@@ -587,8 +604,8 @@ public class QuickSearch<T> {
 
     @NotNull
     private Map<HashWrapper<T>, Double> matchSingleFragment(@NotNull String candidateFragment, Map<HashWrapper<T>, Double> whiteList) {
-        Set<String> candidateKeywords = fragmentToKeywordsMap.get(candidateFragment);
-        if (candidateKeywords == null) {
+        Collection<String> candidateKeywords = fragmentToKeywordsMap.get(candidateFragment);
+        if (candidateKeywords.isEmpty()) {
             if (unmatchedPolicy == BACKTRACKING && candidateFragment.length() > 1) {
                 /*
                  * If we have a supplied keyword we don't have a match for,
@@ -611,7 +628,7 @@ public class QuickSearch<T> {
 
     @NotNull
     private Map<HashWrapper<T>, Double> scoreSingleFragment(@NotNull String candidateFragment,
-                                                            @NotNull Set<String> candidateKeywords,
+                                                            @NotNull Collection<String> candidateKeywords,
                                                             @Nullable Map<HashWrapper<T>, Double> whitelist) {
         Map<HashWrapper<T>, Double> fragmentItems = new LinkedHashMap<>();
 
@@ -637,14 +654,16 @@ public class QuickSearch<T> {
             if (!keywordToItemsMap.containsKey(keyword)) {
                 forAllPossibleSubstrings(
                         keyword,
-                        (kw, substring) -> addToSetInMap(fragmentToKeywordsMap, substring, kw, LinkedHashSet::new)
+                        (kw, substring) -> {
+                            fragmentToKeywordsMap.put(substring, keyword);
+                        }
                 );
             }
             // Then populate keyword -> items link
-            addToSetInMap(keywordToItemsMap, keyword, item, LinkedHashSet::new);
+            keywordToItemsMap.put(keyword, item);
 
             // and then make sure to store known keywords for item (needed on removal)
-            addToSetInMap(itemKeywordsMap, item, keyword, LinkedHashSet::new);
+            itemKeywordsMap.put(item, keyword);
         }
     }
 
@@ -653,48 +672,24 @@ public class QuickSearch<T> {
             return false;
 
         //  all known keywords for the item
-        Set<String> itemKeywords = itemKeywordsMap.get(item);
+        Collection<String> itemKeywords = itemKeywordsMap.get(item);
 
         /*
          * Only unmap the substrings if the keyword is no longer in use after
          * removing this associated item.
          */
         itemKeywords.stream()
-                .filter(keyword -> removeFromSetInMap(keywordToItemsMap, keyword, item)) // if this was final item for keyword proceed to unlink keyword too
-                .forEach(keyword -> forAllPossibleSubstrings(keyword, (kw, fragment) -> removeFromSetInMap(fragmentToKeywordsMap, fragment, kw)));
+                .filter(keyword -> {
+                    keywordToItemsMap.remove(keyword, item);
+                    return keywordToItemsMap.get(keyword).isEmpty();
+                }) // if this was final item for keyword proceed to unlink keyword too
+                .forEach(keyword -> forAllPossibleSubstrings(keyword, (kw, fragment) -> {
+                    fragmentToKeywordsMap.remove(fragment, kw);
+                }));
 
         // forget about the item
-        itemKeywordsMap.remove(item);
+        itemKeywordsMap.removeAll(item);
         return true;
-    }
-
-    private <K, V, X extends V> void addToSetInMap(@NotNull Map<K, Set<V>> map,
-                                                   @NotNull K key,
-                                                   @NotNull X value,
-                                                   @NotNull Supplier<Set<V>> supplier) {
-        Set<V> set = map.get(key);
-
-        if (set == null) {
-            set = supplier.get();
-            map.put(key, set);
-        }
-
-        set.add(value);
-    }
-
-    private <K, V, X extends V> boolean removeFromSetInMap(@NotNull Map<K, Set<V>> map,
-                                                           @NotNull K key,
-                                                           @NotNull X value) {
-        Set<V> set = map.get(key);
-
-        set.remove(value);
-
-        if (set.isEmpty()) {
-            map.remove(key);
-            return true; // was last item
-        }
-
-        return false; // still items remaining
     }
 
     private void forAllPossibleSubstrings(@NotNull String keyword, @NotNull BiConsumer<String, String> function) {

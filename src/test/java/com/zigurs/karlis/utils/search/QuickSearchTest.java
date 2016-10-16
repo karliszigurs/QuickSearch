@@ -17,6 +17,7 @@ package com.zigurs.karlis.utils.search;
 
 import com.zigurs.karlis.utils.search.model.Result;
 import com.zigurs.karlis.utils.search.model.Stats;
+import org.github.jamm.MemoryMeter;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Ignore;
@@ -139,7 +140,6 @@ public class QuickSearchTest {
 
     @After
     public void tearDown() throws Exception {
-        searchInstance.clear();
         searchInstance = null;
     }
 
@@ -1218,13 +1218,75 @@ public class QuickSearchTest {
         ));
     }
 
+    @Test
+    public void measureMemoryUse() {
+        searchInstance = new QuickSearch<>(
+                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
+                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
+                QuickSearch.DEFAULT_MATCH_SCORER,
+                BACKTRACKING,
+                INTERSECTION);
+
+        for (int i = 0; i < 100_000; i++) {
+            String[] items = USA_STATES[i % USA_STATES.length];
+            addItem(items[0] + "-" + i, String.format("%s %s %s %s", items[0], items[1], items[2], items[3]));
+        }
+
+//        searchInstance.goImmutable();
+
+        MemoryMeter meter = new MemoryMeter().withGuessing(MemoryMeter.Guess.ALWAYS_UNSAFE);
+        long measured = meter.measureDeep(searchInstance);
+        System.out.println("Memory consumption measured at " + measured);
+
+        final long JDK_COLLECTIONS_TARGET = 117_416_608;
+        final long GUAVA_MULTIMAP_TARGET = 104_140_960;
+        final long GUAVA_MULTIMAP_IMMUTABLE_TARGET = 54_848_672;
+
+        assertTrue("Calculated size exceeds JDK Collections target", measured < (JDK_COLLECTIONS_TARGET * 1.1));
+    }
+
+    @Test
+    public void measureQueryMicrobench() {
+        searchInstance = new QuickSearch<>(
+                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
+                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
+                QuickSearch.DEFAULT_MATCH_SCORER,
+                BACKTRACKING,
+                INTERSECTION);
+
+        for (int i = 0; i < 100_000; i++) {
+            String[] items = USA_STATES[i % USA_STATES.length];
+            addItem(items[0] + "-" + i, String.format("%s %s %s %s", items[0], items[1], items[2], items[3]));
+        }
+
+//        searchInstance.goImmutable();
+
+        long startTime = System.currentTimeMillis();
+
+        for (int i = 0; i < 10_000; i++) {
+            String searchString = USA_STATES[i % USA_STATES.length][0];
+            assertFalse("No results found", searchInstance.findItems(searchString, 10).isEmpty());
+        }
+
+        final long JDK_COLLECTIONS_TARGET = 12100;
+        final long GUAVA_MULTIMAP_TARGET = 19600;
+        final long GUAVA_MULTIMAP_IMMUTABLE_TARGET = 13100;
+
+        System.out.println("Time taken: " + (System.currentTimeMillis() - startTime));
+    }
+
+
+
+    /*
+     * Tests boilerplate
+     */
+
     private void addItem(String item, String keywords) {
         addItem(searchInstance, item, keywords);
     }
 
     private void addItem(QuickSearch<String> instance, String item, String keywords) {
         assertTrue("Failed to add item", instance.addItem(item, keywords));
-
     }
 
     private void checkStats(int items, int keywords, int fragments) {

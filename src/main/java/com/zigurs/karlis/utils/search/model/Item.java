@@ -15,9 +15,9 @@
  */
 package com.zigurs.karlis.utils.search.model;
 
+import com.google.common.collect.ImmutableSet;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.Collections;
 import java.util.Set;
 
 /**
@@ -38,13 +38,13 @@ public class Item<T> {
     /**
      * Construct an instance.
      *
-     * @param item item
-     * @param itemKeywords keywords associated with item
-     * @param score search result score for the item
+     * @param item         item
+     * @param itemKeywords set of non-null keywords associated with item
+     * @param score        search result score for the item
      */
     public Item(@NotNull T item, @NotNull Set<String> itemKeywords, double score) {
         this.item = item;
-        this.itemKeywords = Collections.unmodifiableSet(itemKeywords);
+        this.itemKeywords = ImmutableSet.copyOf(itemKeywords);
         this.score = score;
     }
 
