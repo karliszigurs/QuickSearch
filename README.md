@@ -78,3 +78,7 @@ All internal data structures are pre-calculated and reside in memory. Following 
 ## Credits
 
 Karlis Zigurs, 2016
+
+### Cloudy things
+
+[![Build Status](https://travis-ci.org/karliszigurs/QuickSearch.svg?branch=master)](https://travis-ci.org/karliszigurs/QuickSearch)
