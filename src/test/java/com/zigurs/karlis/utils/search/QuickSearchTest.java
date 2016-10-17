@@ -319,17 +319,8 @@ public class QuickSearchTest {
     @Test
     public void itemRemoved() throws Exception {
         addItem("toBeRemoved", "one two three");
-        assertTrue("Failed to remove search item", searchInstance.removeItem("toBeRemoved"));
-    }
-
-    @Test
-    public void itemNotRemoved() throws Exception {
-        assertFalse("Failed to remove search item", searchInstance.removeItem("toBeRemoved"));
-    }
-
-    @Test
-    public void itemRemovedNull() throws Exception {
-        assertFalse("Failed to remove search item", searchInstance.removeItem(null));
+        searchInstance.removeItem("toBeRemoved");
+        assertEquals(0, searchInstance.getStats().getFragments());
     }
 
     @Test
@@ -1223,6 +1214,7 @@ public class QuickSearchTest {
         ));
     }
 
+    @Ignore
     @Test
     public void measureMemoryUse() {
         searchInstance = new QuickSearch<>(
@@ -1248,7 +1240,6 @@ public class QuickSearchTest {
         final long JDK_COLLECTIONS_TARGET = 117_416_608;
         final long GUAVA_MULTIMAP_TARGET = 104_140_960;
         final long CUSTOM_TREE_TARGET = 54_255_008;
-
 
         assertTrue("Calculated size exceeds target", measured < (CUSTOM_TREE_TARGET * 1.1));
     }

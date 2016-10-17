@@ -310,18 +310,20 @@ public class QuickSearch<T> {
     }
 
     /**
-     * Remove previously added item. Calling this method removes the item and its mapping of keywords from the database.
+     * Remove an item, if it exists. Calling this method ensures that specified item
+     * and any keywords it was associated with is gone.
+     *
+     * Or it does nothing if no such item was present.
      *
      * @param item Item to remove
-     * @return True if the item was removed, false if no such item was found
      */
-    public boolean removeItem(@Nullable T item) {
+    public void removeItem(@Nullable T item) {
         if (item == null)
-            return false;
+            return;
 
         long writeLock = lock.writeLock();
         try {
-            return removeItemImpl(new HashWrapper<>(item));
+            removeItemImpl(new HashWrapper<>(item));
         } finally {
             lock.unlockWrite(writeLock);
         }
@@ -609,7 +611,7 @@ public class QuickSearch<T> {
                                                      Set<String> visited) {
         visited.add(node.getKey());
 
-        if (node.getItems() != null && !node.getItems().isEmpty()) {
+        if (!node.getItems().isEmpty()) {
             Double score = keywordMatchScorer.apply(originalFragment, node.getKey());
 
             node.getItems().forEach((item) -> {
@@ -638,10 +640,9 @@ public class QuickSearch<T> {
         }
     }
 
-    private boolean removeItemImpl(@NotNull HashWrapper<T> item) {
-        boolean removed = unregisterItem(item);
+    private void removeItemImpl(@NotNull HashWrapper<T> item) {
+        unregisterItem(item);
         itemKeywordsMap.remove(item);
-        return removed;
     }
 
     @NotNull
@@ -758,24 +759,11 @@ public class QuickSearch<T> {
 
     private void registerItem(HashWrapper<T> item, Set<String> keywords) {
         for (String keyword : keywords) {
-            GraphNode<HashWrapper<T>> node = fragmentsItemsTree.get(keyword);
-
-            if (node == null) {
-                node = new GraphNode<>(keyword);
-                fragmentsItemsTree.put(keyword, node);
-                node.addItem(item);
-
-                if (keyword.length() > 1) {
-                    addNode(node, keyword.substring(0, keyword.length() - 1));
-                    addNode(node, keyword.substring(1));
-                }
-            } else {
-                node.addItem(item);
-            }
+            createAndRegisterNode(null, keyword, item);
         }
     }
 
-    private void addNode(GraphNode<HashWrapper<T>> parent, String identity) {
+    private void createAndRegisterNode(GraphNode<HashWrapper<T>> parent, String identity, HashWrapper<T> item) {
         GraphNode<HashWrapper<T>> node = fragmentsItemsTree.get(identity);
 
         if (node == null) {
@@ -784,33 +772,30 @@ public class QuickSearch<T> {
 
             // And proceed to add child nodes
             if (node.getKey().length() > 1) {
-                addNode(node, identity.substring(0, identity.length() - 1));
-                addNode(node, identity.substring(1));
+                createAndRegisterNode(node, identity.substring(0, identity.length() - 1), null);
+                createAndRegisterNode(node, identity.substring(1), null);
             }
         }
 
-        node.addParent(parent);
+        if (item != null) node.addItem(item);
+        if (parent != null) node.addParent(parent);
     }
 
-    private boolean unregisterItem(@NotNull HashWrapper<T> item) {
-        int removed = 0;
-
+    private void unregisterItem(@NotNull HashWrapper<T> item) {
         if (itemKeywordsMap.containsKey(item)) {
             for (String keyword : itemKeywordsMap.get(item)) {
                 GraphNode<HashWrapper<T>> keywordNode = fragmentsItemsTree.get(keyword);
 
                 keywordNode.removeItem(item);
-                removed++;
 
                 if (keywordNode.getItems().isEmpty()) {
-                    tearDownNode(keywordNode, null);
+                    collapseEdge(keywordNode, null);
                 }
             }
         }
-        return removed > 0;
     }
 
-    private void tearDownNode(GraphNode<HashWrapper<T>> node, GraphNode<HashWrapper<T>> parent) {
+    private void collapseEdge(GraphNode<HashWrapper<T>> node, GraphNode<HashWrapper<T>> parent) {
         if (node == null) //already removed
             return;
 
@@ -818,13 +803,13 @@ public class QuickSearch<T> {
             node.removeParent(parent);
         }
 
-        // No getParents or getItems means that there's nothing here to find
-        if (node.getParents().isEmpty() && (node.getItems() == null || node.getItems().isEmpty())) {
+        // No getParents or getItems means that there's nothing here to find, proceed onwards
+        if (node.getParents().isEmpty() && node.getItems().isEmpty()) {
             fragmentsItemsTree.remove(node.getKey());
 
             if (node.getKey().length() > 1) {
-                tearDownNode(fragmentsItemsTree.get(node.getKey().substring(0, node.getKey().length() - 1)), node);
-                tearDownNode(fragmentsItemsTree.get(node.getKey().substring(1)), node);
+                collapseEdge(fragmentsItemsTree.get(node.getKey().substring(0, node.getKey().length() - 1)), node);
+                collapseEdge(fragmentsItemsTree.get(node.getKey().substring(1)), node);
             }
         }
     }
