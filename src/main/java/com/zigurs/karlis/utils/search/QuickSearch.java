@@ -23,10 +23,8 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 import java.util.concurrent.locks.StampedLock;
-import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import static com.zigurs.karlis.utils.search.QuickSearch.CANDIDATE_ACCUMULATION_POLICY.UNION;
@@ -198,11 +196,11 @@ public class QuickSearch<T> {
     private final UNMATCHED_POLICY unmatchedPolicy;
     @NotNull
     private final CANDIDATE_ACCUMULATION_POLICY candidateAccumulationPolicy;
-
-    private final Map<String, Set<String>> fragmentToKeywordsMap = new HashMap<>(); // links to
-    private final Map<String, Set<HashWrapper<T>>> keywordToItemsMap = new HashMap<>();
-    private final Map<HashWrapper<T>, Set<String>> itemKeywordsMap = new HashMap<>();
-
+    @NotNull
+    private final Map<String, GraphNode<HashWrapper<T>>> fragmentsItemsTree = new HashMap<>();
+    @NotNull
+    private final Map<HashWrapper<T>, ReadOnlySet<String>> itemKeywordsMap = new HashMap<>();
+    @NotNull
     private final StampedLock lock = new StampedLock();
 
     /*
@@ -223,9 +221,9 @@ public class QuickSearch<T> {
      * <p>
      * Please note that supplied functions will be validated for basic behavior on creating the instance.
      *
-     * @param keywordsExtractor    Extractor function.
-     * @param keywordNormalizer    Normalizer function.
-     * @param keywordMatchScorer   Scorer function.
+     * @param keywordsExtractor  Extractor function.
+     * @param keywordNormalizer  Normalizer function.
+     * @param keywordMatchScorer Scorer function.
      */
     public QuickSearch(@Nullable Function<String, Set<String>> keywordsExtractor,
                        @Nullable Function<String, String> keywordNormalizer,
@@ -312,18 +310,20 @@ public class QuickSearch<T> {
     }
 
     /**
-     * Remove previously added item. Calling this method removes the item and its mapping of keywords from the database.
+     * Remove an item, if it exists. Calling this method ensures that specified item
+     * and any keywords it was associated with is gone.
+     *
+     * Or it does nothing if no such item was present.
      *
      * @param item Item to remove
-     * @return True if the item was removed, false if no such item was found
      */
-    public boolean removeItem(@Nullable T item) {
+    public void removeItem(@Nullable T item) {
         if (item == null)
-            return false;
+            return;
 
         long writeLock = lock.writeLock();
         try {
-            return removeItemImpl(new HashWrapper<>(item));
+            removeItemImpl(new HashWrapper<>(item));
         } finally {
             lock.unlockWrite(writeLock);
         }
@@ -427,7 +427,7 @@ public class QuickSearch<T> {
                 return Optional.of(
                         new Item<>(
                                 w.unwrap().unwrap(),
-                                itemKeywordsMap.get(w.unwrap()),
+                                itemKeywordsMap.get(w.unwrap()).safeCopy(),
                                 w.getScore()
                         )
                 );
@@ -467,7 +467,11 @@ public class QuickSearch<T> {
                 return new Result<>(
                         searchString,
                         results.stream()
-                                .map(i -> new Item<>(i.unwrap().unwrap(), itemKeywordsMap.get(i.unwrap()), i.getScore()))
+                                .map(i -> new Item<>(
+                                        i.unwrap().unwrap(),
+                                        itemKeywordsMap.get(i.unwrap()).safeCopy(),
+                                        i.getScore())
+                                )
                                 .collect(Collectors.toList())
                 );
             }
@@ -482,9 +486,7 @@ public class QuickSearch<T> {
     public void clear() {
         long writeLock = lock.writeLock();
         try {
-            keywordToItemsMap.clear();
-            fragmentToKeywordsMap.clear();
-            itemKeywordsMap.clear();
+            fragmentsItemsTree.clear();
         } finally {
             lock.unlockWrite(writeLock);
         }
@@ -501,7 +503,11 @@ public class QuickSearch<T> {
 
         long readLock = lock.readLock();
         try {
-            stats = new Stats(itemKeywordsMap.size(), keywordToItemsMap.size(), fragmentToKeywordsMap.size());
+            stats = new Stats(
+                    fragmentsItemsTree.size(),
+                    fragmentsItemsTree.size(),
+                    fragmentsItemsTree.size()
+            );
         } finally {
             lock.unlockRead(readLock);
         }
@@ -554,8 +560,7 @@ public class QuickSearch<T> {
         Map<HashWrapper<T>, Double> accumulatedItems = new LinkedHashMap<>();
 
         for (String suppliedFragment : searchFragments) {
-            matchSingleFragment(suppliedFragment, null)
-                    .forEach((k, v) -> accumulatedItems.merge(k, v, (d1, d2) -> d1 + d2));
+            walkAndScore(suppliedFragment, null).forEach((k, v) -> accumulatedItems.merge(k, v, (d1, d2) -> d1 + d2));
         }
 
         return accumulatedItems;
@@ -568,7 +573,7 @@ public class QuickSearch<T> {
         boolean firstFragment = true;
 
         for (String suppliedFragment : suppliedFragments) {
-            Map<HashWrapper<T>, Double> fragmentItems = matchSingleFragment(suppliedFragment, accumulatedItems);
+            Map<HashWrapper<T>, Double> fragmentItems = walkAndScore(suppliedFragment, accumulatedItems);
             if (fragmentItems.isEmpty())
                 return fragmentItems; // Can fail early
 
@@ -585,126 +590,59 @@ public class QuickSearch<T> {
         return accumulatedItems;
     }
 
-    @NotNull
-    private Map<HashWrapper<T>, Double> matchSingleFragment(@NotNull String candidateFragment, Map<HashWrapper<T>, Double> whiteList) {
-        Set<String> candidateKeywords = fragmentToKeywordsMap.get(candidateFragment);
-        if (candidateKeywords == null) {
-            if (unmatchedPolicy == BACKTRACKING && candidateFragment.length() > 1) {
-                /*
-                 * If we have a supplied keyword we don't have a match for,
-                 * try to shorten it by a char to see if that yields a result.
-                 *
-                 * As a result we should be able to match 'termite' against 'terminator'
-                 * after two backtracking iterations.
-                 */
-                return matchSingleFragment(candidateFragment.substring(0, candidateFragment.length() - 1), whiteList);
+    private Map<HashWrapper<T>, Double> walkAndScore(String fragment, Map<HashWrapper<T>, Double> whiteList) {
+        GraphNode<HashWrapper<T>> root = fragmentsItemsTree.get(fragment);
+
+        if (root == null) {
+            if (unmatchedPolicy == BACKTRACKING && fragment.length() > 1) {
+                return walkAndScore(fragment.substring(0, fragment.length() - 1), whiteList);
             } else {
                 return Collections.emptyMap();
             }
-        } else {
-            /*
-             * Otherwise proceed with normal 1:1 matching.
-             */
-            return scoreSingleFragment(candidateFragment, candidateKeywords, whiteList);
         }
+
+        return walkAndScore(fragment, root, new HashMap<>(), whiteList, new HashSet<>());
     }
 
-    @NotNull
-    private Map<HashWrapper<T>, Double> scoreSingleFragment(@NotNull String candidateFragment,
-                                                            @NotNull Set<String> candidateKeywords,
-                                                            @Nullable Map<HashWrapper<T>, Double> whitelist) {
-        Map<HashWrapper<T>, Double> fragmentItems = new LinkedHashMap<>();
+    private Map<HashWrapper<T>, Double> walkAndScore(String originalFragment,
+                                                     GraphNode<HashWrapper<T>> node,
+                                                     Map<HashWrapper<T>, Double> accumulated,
+                                                     Map<HashWrapper<T>, Double> whiteList,
+                                                     Set<String> visited) {
+        visited.add(node.getKey());
 
-        for (String keyword : candidateKeywords) {
-            Double score = keywordMatchScorer.apply(candidateFragment, keyword);
+        if (!node.getItems().isEmpty()) {
+            Double score = keywordMatchScorer.apply(originalFragment, node.getKey());
 
-            // Not using Math::max here due to unboxing->compare->boxing scenario.
-            keywordToItemsMap.get(keyword).forEach(item -> {
-                if (whitelist == null || whitelist.containsKey(item)) {
-                    fragmentItems.merge(item, score, (d1, d2) -> (d1 > d2) ? d1 : d2);
+            node.getItems().forEach((item) -> {
+                if (whiteList == null || whiteList.containsKey(item)) {
+                    accumulated.merge(item, score, (d1, d2) -> d1 > d2 ? d1 : d2);
                 }
             });
         }
 
-        return fragmentItems;
+        node.getParents().forEach((parent) -> {
+            if (!visited.contains(parent.getKey())) {
+                walkAndScore(originalFragment, parent, accumulated, whiteList, visited);
+            }
+        });
+
+        return accumulated;
     }
 
     private void addItemImpl(@NotNull HashWrapper<T> item, @NotNull Set<String> suppliedKeywords) {
-        // Populate maps
-        for (String keyword : suppliedKeywords) {
+        registerItem(item, suppliedKeywords);
 
-            // If it's a previously unknown keyword, populate fragments to keywords map
-            if (!keywordToItemsMap.containsKey(keyword)) {
-                forAllPossibleSubstrings(
-                        keyword,
-                        (kw, substring) -> addToSetInMap(fragmentToKeywordsMap, substring, kw, LinkedHashSet::new)
-                );
-            }
-            // Then populate keyword -> items link
-            addToSetInMap(keywordToItemsMap, keyword, item, LinkedHashSet::new);
-
-            // and then make sure to store known keywords for item (needed on removal)
-            addToSetInMap(itemKeywordsMap, item, keyword, LinkedHashSet::new);
+        if (itemKeywordsMap.containsKey(item)) {
+            itemKeywordsMap.put(item, ReadOnlySet.fromCollections(itemKeywordsMap.get(item), suppliedKeywords));
+        } else {
+            itemKeywordsMap.put(item, ReadOnlySet.fromCollection(suppliedKeywords));
         }
     }
 
-    private boolean removeItemImpl(@NotNull HashWrapper<T> item) {
-        if (!itemKeywordsMap.containsKey(item))
-            return false;
-
-        //  all known keywords for the item
-        Set<String> itemKeywords = itemKeywordsMap.get(item);
-
-        /*
-         * Only unmap the substrings if the keyword is no longer in use after
-         * removing this associated item.
-         */
-        itemKeywords.stream()
-                .filter(keyword -> removeFromSetInMap(keywordToItemsMap, keyword, item)) // if this was final item for keyword proceed to unlink keyword too
-                .forEach(keyword -> forAllPossibleSubstrings(keyword, (kw, fragment) -> removeFromSetInMap(fragmentToKeywordsMap, fragment, kw)));
-
-        // forget about the item
+    private void removeItemImpl(@NotNull HashWrapper<T> item) {
+        unregisterItem(item);
         itemKeywordsMap.remove(item);
-        return true;
-    }
-
-    private <K, V, X extends V> void addToSetInMap(@NotNull Map<K, Set<V>> map,
-                                                   @NotNull K key,
-                                                   @NotNull X value,
-                                                   @NotNull Supplier<Set<V>> supplier) {
-        Set<V> set = map.get(key);
-
-        if (set == null) {
-            set = supplier.get();
-            map.put(key, set);
-        }
-
-        set.add(value);
-    }
-
-    private <K, V, X extends V> boolean removeFromSetInMap(@NotNull Map<K, Set<V>> map,
-                                                           @NotNull K key,
-                                                           @NotNull X value) {
-        Set<V> set = map.get(key);
-
-        set.remove(value);
-
-        if (set.isEmpty()) {
-            map.remove(key);
-            return true; // was last item
-        }
-
-        return false; // still items remaining
-    }
-
-    private void forAllPossibleSubstrings(@NotNull String keyword, @NotNull BiConsumer<String, String> function) {
-        Set<String> uniques = new LinkedHashSet<>();
-        for (int i = 0; i < keyword.length(); i++) {
-            for (int y = i + 1; y <= keyword.length(); y++) {
-                uniques.add(keyword.substring(i, y));
-            }
-        }
-        uniques.forEach(substring -> function.accept(keyword, substring));
     }
 
     @NotNull
@@ -812,6 +750,67 @@ public class QuickSearch<T> {
             function.apply("testinput", "testinput");
         } catch (Exception e) {
             throw new IllegalArgumentException("Exception while testing keyword match scorer function", e);
+        }
+    }
+
+    /*
+     * Tree/graph of keyword fragments
+     */
+
+    private void registerItem(HashWrapper<T> item, Set<String> keywords) {
+        for (String keyword : keywords) {
+            createAndRegisterNode(null, keyword, item);
+        }
+    }
+
+    private void createAndRegisterNode(GraphNode<HashWrapper<T>> parent, String identity, HashWrapper<T> item) {
+        GraphNode<HashWrapper<T>> node = fragmentsItemsTree.get(identity);
+
+        if (node == null) {
+            node = new GraphNode<>(identity);
+            fragmentsItemsTree.put(identity, node);
+
+            // And proceed to add child nodes
+            if (node.getKey().length() > 1) {
+                createAndRegisterNode(node, identity.substring(0, identity.length() - 1), null);
+                createAndRegisterNode(node, identity.substring(1), null);
+            }
+        }
+
+        if (item != null) node.addItem(item);
+        if (parent != null) node.addParent(parent);
+    }
+
+    private void unregisterItem(@NotNull HashWrapper<T> item) {
+        if (itemKeywordsMap.containsKey(item)) {
+            for (String keyword : itemKeywordsMap.get(item)) {
+                GraphNode<HashWrapper<T>> keywordNode = fragmentsItemsTree.get(keyword);
+
+                keywordNode.removeItem(item);
+
+                if (keywordNode.getItems().isEmpty()) {
+                    collapseEdge(keywordNode, null);
+                }
+            }
+        }
+    }
+
+    private void collapseEdge(GraphNode<HashWrapper<T>> node, GraphNode<HashWrapper<T>> parent) {
+        if (node == null) //already removed
+            return;
+
+        if (parent != null) {
+            node.removeParent(parent);
+        }
+
+        // No getParents or getItems means that there's nothing here to find, proceed onwards
+        if (node.getParents().isEmpty() && node.getItems().isEmpty()) {
+            fragmentsItemsTree.remove(node.getKey());
+
+            if (node.getKey().length() > 1) {
+                collapseEdge(fragmentsItemsTree.get(node.getKey().substring(0, node.getKey().length() - 1)), node);
+                collapseEdge(fragmentsItemsTree.get(node.getKey().substring(1)), node);
+            }
         }
     }
 }
