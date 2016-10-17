@@ -1,22 +1,21 @@
 package com.zigurs.karlis.utils.search;
 
-import java.util.Collections;
 import java.util.Set;
 
-public class GraphNode<T, V> {
+public class GraphNode<V> {
 
-    private final T identity;
+    private final String key;
     private Set<V> items;
-    private Set<GraphNode<T, V>> parents;
+    private Set<GraphNode<V>> parents;
 
-    public GraphNode(T nodeIdentity) {
-        this.identity = nodeIdentity;
-        this.items = Collections.emptySet();
-        this.parents = Collections.emptySet();
+    public GraphNode(String nodeIdentity) {
+        this.key = nodeIdentity;
+        this.items = null;
+        this.parents = ReadOnlySet.empty();
     }
 
-    public T getIdentity() {
-        return identity;
+    public String getKey() {
+        return key;
     }
 
     public Set<V> getItems() {
@@ -24,8 +23,8 @@ public class GraphNode<T, V> {
     }
 
     public void addItem(V item) {
-        if (items.isEmpty()) {
-            items = ReadOnlySet.create(item);
+        if (items == null || items.isEmpty()) {
+            items = ReadOnlySet.fromSingle(item);
             return;
         }
 
@@ -36,20 +35,20 @@ public class GraphNode<T, V> {
         items = ReadOnlySet.removeAndCreate(items, item);
     }
 
-    public Set<GraphNode<T, V>> getParents() {
+    public Set<GraphNode<V>> getParents() {
         return parents;
     }
 
-    public void addParent(GraphNode<T, V> parent) {
+    public void addParent(GraphNode<V> parent) {
         if (parents.isEmpty()) {
-            parents = ReadOnlySet.create(parent);
+            parents = ReadOnlySet.fromSingle(parent);
             return;
         }
 
         parents = ReadOnlySet.addAndCreate(parents, parent);
     }
 
-    public void removeParent(GraphNode<T, V> parent) {
+    public void removeParent(GraphNode<V> parent) {
         // TODO investigate - assert parents.contains(parent);
         parents = ReadOnlySet.removeAndCreate(parents, parent);
     }

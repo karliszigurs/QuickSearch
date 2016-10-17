@@ -1247,7 +1247,7 @@ public class QuickSearchTest {
          */
         final long JDK_COLLECTIONS_TARGET = 117_416_608;
         final long GUAVA_MULTIMAP_TARGET = 104_140_960;
-        final long CUSTOM_TREE_TARGET = 54_249_488;
+        final long CUSTOM_TREE_TARGET = 54_255_008;
 
 
         assertTrue("Calculated size exceeds target", measured < (CUSTOM_TREE_TARGET * 1.1));

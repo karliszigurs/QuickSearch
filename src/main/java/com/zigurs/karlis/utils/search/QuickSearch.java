@@ -196,11 +196,11 @@ public class QuickSearch<T> {
     private final UNMATCHED_POLICY unmatchedPolicy;
     @NotNull
     private final CANDIDATE_ACCUMULATION_POLICY candidateAccumulationPolicy;
-
-    private Map<String, GraphNode<String, HashWrapper<T>>> fragmentsItemsTree = new HashMap<>();
-
-    private Map<HashWrapper<T>, ReadOnlySet<String>> itemKeywordsMap = new HashMap<>();
-
+    @NotNull
+    private final Map<String, GraphNode<HashWrapper<T>>> fragmentsItemsTree = new HashMap<>();
+    @NotNull
+    private final Map<HashWrapper<T>, ReadOnlySet<String>> itemKeywordsMap = new HashMap<>();
+    @NotNull
     private final StampedLock lock = new StampedLock();
 
     /*
@@ -589,7 +589,7 @@ public class QuickSearch<T> {
     }
 
     private Map<HashWrapper<T>, Double> walkAndScore(String fragment, Map<HashWrapper<T>, Double> whiteList) {
-        GraphNode<String, HashWrapper<T>> root = fragmentsItemsTree.get(fragment);
+        GraphNode<HashWrapper<T>> root = fragmentsItemsTree.get(fragment);
 
         if (root == null) {
             if (unmatchedPolicy == BACKTRACKING && fragment.length() > 1) {
@@ -603,14 +603,14 @@ public class QuickSearch<T> {
     }
 
     private Map<HashWrapper<T>, Double> walkAndScore(String originalFragment,
-                                                     GraphNode<String, HashWrapper<T>> node,
+                                                     GraphNode<HashWrapper<T>> node,
                                                      Map<HashWrapper<T>, Double> accumulated,
                                                      Map<HashWrapper<T>, Double> whiteList,
                                                      Set<String> visited) {
-        visited.add(node.getIdentity());
+        visited.add(node.getKey());
 
-        if (!node.getItems().isEmpty()) {
-            Double score = keywordMatchScorer.apply(originalFragment, node.getIdentity());
+        if (node.getItems() != null && !node.getItems().isEmpty()) {
+            Double score = keywordMatchScorer.apply(originalFragment, node.getKey());
 
             node.getItems().forEach((item) -> {
                 if (whiteList == null || whiteList.containsKey(item)) {
@@ -620,7 +620,7 @@ public class QuickSearch<T> {
         }
 
         node.getParents().forEach((parent) -> {
-            if (!visited.contains(parent.getIdentity())) {
+            if (!visited.contains(parent.getKey())) {
                 walkAndScore(originalFragment, parent, accumulated, whiteList, visited);
             }
         });
@@ -758,7 +758,7 @@ public class QuickSearch<T> {
 
     private void registerItem(HashWrapper<T> item, Set<String> keywords) {
         for (String keyword : keywords) {
-            GraphNode<String, HashWrapper<T>> node = fragmentsItemsTree.get(keyword);
+            GraphNode<HashWrapper<T>> node = fragmentsItemsTree.get(keyword);
 
             if (node == null) {
                 node = new GraphNode<>(keyword);
@@ -775,15 +775,15 @@ public class QuickSearch<T> {
         }
     }
 
-    private void addNode(GraphNode<String, HashWrapper<T>> parent, String identity) {
-        GraphNode<String, HashWrapper<T>> node = fragmentsItemsTree.get(identity);
+    private void addNode(GraphNode<HashWrapper<T>> parent, String identity) {
+        GraphNode<HashWrapper<T>> node = fragmentsItemsTree.get(identity);
 
         if (node == null) {
             node = new GraphNode<>(identity);
             fragmentsItemsTree.put(identity, node);
 
             // And proceed to add child nodes
-            if (node.getIdentity().length() > 1) {
+            if (node.getKey().length() > 1) {
                 addNode(node, identity.substring(0, identity.length() - 1));
                 addNode(node, identity.substring(1));
             }
@@ -797,7 +797,7 @@ public class QuickSearch<T> {
 
         if (itemKeywordsMap.containsKey(item)) {
             for (String keyword : itemKeywordsMap.get(item)) {
-                GraphNode<String, HashWrapper<T>> keywordNode = fragmentsItemsTree.get(keyword);
+                GraphNode<HashWrapper<T>> keywordNode = fragmentsItemsTree.get(keyword);
 
                 keywordNode.removeItem(item);
                 removed++;
@@ -810,7 +810,7 @@ public class QuickSearch<T> {
         return removed > 0;
     }
 
-    private void tearDownNode(GraphNode<String, HashWrapper<T>> node, GraphNode<String, HashWrapper<T>> parent) {
+    private void tearDownNode(GraphNode<HashWrapper<T>> node, GraphNode<HashWrapper<T>> parent) {
         if (node == null) //already removed
             return;
 
@@ -819,12 +819,12 @@ public class QuickSearch<T> {
         }
 
         // No getParents or getItems means that there's nothing here to find
-        if (node.getParents().isEmpty() && node.getItems().isEmpty()) {
-            fragmentsItemsTree.remove(node.getIdentity());
+        if (node.getParents().isEmpty() && (node.getItems() == null || node.getItems().isEmpty())) {
+            fragmentsItemsTree.remove(node.getKey());
 
-            if (node.getIdentity().length() > 1) {
-                tearDownNode(fragmentsItemsTree.get(node.getIdentity().substring(0, node.getIdentity().length() - 1)), node);
-                tearDownNode(fragmentsItemsTree.get(node.getIdentity().substring(1)), node);
+            if (node.getKey().length() > 1) {
+                tearDownNode(fragmentsItemsTree.get(node.getKey().substring(0, node.getKey().length() - 1)), node);
+                tearDownNode(fragmentsItemsTree.get(node.getKey().substring(1)), node);
             }
         }
     }

@@ -1,5 +1,7 @@
 package com.zigurs.karlis.utils.search;
 
+import org.jetbrains.annotations.NotNull;
+
 import java.util.*;
 import java.util.function.Consumer;
 
@@ -17,27 +19,15 @@ import java.util.function.Consumer;
  *
  * @param <T>
  */
-public class ReadOnlySet<T> implements Set<T> {
+@SuppressWarnings("unchecked")
+public class ReadOnlySet<T> extends AbstractSet<T> {
 
-    public static <S> ReadOnlySet<S> fromCollection(Collection<? extends S> source) {
-        Objects.requireNonNull(source);
-
-        HashSet set = new HashSet();
-        set.addAll(source);
-        return new ReadOnlySet<>((S[]) set.toArray());
+    public static <S> ReadOnlySet<S> empty() {
+        //noinspection unchecked
+        return new ReadOnlySet<>((S[]) new Object[0]);
     }
 
-    public static <S> ReadOnlySet<S> fromCollections(Collection<? extends S> source, Collection<? extends S> source2) {
-        Objects.requireNonNull(source);
-        Objects.requireNonNull(source2);
-
-        HashSet set = new HashSet();
-        set.addAll(source);
-        set.addAll(source2);
-        return new ReadOnlySet<>((S[]) set.toArray());
-    }
-
-    public static <S> ReadOnlySet<S> create(S item) {
+    public static <S> ReadOnlySet<S> fromSingle(S item) {
         Objects.requireNonNull(item);
 
         return new ReadOnlySet<>((S[]) new Object[]{item});
@@ -60,7 +50,6 @@ public class ReadOnlySet<T> implements Set<T> {
             arr[arr.length - 1] = newItem;
 
             set.array = (S[]) arr;
-            set.bloom |= newItem.hashCode();
             return set;
         } else {
             HashSet<S> set = new HashSet<>();
@@ -78,11 +67,9 @@ public class ReadOnlySet<T> implements Set<T> {
             ReadOnlySet<S> set = (ReadOnlySet<S>) source;
 
             for (int i = 0; i < set.array.length; i++) {
-                if (set.array[i].equals(surplusItem)) {
-
+                if (set.array[i].hashCode() == surplusItem.hashCode() && set.array[i].equals(surplusItem)) {
                     System.arraycopy(set.array, i + 1, set.array, i, set.array.length - (i + 1));
                     set.array = Arrays.copyOf(set.array, set.array.length - 1);
-                    set.refreshBloom();
                     return set;
                 }
             }
@@ -93,8 +80,27 @@ public class ReadOnlySet<T> implements Set<T> {
             set.addAll(source);
             set.remove(surplusItem);
 
-            return new ReadOnlySet<>((S[]) set.toArray(new Object[set.size()]));
+            return new ReadOnlySet<>((S[]) set.toArray());
         }
+    }
+
+    public static <S> ReadOnlySet<S> fromCollection(Collection<? extends S> source) {
+        Objects.requireNonNull(source);
+
+        HashSet<S> set = new HashSet<>();
+        set.addAll(source);
+        //noinspection unchecked
+        return new ReadOnlySet<>((S[]) set.toArray());
+    }
+
+    public static <S> ReadOnlySet<S> fromCollections(Collection<? extends S> source, Collection<? extends S> source2) {
+        Objects.requireNonNull(source);
+        Objects.requireNonNull(source2);
+
+        HashSet<S> set = new HashSet<>();
+        set.addAll(source);
+        set.addAll(source2);
+        return new ReadOnlySet<>((S[]) set.toArray());
     }
 
     /*
@@ -102,17 +108,9 @@ public class ReadOnlySet<T> implements Set<T> {
      */
 
     private T[] array;
-    private int bloom = 0;
 
     private ReadOnlySet(T[] array) {
         this.array = array;
-        refreshBloom();
-    }
-
-    private void refreshBloom() {
-        bloom = 0;
-        for (int i = 0; i < array.length; i++)
-            bloom |= array[i].hashCode();
     }
 
     @Override
@@ -121,78 +119,22 @@ public class ReadOnlySet<T> implements Set<T> {
     }
 
     @Override
-    public boolean isEmpty() {
-        return array.length == 0;
-    }
-
-    @Override
     public boolean contains(Object o) {
         Objects.requireNonNull(o);
 
-        /*
-         * Pretty futile with only 32 bits to juggle in,
-         * but leaving it in to expand on in future.
-         */
-        if ((bloom & o.hashCode()) != o.hashCode()) {
-            return false;
-        }
-
-        for (int i = 0; i < array.length; i++)
-            if (array[i] != null && array[i].equals(o)) {
+        for (int i = 0; i < array.length; i++) {
+            /* Try to skip more by cheaper hash check first */
+            if (array[i].hashCode() == o.hashCode() && array[i].equals(o)) {
                 return true;
             }
-
+        }
         return false;
     }
 
+    @NotNull
     @Override
     public Iterator<T> iterator() {
         return new ArrayIterator(array);
-    }
-
-    @Override
-    public Object[] toArray() {
-        return Arrays.copyOf(array, array.length);
-    }
-
-    @Override
-    public <T> T[] toArray(T[] a) {
-        return (T[]) Arrays.copyOf(array, array.length);
-    }
-
-    @Override
-    public boolean add(T t) {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public boolean remove(Object o) {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public boolean containsAll(Collection<?> c) {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public boolean addAll(Collection<? extends T> c) {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public boolean retainAll(Collection<?> c) {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public boolean removeAll(Collection<?> c) {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public void clear() {
-        throw new UnsupportedOperationException();
     }
 
     @Override
