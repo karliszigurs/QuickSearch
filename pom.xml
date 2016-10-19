@@ -6,7 +6,7 @@
     <groupId>com.zigurs.karlis.utils.search</groupId>
     <artifactId>quicksearch</artifactId>
     <version>1.6-SNAPSHOT</version>
-    <packaging>jar</packaging>s
+    <packaging>jar</packaging>
 
     <name>${project.groupId}:${project.artifactId}</name>
     <url>https://github.com/karliszigurs/QuickSearch</url>
