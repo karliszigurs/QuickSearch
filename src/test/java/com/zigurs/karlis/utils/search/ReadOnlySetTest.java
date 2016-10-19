@@ -15,6 +15,7 @@
  */
 package com.zigurs.karlis.utils.search;
 
+import org.junit.Assert;
 import org.junit.Test;
 
 import java.util.*;
@@ -198,9 +199,7 @@ public class ReadOnlySetTest {
             set = ReadOnlySet.addAndCreate(set, "Item" + i);
         }
 
-        for (String item : set) {
-            assertNotNull(item);
-        }
+        set.forEach(Assert::assertNotNull);
     }
 
     @Test(expected=NoSuchElementException.class)
@@ -294,6 +293,14 @@ public class ReadOnlySetTest {
         Set<String> setTwo = new HashSet<>(Arrays.asList("one", "two"));
         assertTrue(setOne.equals(setTwo));
         assertEquals(setOne.hashCode(), setTwo.hashCode());
+    }
+
+    @Test
+    public void equalsTest7() {
+        Set<String> setOne = ReadOnlySet.fromCollection(Arrays.asList("one", "two"));
+        Collection<String> setTwo = Arrays.asList("one", "two");
+        assertFalse(setOne.equals(setTwo));
+        assertNotEquals(setOne.hashCode(), setTwo.hashCode());
     }
 
     @Test
