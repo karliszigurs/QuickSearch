@@ -18,6 +18,8 @@ package com.zigurs.karlis.utils.search;
 import org.github.jamm.MemoryMeter;
 import org.junit.Test;
 
+import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -76,15 +78,18 @@ public class QuickSearchBenchmarks extends QuickSearchTest {
 
     private void multiThreadTestIteration(final String label) throws InterruptedException {
         int threads = 4;
-        int iterationsPerThread = 1000;
+        int iterationsPerThread = 1_000;
 
         CountDownLatch latch = new CountDownLatch(threads);
         AtomicLong wrote = new AtomicLong(0L);
 
         // Writing thread
-        new Thread(() -> {
+        Thread wt = new Thread(() -> {
             int i = 0;
             while (latch.getCount() > 0) {
+                if (Thread.interrupted())
+                    return;
+
                 addItem("new item" + i, "few new keywords" + i++);
                 wrote.incrementAndGet();
 
@@ -92,23 +97,34 @@ public class QuickSearchBenchmarks extends QuickSearchTest {
                 try {
                     Thread.sleep(500);
                 } catch (InterruptedException e) {
+                    return;
                 }
             }
-        }).start();
+        });
+        wt.setPriority(Thread.MAX_PRIORITY);
+        wt.start();
 
         Long startTime = System.currentTimeMillis();
 
+        List<Thread> threadsList = new LinkedList<>();
         // Reading threads
         for (int i = 0; i < threads; i++) {
             Thread t = new Thread(() -> {
                 multiThreadTestThread(iterationsPerThread, label);
                 latch.countDown();
             });
-            t.setPriority(Thread.MAX_PRIORITY);
+            threadsList.add(t);
             t.start();
         }
 
         latch.await(60, TimeUnit.SECONDS);
+
+        if (latch.getCount() > 0) {
+            System.out.println("Timed out before completing all iterations, results are invalid");
+            threadsList.forEach(Thread::interrupt);
+        }
+
+
         long totalTime = System.currentTimeMillis() - startTime;
 
         System.out.println(String.format(
@@ -123,6 +139,8 @@ public class QuickSearchBenchmarks extends QuickSearchTest {
         long startTime = System.currentTimeMillis();
         for (int i = 0; i < iterations; i++) {
             assertTrue(searchInstance.findItems(USA_STATES[i % USA_STATES.length][1].substring(0, 3), 10).size() > 0);
+            if (Thread.interrupted())
+                return;
         }
         long totalTime = System.currentTimeMillis() - startTime;
 
