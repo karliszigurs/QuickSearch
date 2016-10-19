@@ -233,6 +233,8 @@ public class QuickSearchBenchmarks extends QuickSearchTest {
 //        final long JDK_COLLECTIONS_TARGET = 117_416_608;
 //        final long GUAVA_MULTIMAP_TARGET = 104_140_960;
 //        final long CUSTOM_TREE_TARGET = 54_255_008;
+//        final long CUSTOM_TREE_TARGET = 54_255_008;
+//        final long CUSTOM_TREE_TARGET_INTERN = 21_848_000;
         final long SMALL_TEST_TARGET = 908_144;
 
         assertTrue("Calculated size exceeds target", measured < (SMALL_TEST_TARGET * 1.1));

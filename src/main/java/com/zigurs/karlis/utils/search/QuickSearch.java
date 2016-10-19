@@ -645,10 +645,13 @@ public class QuickSearch<T> {
 
     @NotNull
     private Set<String> prepareKeywords(@NotNull final String keywordsString) {
-        return keywordsExtractor.apply(keywordsString).stream()
+        return ReadOnlySet.fromCollection(
+                keywordsExtractor.apply(keywordsString).stream()
                 .map(keywordNormalizer)
                 .filter(s -> !s.isEmpty())
-                .collect(Collectors.toSet()); // implies distinct
+                .map(String::intern)
+                .collect(Collectors.toSet()) // implies distinct
+        );
     }
 
     /*
