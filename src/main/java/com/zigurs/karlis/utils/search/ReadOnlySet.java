@@ -33,7 +33,7 @@ import java.util.function.Consumer;
  * <p>
  * To be used in QuickSearch and behind write lock _ONLY_!
  *
- * @param <T>
+ * @param <T> type this set instance will operate on
  */
 @SuppressWarnings("unchecked")
 public class ReadOnlySet<T> extends AbstractSet<T> {

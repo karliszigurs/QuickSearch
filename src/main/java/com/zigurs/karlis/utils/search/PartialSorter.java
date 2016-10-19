@@ -23,8 +23,9 @@ import java.util.*;
  * Purpose built sort discarding known beyond-the-cut elements early.
  * Trades the cost of manual insertion against the cost of having to sort whole array.
  * <p>
- * Comparable to built in sort functions on smaller datasets (<1000 elements), becomes
- * significantly quicker for larger datasets.
+ * Comparable to built in sort functions on smaller datasets (&lt;1000 elements), but
+ * significantly outperforms built-in sort algorithms on larger datasets (which may be important
+ * when sorting 5000 matching items by score to serve only top 3).
  */
 public class PartialSorter {
 
