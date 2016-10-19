@@ -17,18 +17,11 @@ package com.zigurs.karlis.utils.search;
 
 import com.zigurs.karlis.utils.search.model.Result;
 import com.zigurs.karlis.utils.search.model.Stats;
-import org.github.jamm.MemoryMeter;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.*;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.LongSupplier;
-import java.util.stream.Collectors;
 
 import static com.zigurs.karlis.utils.search.QuickSearch.CANDIDATE_ACCUMULATION_POLICY.INTERSECTION;
 import static com.zigurs.karlis.utils.search.QuickSearch.CANDIDATE_ACCUMULATION_POLICY.UNION;
@@ -38,47 +31,7 @@ import static org.junit.Assert.*;
 
 public class QuickSearchTest {
 
-    private static final class StoreItem {
-
-        private final int itemIdentifier;
-        private final String name;
-        private final String category;
-        private final String description;
-
-        public StoreItem(int itemIdentifier, String name, String category, String description) {
-            this.itemIdentifier = itemIdentifier;
-            this.name = name;
-            this.category = category;
-            this.description = description;
-        }
-
-        public int getItemIdentifier() {
-            return itemIdentifier;
-        }
-
-        public String getName() {
-            return name;
-        }
-
-        public String getCategory() {
-            return category;
-        }
-
-        public String getDescription() {
-            return description;
-        }
-
-        @Override
-        public String toString() {
-            return String.format("(%s (%d) \"%s\")",
-                    getName(),
-                    getItemIdentifier(),
-                    getDescription()
-            );
-        }
-    }
-
-    private final static String[][] USA_STATES = {
+    public final static String[][] USA_STATES = {
             {"AL", "Alabama", "Montgomery", "December 14, 1819"},
             {"AK", "Alaska", "Juneau", "January 3, 1959"},
             {"AZ", "Arizona", "Phoenix", "February 14, 1912"},
@@ -131,7 +84,7 @@ public class QuickSearchTest {
             {"WY", "Wyoming", "Cheyenne", "July 10, 1890"}
     };
 
-    private QuickSearch<String> searchInstance;
+    protected QuickSearch<String> searchInstance;
 
     @Before
     public void setUp() throws Exception {
@@ -278,7 +231,7 @@ public class QuickSearchTest {
     @Test
     public void itemAdded() throws Exception {
         addItem("item", "one two three");
-        checkStats(23, 23, 23);
+        checkStats(1, 23);
     }
 
     @Test
@@ -313,7 +266,7 @@ public class QuickSearchTest {
             addItem(testString.substring(0, 5), testString.substring(0, 5));
         }
 
-        checkStats(13, 13, 13);
+        checkStats(1, 13);
     }
 
     @Test
@@ -337,7 +290,7 @@ public class QuickSearchTest {
 
         assertTrue("Unexpected result size", searchInstance.findItems("one", 10).size() == 0);
 
-        checkStats(0, 0, 0);
+        checkStats(0, 0);
     }
 
     @Test
@@ -563,7 +516,7 @@ public class QuickSearchTest {
 
     @Test
     public void statsAreEmpty() throws Exception {
-        checkStats(0, 0, 0);
+        checkStats(0, 0);
     }
 
     @Test
@@ -580,7 +533,7 @@ public class QuickSearchTest {
         }
 
         assertEquals(10, searchInstance.findItems("e ex exe exer exerc i is ise", 10).size());
-        checkStats(554, 554, 554);
+        checkStats(33, 554);
     }
 
     @Test
@@ -608,7 +561,7 @@ public class QuickSearchTest {
 
         assertEquals(10, alternativeConfig.findItems("e ex exe exer exerc i is ise", 10).size());
 
-        checkStats(alternativeConfig.getStats(), 554, 554, 554);
+        checkStats(alternativeConfig.getStats(), 33, 554);
     }
 
     @Test
@@ -638,9 +591,7 @@ public class QuickSearchTest {
 
         assertEquals(10, searchInstance.findItems("e ex exe exer exerc i is ise", 10).size());
 
-        assertEquals(stats.getItems(), searchInstance.getStats().getItems());
-        assertEquals(stats.getKeywords(), searchInstance.getStats().getKeywords());
-        assertEquals(stats.getFragments(), searchInstance.getStats().getFragments());
+        checkStats(stats.getItems(), stats.getFragments());
     }
 
     @Test
@@ -855,7 +806,7 @@ public class QuickSearchTest {
 
         searchInstance.clear();
 
-        checkStats(0, 0, 0);
+        checkStats(0, 0);
 
         assertFalse("Unexpected result", searchInstance.findItem("one").isPresent());
     }
@@ -942,378 +893,64 @@ public class QuickSearchTest {
         }
     }
 
-    @Test
-    public void customSorting() {
-        List<Double> testSet = new ArrayList<>();
-
-        for (int i = 0; i < 100; i++) {
-            testSet.add((double) i);
-        }
-
-        testSet.add(1000.0);
-
-        Collections.shuffle(testSet);
-
-        List<Double> list = searchInstance.sortAndLimit(testSet, 10, Comparator.naturalOrder());
-        assertEquals(0.0, list.get(0), 0);
-        assertEquals(1.0, list.get(1), 0);
-        assertEquals(2.0, list.get(2), 0);
-        assertEquals(9.0, list.get(9), 0);
-        assertEquals(10, list.size());
-    }
-
-    @Test
-    public void customSortingReverse() {
-        List<Double> testSet = new ArrayList<>();
-
-        for (int i = 0; i < 100; i++) {
-            testSet.add((double) i);
-        }
-
-        testSet.add(1000.0);
-
-        Collections.shuffle(testSet);
-
-        List<Double> list = searchInstance.sortAndLimit(testSet, 1, Comparator.reverseOrder());
-
-        assertEquals(1000.0, list.get(0), 0);
-        assertEquals(1, list.size());
-    }
-
-    /*
-     * microbenchmarks and utilities
-     */
-
-    @Ignore
-    @Test
-    public void intersectionBench() throws Exception {
-        searchInstance = new QuickSearch<>(
-                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
-                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
-                QuickSearch.DEFAULT_MATCH_SCORER,
-                BACKTRACKING,
-                INTERSECTION);
-
-        long st = System.currentTimeMillis();
-        for (int i = 0; i < 3000; i++) {
-            String[] items = USA_STATES[i % USA_STATES.length];
-            addItem(items[0] + "-" + i, String.format("%s %s %s %s", items[0], items[1], items[2], items[3]));
-        }
-
-        for (String[] items : USA_STATES) {
-            addItem(items[0], String.format("%s %s %s %s", items[0], items[1], items[2], items[3]));
-        }
-
-        System.out.println("Loaded in " + (System.currentTimeMillis() - st) + "ms");
-
-        int iterations = 5000;
-        long startTime = System.currentTimeMillis();
-        for (int i = 0; i < iterations; i++) {
-//            assertTrue(searchInstance.findItem("a b c d e g h i l m n p r s u v y").isPresent());
-            assertTrue(searchInstance.findItems("w a s", 10).size() > 0);
-        }
-
-        long totalTime = System.currentTimeMillis() - startTime;
-        System.out.println(String.format("%f k/sec", (double) iterations / totalTime));
-    }
-
-    @Ignore
-    @Test
-    public void sortBench() {
-        /*
-         * Microbenchmarking caveats apply. Make sure the number of iterations is
-         * large enough and JVM is given a chance to warm up and apply the
-         * optimisations on the code exercised.
-         */
-        List<Double> testList = new LinkedList<>();
-
-        int listSize = 100000;
-        for (int i = 0; i < listSize; i++) {
-            testList.add((double) i);
-        }
-
-        Collections.shuffle(testList);
-
-        Map<Double, Double> testMap = new LinkedHashMap<>();
-        testList.forEach(d -> testMap.put(d, d));
-
-        int iterationsCount = 10;
-        int topItems = 10;
-
-        Comparator<Double> comparator = Comparator.reverseOrder();
-        double topResultShouldBe = (double) listSize - 1;
-
-        sortBench("Warmup: ", testMap.values(), iterationsCount, topItems, comparator, topResultShouldBe);
-        sortBench("Warmer: ", testMap.values(), iterationsCount, topItems, comparator, topResultShouldBe);
-        sortBench("Warm:   ", testMap.values(), iterationsCount, topItems, comparator, topResultShouldBe);
-    }
-
-    private void sortBench(String prefix, Collection<Double> testList, int iterationsCount, int topItems, Comparator<Double> comparator, double topResultShouldBe) {
-        LongSupplier time = System::nanoTime;
-        int timeDivisor = 1000;
-        String unit = "us";
-
-//        LongSupplier time = System::currentTimeMillis;
-//        int timeDivisor = 1;
-//        String unit = "ms";
-
-        long totalTimeCropped = 0;
-        long totalTimeCollections = 0;
-        long totalTimeStreamed = 0;
-        long totalTimeParallel = 0;
-        long startTime;
-
-        for (int i = 0; i < iterationsCount; i++) {
-            startTime = time.getAsLong();
-            List<Double> listCropped = searchInstance.sortAndLimit(testList, topItems, comparator);
-            assertEquals(topResultShouldBe, listCropped.get(0), 0);
-            totalTimeCropped += time.getAsLong() - startTime;
-
-            List<Double> listRepresentation = new LinkedList<>(testList);
-            Collections.shuffle(listRepresentation);
-            startTime = time.getAsLong();
-            Collections.sort(listRepresentation, comparator);
-            assertEquals(topResultShouldBe, listRepresentation.get(0), 0);
-            totalTimeCollections += time.getAsLong() - startTime;
-
-            startTime = time.getAsLong();
-            List<Double> listStreamed = testList.stream()
-                    .sorted(comparator)
-                    .limit(topItems)
-                    .collect(Collectors.toList());
-            assertEquals(topResultShouldBe, listStreamed.get(0), 0);
-            totalTimeStreamed += time.getAsLong() - startTime;
-
-            startTime = time.getAsLong();
-            List<Double> listParallel = testList.parallelStream()
-                    .sorted(comparator)
-                    .limit(topItems)
-                    .collect(Collectors.toList());
-            assertEquals(topResultShouldBe, listParallel.get(0), 0);
-            totalTimeParallel += time.getAsLong() - startTime;
-        }
-
-        System.out.println(String.format("%6$s %1$d%5$s cropped, %2$d%5$s collections, %3$d%5$s streamed, %4$d%5$s parallel on average",
-                (totalTimeCropped / iterationsCount) / timeDivisor,
-                (totalTimeCollections / iterationsCount) / timeDivisor,
-                (totalTimeStreamed / iterationsCount) / timeDivisor,
-                (totalTimeParallel / iterationsCount) / timeDivisor,
-                unit,
-                prefix
-        ));
-    }
-
-    @Ignore
-    @Test
-    public void mtBench() throws Exception {
-        for (String[] items : USA_STATES) {
-            addItem(
-                    items[0],
-                    String.format("%s %s %s", items[1], items[2], items[3])
-            );
-        }
-
-//        long startTime = System.currentTimeMillis();
-//
-//        for (int i = 0; i < 1000; i++) {
-//            assertTrue("No results found?",
-//                    searchInstance.findItems(USA_STATES[i % USA_STATES.length][1].substring(0, 3), 10).size() > 0);
-//        }
-//
-//        assertTrue("Shouldn't be anywhere near this slow...", (System.currentTimeMillis() - startTime) < 1000);
-
-        // Warmup
-        mtIteration();
-
-        // Warmed up
-        mtIteration();
-    }
-
-    private void mtIteration() throws InterruptedException {
-        int threads = 4;
-        int iterationsPerThread = 1000000;
-        CountDownLatch latch = new CountDownLatch(threads);
-        AtomicLong wrote = new AtomicLong(0L);
-
-        // Writing thread
-        new Thread(() -> {
-            int i = 0;
-            while (latch.getCount() > 0) {
-//                addItem("new item" + i, "few new keywords" + i++);
-                wrote.incrementAndGet();
-
-                //noinspection EmptyCatchBlock
-                try {
-                    Thread.sleep(50);
-                } catch (InterruptedException e) {
-                }
-            }
-        }).start();
-
-        Long startTime = System.currentTimeMillis();
-
-        // Reading threads
-        for (int i = 0; i < threads; i++) {
-            Thread t = new Thread(() -> {
-                mtThreadIteration(iterationsPerThread);
-                latch.countDown();
-            });
-            t.setPriority(Thread.MAX_PRIORITY);
-            t.start();
-        }
-
-        latch.await(60, TimeUnit.SECONDS);
-        long totalTime = System.currentTimeMillis() - startTime;
-        System.out.println("Aggregate throughput: " + ((iterationsPerThread / totalTime) * threads) + "k per second, " + wrote.get() + " writes");
-    }
-
-    private void mtThreadIteration(final int iterations) {
-        long startTime = System.currentTimeMillis();
-
-        for (int i = 0; i < iterations; i++) {
-            assertTrue(searchInstance.findItems(USA_STATES[i % USA_STATES.length][1].substring(0, 3), 10).size() > 0);
-        }
-
-        long totalTime = System.currentTimeMillis() - startTime;
-        System.out.println(String.format("Took %dms, %dk searches second.",
-                totalTime,
-                iterations / totalTime
-        ));
-    }
-
-    @Ignore
-    @Test
-    public void opsBench() throws Exception {
-        for (String[] items : USA_STATES) {
-            addItem(items[0], String.format("%s %s %s", items[1], items[2], items[3]));
-        }
-
-        // Warmup
-        mtOpsBench();
-
-        // Warmed up
-        mtOpsBench();
-    }
-
-    private void mtOpsBench() throws InterruptedException {
-        int threads = 1;
-        int iterationsPerThread = 100000;
-        CountDownLatch latch = new CountDownLatch(threads);
-
-        // ops threads
-        Long startTime = System.currentTimeMillis();
-        for (int i = 0; i < threads; i++) {
-            Thread t = new Thread(() -> {
-                mtOpsIteration(iterationsPerThread);
-                latch.countDown();
-            });
-            t.setPriority(Thread.MAX_PRIORITY);
-            t.start();
-        }
-
-        latch.await(60, TimeUnit.SECONDS);
-        long totalTime = System.currentTimeMillis() - startTime;
-        System.out.println("Aggregate throughput: " + ((iterationsPerThread / totalTime) * threads) + "k ops per second");
-    }
-
-    private void mtOpsIteration(final int iterations) {
-        long startTime = System.currentTimeMillis();
-
-        for (int i = 0; i < iterations; i++) {
-            addItem(USA_STATES[i % USA_STATES.length][1].substring(0, 3), USA_STATES[i % USA_STATES.length][0] + " " + USA_STATES[i % USA_STATES.length][2]);
-            searchInstance.removeItem(USA_STATES[i % USA_STATES.length][1].substring(0, 3));
-        }
-
-        long totalTime = System.currentTimeMillis() - startTime;
-        System.out.println(String.format("Took %dms, %dk ops second.",
-                totalTime,
-                iterations / totalTime
-        ));
-    }
-
-    @Ignore
-    @Test
-    public void measureMemoryUse() {
-        searchInstance = new QuickSearch<>(
-                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
-                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
-                QuickSearch.DEFAULT_MATCH_SCORER,
-                BACKTRACKING,
-                INTERSECTION);
-
-        for (int i = 0; i < 100_000; i++) {
-            String[] items = USA_STATES[i % USA_STATES.length];
-            addItem(items[0] + "-" + i, String.format("%s %s %s %s", items[0], items[1], items[2], items[3]));
-        }
-
-        MemoryMeter meter = new MemoryMeter().withGuessing(MemoryMeter.Guess.ALWAYS_UNSAFE);
-        long measured = meter.measureDeep(searchInstance);
-
-        System.out.println("Memory consumption is " + measured);
-
-        /*
-         * Measured on Java 1.8.0_102
-         */
-        final long JDK_COLLECTIONS_TARGET = 117_416_608;
-        final long GUAVA_MULTIMAP_TARGET = 104_140_960;
-        final long CUSTOM_TREE_TARGET = 54_255_008;
-
-        assertTrue("Calculated size exceeds target", measured < (CUSTOM_TREE_TARGET * 1.1));
-    }
-
-    @Ignore
-    @Test
-    public void measureQueryMicrobench() {
-        searchInstance = new QuickSearch<>(
-                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
-                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
-                QuickSearch.DEFAULT_MATCH_SCORER,
-                BACKTRACKING,
-                INTERSECTION);
-
-        long startTime = System.currentTimeMillis();
-        for (int i = 0; i < 100_000; i++) {
-            String[] items = USA_STATES[i % USA_STATES.length];
-            addItem(items[0] + "-" + i, String.format("%s %s %s %s", items[0], items[1], items[2], items[3]));
-        }
-        System.out.println("Added in " + (System.currentTimeMillis() - startTime));
-
-        startTime = System.currentTimeMillis();
-
-        for (int i = 0; i < 10_000; i++) {
-            String searchString = USA_STATES[i % USA_STATES.length][0];
-            assertFalse("No results found", searchInstance.findItems(searchString, 10).isEmpty());
-        }
-
-        /*
-         * Comparable only on my machine, therefore no assert.
-         */
-        final long JDK_COLLECTIONS_TARGET = 13000;
-        final long GUAVA_MULTIMAP_TARGET = 20000;
-        final long CUSTOM_TREE_TARGET = 13000;
-
-        System.out.println("Time taken " + (System.currentTimeMillis() - startTime));
-    }
-
     /*
      * Tests boilerplate
      */
 
-    private void addItem(String item, String keywords) {
+    protected void addItem(String item, String keywords) throws AssertionError {
         addItem(searchInstance, item, keywords);
     }
 
-    private void addItem(QuickSearch<String> instance, String item, String keywords) {
+    protected void addItem(QuickSearch<String> instance, String item, String keywords) throws AssertionError {
         assertTrue("Failed to add item", instance.addItem(item, keywords));
     }
 
-    private void checkStats(int items, int keywords, int fragments) {
-        checkStats(searchInstance.getStats(), items, keywords, fragments);
+    protected void checkStats(int items, int fragments) throws AssertionError {
+        checkStats(searchInstance.getStats(), items, fragments);
     }
 
-    private void checkStats(Stats stats, int items, int keywords, int fragments) {
+    protected void checkStats(Stats stats, int items, int fragments) throws AssertionError {
         assertEquals(items, stats.getItems());
-        assertEquals(keywords, stats.getKeywords());
         assertEquals(fragments, stats.getFragments());
+    }
+
+    private static final class StoreItem {
+
+        private final int itemIdentifier;
+        private final String name;
+        private final String category;
+        private final String description;
+
+        public StoreItem(int itemIdentifier, String name, String category, String description) {
+            this.itemIdentifier = itemIdentifier;
+            this.name = name;
+            this.category = category;
+            this.description = description;
+        }
+
+        public int getItemIdentifier() {
+            return itemIdentifier;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public String getCategory() {
+            return category;
+        }
+
+        public String getDescription() {
+            return description;
+        }
+
+        @Override
+        public String toString() {
+            return String.format("(%s (%d) \"%s\")",
+                    getName(),
+                    getItemIdentifier(),
+                    getDescription()
+            );
+        }
     }
 }

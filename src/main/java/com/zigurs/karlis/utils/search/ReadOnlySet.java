@@ -36,168 +36,68 @@ import java.util.function.Consumer;
  * @param <T>
  */
 @SuppressWarnings("unchecked")
-public final class ReadOnlySet<T> extends AbstractSet<T> {
-
-    private static final ReadOnlySet EMPTY_SET = new ReadOnlySet(new Object[0]);
+public class ReadOnlySet<T> extends AbstractSet<T> {
 
     /**
-     * Empty set of given type.
-     *
-     * @param <S> type
-     * @return empty set
+     * Static, shareable empty iterator.
      */
-    @NotNull
-    public static <S> ReadOnlySet<S> empty() {
-        return (ReadOnlySet<S>) EMPTY_SET;
-    }
-
-    /**
-     * Set with one member.
-     *
-     * @param item item to wrap in set
-     * @param <S>  type
-     * @return set of type with specified member
-     */
-    @NotNull
-    public static <S> ReadOnlySet<S> fromSingle(@NotNull S item) {
-        Objects.requireNonNull(item);
-
-        return new ReadOnlySet<>((S[]) new Object[]{item});
-    }
-
-    /**
-     * Expand given collection with a specified item and return a set.
-     * <p>
-     * Given as convenience method that performs better if operating on
-     * ReadOnlySet already.
-     *
-     * @param source base collection
-     * @param item   item to add
-     * @param <S>    type
-     * @return set of items
-     */
-    @NotNull
-    public static <S> ReadOnlySet<S> addAndCreate(@NotNull Collection<? extends S> source,
-                                                  @NotNull S item) {
-        Objects.requireNonNull(source);
-        Objects.requireNonNull(item);
-
-        if (source.isEmpty())
-            return new ReadOnlySet<>((S[]) new Object[]{item});
-
-        if (source instanceof ReadOnlySet) {
-            ReadOnlySet<S> set = (ReadOnlySet<S>) source;
-
-            if (set.contains(item)) {
-                return set;
-            }
-
-            Object[] arr = new Object[set.array.length + 1];
-            System.arraycopy(set.array, 0, arr, 0, set.array.length);
-            arr[arr.length - 1] = item;
-
-            set.array = (S[]) arr;
-            return set;
-        } else {
-            HashSet<S> set = new HashSet<>();
-            set.addAll(source);
-            set.add(item);
-            return new ReadOnlySet<>((S[]) set.toArray());
-        }
-    }
-
-    /**
-     * Create a set consisting of supplied collection with the specified item removed.
-     * Again, ideally operating on a ReadOnlySet itself as the source collection.
-     *
-     * @param source      source collection
-     * @param surplusItem item to remove
-     * @param <S>         type
-     * @return set of original collection items minus specified item
-     */
-    @NotNull
-    public static <S> ReadOnlySet<S> removeAndCreate(@NotNull Collection<? extends S> source,
-                                                     @NotNull S surplusItem) {
-        Objects.requireNonNull(source);
-        Objects.requireNonNull(surplusItem);
-
-        if (source instanceof ReadOnlySet) {
-            ReadOnlySet<S> set = (ReadOnlySet<S>) source;
-
-            if (set.size() == 1) {
-                if (set.array[0].equals(surplusItem)) {
-                    return empty();
-                } else {
-                    return set; // trying to remove an item we know isn't there? I'd argue that that hints at a bug.
-                }
-            } else {
-                /* Do it the hard way, by compacting the array */
-                for (int i = 0; i < set.array.length; i++) {
-                    if (set.array[i].hashCode() == surplusItem.hashCode() && set.array[i].equals(surplusItem)) {
-                        System.arraycopy(set.array, i + 1, set.array, i, set.array.length - (i + 1));
-                        set.array = Arrays.copyOf(set.array, set.array.length - 1);
-                        return set;
-                    }
-                }
-            }
-            return set; // No item was removed
-        } else {
-            HashSet<S> set = new HashSet<>();
-
-            set.addAll(source);
-            set.remove(surplusItem);
-
-            return new ReadOnlySet<>((S[]) set.toArray());
-        }
-    }
-
-    /**
-     * Create a read only set from a specified collection.
-     *
-     * @param source source collection
-     * @param <S>    type
-     * @return read only set
-     */
-    @NotNull
-    public static <S> ReadOnlySet<S> fromCollection(@NotNull Collection<? extends S> source) {
-        Objects.requireNonNull(source);
-
-        if (source.isEmpty()) {
-            return empty();
+    private static final Iterator NULL_ITERATOR = new Iterator() {
+        @Override
+        public boolean hasNext() {
+            return false;
         }
 
-        HashSet<S> set = new HashSet<>();
-        set.addAll(source);
-        return new ReadOnlySet<>((S[]) set.toArray());
-    }
+        @Override
+        public Object next() {
+            throw new NoSuchElementException();
+        }
+    };
 
     /**
-     * Create set from union of two collections.
-     *
-     * @param source  first source collection
-     * @param source2 second source collection
-     * @param <S>     type
-     * @return set of unique items across both collections
+     * Pass around the same instance for empty sets. Yay for less allocations.
      */
-    @NotNull
-    public static <S> ReadOnlySet<S> fromCollections(@NotNull Collection<? extends S> source,
-                                                     @NotNull Collection<? extends S> source2) {
-        Objects.requireNonNull(source);
-        Objects.requireNonNull(source2);
+    private static final ReadOnlySet EMPTY_SET = new ReadOnlySet(new Object[0]) {
+        @Override
+        public int size() {
+            return 0;
+        }
 
-        if (source.isEmpty() && source2.isEmpty())
-            return empty();
+        @Override
+        public boolean contains(Object o) {
+            return false;
+        }
 
-        HashSet<S> set = new HashSet<>();
-        set.addAll(source);
-        set.addAll(source2);
-        return new ReadOnlySet<>((S[]) set.toArray());
-    }
+        @NotNull
+        @Override
+        public Iterator iterator() {
+            return NULL_ITERATOR;
+        }
 
-    /*
-     * Implementation below.
+        @Override
+        public void forEach(Consumer action) {
+
+        }
+
+        @NotNull
+        @Override
+        public ReadOnlySet safeCopy() {
+            return EMPTY_SET;
+        }
+
+        @Override
+        public int hashCode() {
+            return 0;
+        }
+    };
+
+    /**
+     * Cached hashcode
      */
+    private int hashCode = 0;
 
+    /**
+     * Array with elements in this set.
+     */
     private T[] array;
 
     private ReadOnlySet(@NotNull T[] array) {
@@ -215,17 +115,12 @@ public final class ReadOnlySet<T> extends AbstractSet<T> {
 
         //noinspection ForLoopReplaceableByForEach
         for (int i = 0; i < array.length; i++) {
-            /* Try to skip more by cheaper hash check first */
+            /* Try to skip elements by cheaper (presumably) hash check first */
             if (array[i].hashCode() == o.hashCode() && array[i].equals(o)) {
                 return true;
             }
         }
         return false;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        return super.equals(o);
     }
 
     @NotNull
@@ -244,17 +139,40 @@ public final class ReadOnlySet<T> extends AbstractSet<T> {
         }
     }
 
-    @Override
-    public int hashCode() {
-        int h = 0;
-        for (int i = 0; i < array.length; i++)
-            h += array[i].hashCode();
-        return h;
-    }
-
     @NotNull
     public ReadOnlySet<T> safeCopy() {
         return new ReadOnlySet<>(Arrays.copyOf(array, array.length));
+    }
+
+    /**
+     * Follows AbstractSet.hashCode() semantics, that is - hash code is calculated from
+     * the elements in the set and will be equal to other sets that contain the same (hashcodes of)
+     * elements.
+     *
+     * @return calculated hashcode
+     */
+    @Override
+    public int hashCode() {
+        if (hashCode != 0)
+            return hashCode;
+
+        int h = 0;
+        for (int i = 0; i < array.length; i++)
+            h += array[i].hashCode();
+        return hashCode = h;
+    }
+
+
+    /**
+     * Follows AbstractSet.equals() semantics. That is, it is compared as a set
+     * and matches if it contains the same elements.
+     *
+     * @param o object to compare to
+     * @return if matches AbstractSet.equals() semantics
+     */
+    @Override
+    public boolean equals(Object o) {
+        return super.equals(o);
     }
 
     private static class ArrayIterator<I> implements Iterator<I> {
@@ -278,5 +196,166 @@ public final class ReadOnlySet<T> extends AbstractSet<T> {
             }
             return innerArray[index++];
         }
+    }
+
+    /**
+     * Empty set of given type.
+     *
+     * @param <S> type
+     * @return empty set
+     */
+    @NotNull
+    public static <S> ReadOnlySet<S> empty() {
+        return (ReadOnlySet<S>) EMPTY_SET;
+    }
+
+    /**
+     * Set with one member.
+     *
+     * @param item item to wrap in set
+     * @param <S>  type
+     * @return set of type with specified member
+     */
+    @NotNull
+    public static <S> ReadOnlySet<S> fromSingle(@NotNull final S item) {
+        Objects.requireNonNull(item);
+        return new ReadOnlySet<>((S[]) new Object[]{item});
+    }
+
+    /**
+     * Expand given collection with a specified item and return a set.
+     * <p>
+     * Given as convenience method that performs better if operating on
+     * ReadOnlySet already.
+     *
+     * @param source base collection
+     * @param item   item to add
+     * @param <S>    type
+     * @return set of items
+     */
+    @NotNull
+    public static <S> ReadOnlySet<S> addAndCreate(@NotNull final Collection<? extends S> source,
+                                                  @NotNull final S item) {
+        Objects.requireNonNull(source);
+        Objects.requireNonNull(item);
+
+        if (source.isEmpty())
+            return new ReadOnlySet<>((S[]) new Object[]{item});
+
+        if (source instanceof ReadOnlySet) {
+            ReadOnlySet<S> set = (ReadOnlySet<S>) source;
+
+            if (set.contains(item)) {
+                return set;
+            }
+
+            Object[] arr = new Object[set.array.length + 1];
+            System.arraycopy(set.array, 0, arr, 0, set.array.length);
+            arr[arr.length - 1] = item;
+
+            set.array = (S[]) arr;
+            set.hashCode = 0;
+            return set;
+        } else {
+            HashSet<S> set = new HashSet<>();
+            set.addAll(source);
+            set.add(item);
+            return new ReadOnlySet<>((S[]) set.toArray());
+        }
+    }
+
+    /**
+     * Create a set consisting of supplied collection with the specified item removed.
+     * Again, ideally operating on a ReadOnlySet itself as the source collection.
+     *
+     * @param source      source collection
+     * @param surplusItem item to remove
+     * @param <S>         type
+     * @return set of original collection items minus specified item
+     */
+    @NotNull
+    public static <S> ReadOnlySet<S> removeAndCreate(@NotNull final Collection<? extends S> source,
+                                                     @NotNull final S surplusItem) {
+        Objects.requireNonNull(source);
+        Objects.requireNonNull(surplusItem);
+
+        if (source instanceof ReadOnlySet) {
+            ReadOnlySet<S> set = (ReadOnlySet<S>) source;
+
+            if (set.size() == 1) {
+                if (set.array[0].equals(surplusItem)) {
+                    return empty();
+                }
+            } else {
+                removeViaCompacting(set, surplusItem);
+            }
+            return set;
+        } else {
+            HashSet<S> set = new HashSet<>();
+
+            set.addAll(source);
+            set.remove(surplusItem);
+
+            return new ReadOnlySet<>((S[]) set.toArray());
+        }
+    }
+
+    private static <S> void removeViaCompacting(@NotNull final ReadOnlySet<S> set,
+                                                @NotNull final S surplusItem) {
+        /*
+         * Update the set via the hard way, by compacting the array
+         */
+        for (int i = 0; i < set.array.length; i++) {
+            if (set.array[i].hashCode() == surplusItem.hashCode() && set.array[i].equals(surplusItem)) {
+                System.arraycopy(set.array, i + 1, set.array, i, set.array.length - (i + 1));
+                set.array = Arrays.copyOf(set.array, set.array.length - 1);
+                set.hashCode = 0;
+            }
+        }
+        // If the set wasn't compacted in the loop above, there was no item
+        // to remove, so, it remains as-is
+    }
+
+    /**
+     * Create a read only set from a specified collection.
+     *
+     * @param source source collection
+     * @param <S>    type
+     * @return read only set
+     */
+    @NotNull
+    public static <S> ReadOnlySet<S> fromCollection(@NotNull final Collection<? extends S> source) {
+        Objects.requireNonNull(source);
+
+        if (source.isEmpty()) {
+            return empty();
+        }
+
+        HashSet<S> set = new HashSet<>();
+        set.addAll(source);
+        return new ReadOnlySet<>((S[]) set.toArray());
+    }
+
+    /**
+     * Create set from union of two collections.
+     *
+     * @param source  first source collection
+     * @param source2 second source collection
+     * @param <S>     type
+     * @return set of unique items across both collections
+     */
+    @NotNull
+    public static <S> ReadOnlySet<S> fromCollections(@NotNull final Collection<? extends S> source,
+                                                     @NotNull final Collection<? extends S> source2) {
+        Objects.requireNonNull(source);
+        Objects.requireNonNull(source2);
+
+        if (source.isEmpty() && source2.isEmpty())
+            return empty();
+
+        HashSet<S> set = new HashSet<>();
+        set.addAll(source);
+        set.addAll(source2);
+        return new ReadOnlySet<>((S[]) set.toArray());
     }
 }

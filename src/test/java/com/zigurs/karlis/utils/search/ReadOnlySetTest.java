@@ -1,3 +1,18 @@
+/*
+ * Copyright 2016 Karlis Zigurs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.zigurs.karlis.utils.search;
 
 import org.junit.Test;
@@ -8,6 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.Assert.*;
 
 public class ReadOnlySetTest {
+
     @Test
     public void empty() throws Exception {
         Set<String> set = ReadOnlySet.empty();
@@ -279,4 +295,52 @@ public class ReadOnlySetTest {
         assertTrue(setOne.equals(setTwo));
         assertEquals(setOne.hashCode(), setTwo.hashCode());
     }
+
+    @Test
+    public void emptySetTest() {
+        Set<String> set = ReadOnlySet.empty();
+        assertTrue(set.isEmpty());
+    }
+
+    @Test
+    public void emptySetTest1() {
+        Set<String> set = ReadOnlySet.empty();
+        assertEquals(0, set.size());
+    }
+
+    @Test
+    public void emptySetTest2() {
+        ReadOnlySet<String> set = ReadOnlySet.empty();
+        assertFalse(set.contains("cat"));
+        assertFalse(set.safeCopy().contains("cat"));
+    }
+
+    @Test
+    public void emptySetTest3() {
+        Set<String> set = ReadOnlySet.empty();
+        assertFalse(set.contains("cat"));
+    }
+
+    @Test(expected = NoSuchElementException.class)
+    public void emptySetTest4() {
+        Set<String> set = ReadOnlySet.empty();
+        Iterator<String> iterator = set.iterator();
+        assertFalse(iterator.hasNext());
+        assertNull(iterator.next());
+    }
+
+    @Test
+    public void emptySetTest5() {
+        Set<String> set = ReadOnlySet.empty();
+        assertEquals(0, set.hashCode());
+    }
+
+    @Test
+    public void emptySetTest6() {
+        Set<String> set = ReadOnlySet.empty();
+        assertTrue(set.equals(ReadOnlySet.empty()));
+        assertTrue(set.equals(Collections.emptySet()));
+    }
+
+
 }

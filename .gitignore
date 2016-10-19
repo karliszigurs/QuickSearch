@@ -2,3 +2,4 @@
 /.idea
 /quicksearch.iml
 sonar.token.txt
+*.sh

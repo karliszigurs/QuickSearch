@@ -21,19 +21,16 @@ package com.zigurs.karlis.utils.search.model;
 public class Stats {
 
     private final int items;
-    private final int keywords;
     private final int fragments;
 
     /**
      * Construct an instance.
      *
-     * @param items in the search instance
-     * @param keywords in the search instance
+     * @param items     in the search instance
      * @param fragments in the search instance
      */
-    public Stats(int items, int keywords, int fragments) {
+    public Stats(final int items, final int fragments) {
         this.items = items;
-        this.keywords = keywords;
         this.fragments = fragments;
     }
 
@@ -44,15 +41,6 @@ public class Stats {
      */
     public int getItems() {
         return items;
-    }
-
-    /**
-     * Query.
-     *
-     * @return number of keywords
-     */
-    public int getKeywords() {
-        return keywords;
     }
 
     /**

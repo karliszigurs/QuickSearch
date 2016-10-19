@@ -487,6 +487,7 @@ public class QuickSearch<T> {
         long writeLock = lock.writeLock();
         try {
             fragmentsItemsTree.clear();
+            itemKeywordsMap.clear();
         } finally {
             lock.unlockWrite(writeLock);
         }
@@ -504,8 +505,7 @@ public class QuickSearch<T> {
         long readLock = lock.readLock();
         try {
             stats = new Stats(
-                    fragmentsItemsTree.size(),
-                    fragmentsItemsTree.size(),
+                    itemKeywordsMap.size(),
                     fragmentsItemsTree.size()
             );
         } finally {
@@ -534,7 +534,7 @@ public class QuickSearch<T> {
              * need to report back. On large sets of results this can bring notable
              * improvements in speed when compared to built-in sorting methods.
              */
-            return sortAndLimit(matches.entrySet(), maxItemsToList, Map.Entry.comparingByValue(Comparator.reverseOrder())).stream()
+            return PartialSorter.sortAndLimit(matches.entrySet(), maxItemsToList, Map.Entry.comparingByValue(Comparator.reverseOrder())).stream()
                     .map(e -> new ScoreWrapper<>(e.getKey(), e.getValue()))
                     .collect(Collectors.toList());
         } else {
@@ -651,50 +651,6 @@ public class QuickSearch<T> {
                 .map(keywordNormalizer)
                 .filter(s -> !s.isEmpty())
                 .collect(Collectors.toSet()); // implies distinct
-    }
-
-    /**
-     * Purpose built sort discarding known beyond-the-cut elements early.
-     * Trades the cost of manual insertion against the cost of having to sort whole array.
-     * <p>
-     * Comparable to built in sort functions on smaller datasets (<1000 elements), becomes
-     * significantly quicker for larger datasets.
-     *
-     * @param input          collection to select elements from
-     * @param limitResultsTo maximum size of generated ordered list
-     * @param comparator     comparator to use (or use Comparator.naturalOrder())
-     * @param <X>            type of objects to sort
-     * @return sorted list consisting of first (up to limitResultsTo) elements in specified comparator order
-     */
-    final <X> List<X> sortAndLimit(@NotNull final Collection<? extends X> input,
-                                   final int limitResultsTo,
-                                   @NotNull final Comparator<X> comparator) {
-        final int maxResults = Math.max(limitResultsTo, 0); // Safety check that limit is not negative
-        LinkedList<X> result = new LinkedList<>();
-
-        for (X entry : input) {
-            if (result.size() < maxResults) {
-                insertInListInOrderedPos(result, entry, comparator);
-            } else if (comparator.compare(entry, result.getLast()) < 0) {
-                insertInListInOrderedPos(result, entry, comparator);
-                result.removeLast();
-            }
-        }
-
-        return result;
-    }
-
-    private <X> void insertInListInOrderedPos(@NotNull List<X> result,
-                                              @NotNull X entry,
-                                              @NotNull Comparator<X> comparator) {
-        for (int pos = 0; pos < result.size(); pos++) {
-            if (comparator.compare(entry, result.get(pos)) < 0) {
-                result.add(pos, entry);
-                return;
-            }
-        }
-        // If not added already (and returned), append to end of the list
-        result.add(entry);
     }
 
     /*
