@@ -763,9 +763,8 @@ public class QuickSearch<T> {
         if (node == null) //already removed
             return;
 
-        if (parent != null) {
+        if (parent != null)
             node.removeParent(parent);
-        }
 
         // No getParents or getItems means that there's nothing here to find, proceed onwards
         if (node.getParents().isEmpty() && node.getItems().isEmpty()) {
