@@ -133,7 +133,7 @@ public class QuickSearchTest {
                 QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
                 QuickSearch.DEFAULT_MATCH_SCORER,
                 null,
-                QuickSearch.CANDIDATE_ACCUMULATION_POLICY.UNION
+                UNION
         );
         assertNotNull(qs.getStats());
     }
@@ -144,7 +144,7 @@ public class QuickSearchTest {
                 QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
                 QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
                 QuickSearch.DEFAULT_MATCH_SCORER,
-                QuickSearch.UNMATCHED_POLICY.EXACT,
+                EXACT,
                 null
         );
         assertNotNull(qs.getStats());
@@ -172,7 +172,7 @@ public class QuickSearchTest {
     public void testExtractingFunction2() {
         new QuickSearch<String>(
                 s -> {
-                    throw new NullPointerException("testing");
+                    throw new IllegalArgumentException();
                 },
                 QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
                 QuickSearch.DEFAULT_MATCH_SCORER
@@ -211,7 +211,7 @@ public class QuickSearchTest {
         new QuickSearch<String>(
                 QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
                 s -> {
-                    throw new NullPointerException("test");
+                    throw new IllegalArgumentException();
                 },
                 QuickSearch.DEFAULT_MATCH_SCORER
         );
@@ -232,6 +232,7 @@ public class QuickSearchTest {
     public void itemAdded() throws Exception {
         addItem("item", "one two three");
         checkStats(1, 23);
+        assertEquals(1, searchInstance.getStats().getItems());
     }
 
     @Test
@@ -247,6 +248,7 @@ public class QuickSearchTest {
     @Test
     public void emptyItemAdded2() throws Exception {
         addItem("", "one two three");
+        assertEquals(1, searchInstance.getStats().getItems());
     }
 
     @Test
@@ -267,6 +269,7 @@ public class QuickSearchTest {
         }
 
         checkStats(1, 13);
+        assertEquals(1, searchInstance.getStats().getItems());
     }
 
     @Test
@@ -517,6 +520,7 @@ public class QuickSearchTest {
     @Test
     public void statsAreEmpty() throws Exception {
         checkStats(0, 0);
+        assertEquals(0, searchInstance.getStats().getItems());
     }
 
     @Test
@@ -532,13 +536,14 @@ public class QuickSearchTest {
             addItem("test" + i, exerciseString.substring(i, exerciseString.length()));
         }
 
-        assertEquals(10, searchInstance.findItems("e ex exe exer exerc i is ise", 10).size());
         checkStats(33, 554);
+        assertEquals(10, searchInstance.findItems("e ex exe exer exerc i is ise", 10).size());
     }
 
     @Test
     public void singleItem() throws Exception {
         addItem("test", "abra");
+        assertEquals(1, searchInstance.getStats().getItems());
     }
 
     @Test
@@ -559,9 +564,8 @@ public class QuickSearchTest {
             alternativeConfig.addItem("test" + i, exerciseString.substring(i, exerciseString.length()));
         }
 
-        assertEquals(10, alternativeConfig.findItems("e ex exe exer exerc i is ise", 10).size());
-
         checkStats(alternativeConfig.getStats(), 33, 554);
+        assertEquals(10, alternativeConfig.findItems("e ex exe exer exerc i is ise", 10).size());
     }
 
     @Test
@@ -589,9 +593,8 @@ public class QuickSearchTest {
             addItem("test" + ((i % 3) + 3), exerciseString.substring(i, exerciseString.length()));
         }
 
-        assertEquals(10, searchInstance.findItems("e ex exe exer exerc i is ise", 10).size());
-
         checkStats(stats.getItems(), stats.getFragments());
+        assertEquals(10, searchInstance.findItems("e ex exe exer exerc i is ise", 10).size());
     }
 
     @Test
@@ -846,8 +849,10 @@ public class QuickSearchTest {
         assertEquals(10, search.findItems("red shoes", 10).size());
         assertEquals(1, search.findItems("midd", 10).size());
         search.clear();
+        assertEquals(0, searchInstance.getStats().getItems());
     }
 
+    @SuppressWarnings({"ObjectEqualsNull", "EqualsBetweenInconvertibleTypes"})
     @Test
     public void hashWrapperEquals() {
         HashWrapper<String> w = new HashWrapper<>("cat");
@@ -858,6 +863,7 @@ public class QuickSearchTest {
         assertFalse(w.equals(new HashWrapper<>("dog")));
     }
 
+    @SuppressWarnings({"ObjectEqualsNull", "EqualsBetweenInconvertibleTypes"})
     @Test
     public void hashWrapperEquals1() {
         HashWrapper<String> w = new HashWrapper<>("FB");
@@ -907,6 +913,7 @@ public class QuickSearchTest {
 
     protected void checkStats(int items, int fragments) throws AssertionError {
         checkStats(searchInstance.getStats(), items, fragments);
+        assertNotNull(searchInstance.getStats());
     }
 
     protected void checkStats(Stats stats, int items, int fragments) throws AssertionError {

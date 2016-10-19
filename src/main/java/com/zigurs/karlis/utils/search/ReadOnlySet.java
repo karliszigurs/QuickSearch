@@ -75,7 +75,7 @@ public class ReadOnlySet<T> extends AbstractSet<T> {
 
         @Override
         public void forEach(Consumer action) {
-
+            // Noop
         }
 
         @NotNull

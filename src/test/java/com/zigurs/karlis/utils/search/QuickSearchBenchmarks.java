@@ -213,8 +213,8 @@ public class QuickSearchBenchmarks extends QuickSearchTest {
         /*
          * Measured on Java 1.8.0_102
          */
-        final long JDK_COLLECTIONS_TARGET = 117_416_608;
-        final long GUAVA_MULTIMAP_TARGET = 104_140_960;
+//        final long JDK_COLLECTIONS_TARGET = 117_416_608;
+//        final long GUAVA_MULTIMAP_TARGET = 104_140_960;
         final long CUSTOM_TREE_TARGET = 54_255_008;
 
         assertTrue("Calculated size exceeds target", measured < (CUSTOM_TREE_TARGET * 1.1));
@@ -247,9 +247,9 @@ public class QuickSearchBenchmarks extends QuickSearchTest {
         /*
          * Comparable only on my machine, therefore no assert.
          */
-        final long JDK_COLLECTIONS_TARGET = 13000;
-        final long GUAVA_MULTIMAP_TARGET = 20000;
-        final long CUSTOM_TREE_TARGET = 13000;
+//        final long JDK_COLLECTIONS_TARGET = 13000;
+//        final long GUAVA_MULTIMAP_TARGET = 20000;
+//        final long CUSTOM_TREE_TARGET = 13000;
 
         System.out.println("Time taken " + (System.currentTimeMillis() - startTime));
     }
