@@ -758,7 +758,7 @@ public class QuickSearch<T> {
         }
     }
 
-    private void collapseEdge(@NotNull final GraphNode<HashWrapper<T>> node,
+    private void collapseEdge(@Nullable final GraphNode<HashWrapper<T>> node,
                               @Nullable final GraphNode<HashWrapper<T>> parent) {
         if (node == null) //already removed
             return;
