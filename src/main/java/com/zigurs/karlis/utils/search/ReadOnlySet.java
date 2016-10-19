@@ -154,7 +154,9 @@ public class ReadOnlySet<T> extends AbstractSet<T> {
         int h = 0;
         for (int i = 0; i < array.length; i++)
             h += array[i].hashCode();
-        return hashCode = h;
+
+        hashCode = h;
+        return hashCode;
     }
 
     /**
