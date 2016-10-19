@@ -669,8 +669,8 @@ public class QuickSearch<T> {
                 throw new IllegalArgumentException("Keywords extractor function failed non-null result test");
         } catch (IllegalArgumentException e) {
             throw e;
-        } catch (Throwable t) {
-            throw new IllegalArgumentException("Exception while testing keywords extractor function", t);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Exception while testing keywords extractor function", e);
         }
     }
 
@@ -687,8 +687,8 @@ public class QuickSearch<T> {
                 throw new IllegalArgumentException("Keyword normalizer function failed non-null output test");
         } catch (IllegalArgumentException e) {
             throw e;
-        } catch (Throwable t) {
-            throw new IllegalArgumentException("Exception while testing keyword normalizer function", t);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Exception while testing keyword normalizer function", e);
         }
     }
 
@@ -701,8 +701,8 @@ public class QuickSearch<T> {
     protected void testKeywordMatchScorerFunction(@NotNull final BiFunction<String, String, Double> function) {
         try {
             function.apply("testinput", "testinput");
-        } catch (Throwable t) {
-            throw new IllegalArgumentException("Exception while testing keyword match scorer function", t);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Exception while testing keyword match scorer function", e);
         }
     }
 
