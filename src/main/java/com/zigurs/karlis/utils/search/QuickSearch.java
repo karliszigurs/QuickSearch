@@ -301,10 +301,10 @@ public class QuickSearch<T> {
         long writeLock = lock.writeLock();
         try {
             addItemImpl(new HashWrapper<>(item), keywordsSet);
-            return true;
         } finally {
             lock.unlockWrite(writeLock);
         }
+        return true;
     }
 
     /**
@@ -335,7 +335,7 @@ public class QuickSearch<T> {
      */
     @NotNull
     public Optional<T> findItem(@Nullable final String searchString) {
-        if (isVoidRequest(searchString, 1))
+        if (invalidRequest(searchString, 1))
             return Optional.empty();
 
         Set<String> searchKeywords = prepareKeywords(searchString);
@@ -352,11 +352,10 @@ public class QuickSearch<T> {
             lock.unlockRead(readLock);
         }
 
-        if (results.isEmpty()) {
+        if (results.isEmpty())
             return Optional.empty();
-        } else {
+        else
             return Optional.of(results.get(0).unwrap().unwrap());
-        }
     }
 
     /**
@@ -369,7 +368,7 @@ public class QuickSearch<T> {
      */
     @NotNull
     public List<T> findItems(@Nullable final String searchString, final int numberOfTopItems) {
-        if (isVoidRequest(searchString, numberOfTopItems))
+        if (invalidRequest(searchString, numberOfTopItems))
             return Collections.emptyList();
 
         Set<String> searchKeywords = prepareKeywords(searchString);
@@ -404,9 +403,8 @@ public class QuickSearch<T> {
      */
     @NotNull
     public Optional<Item<T>> findItemWithDetail(@Nullable final String searchString) {
-        if (isVoidRequest(searchString, 1)) {
+        if (invalidRequest(searchString, 1))
             return Optional.empty();
-        }
 
         Set<String> searchKeywords = prepareKeywords(searchString);
 
@@ -445,9 +443,8 @@ public class QuickSearch<T> {
      */
     @NotNull
     public Result<T> findItemsWithDetail(@Nullable final String searchString, final int numberOfTopItems) {
-        if (isVoidRequest(searchString, numberOfTopItems)) {
+        if (invalidRequest(searchString, numberOfTopItems))
             return new Result<>(searchString != null ? searchString : "", Collections.emptyList());
-        }
 
         Set<String> searchKeywords = prepareKeywords(searchString);
 
@@ -517,7 +514,7 @@ public class QuickSearch<T> {
      * Implementation methods
      */
 
-    private boolean isVoidRequest(@Nullable final String searchString, final int numItems) {
+    private boolean invalidRequest(@Nullable final String searchString, final int numItems) {
         return searchString == null || searchString.isEmpty() || numItems < 1;
     }
 
@@ -547,20 +544,20 @@ public class QuickSearch<T> {
 
     @NotNull
     private Map<HashWrapper<T>, Double> findAndScoreImpl(@NotNull final Set<String> suppliedFragments) {
-        if (candidateAccumulationPolicy == UNION) {
+        if (candidateAccumulationPolicy == UNION)
             return findAndScoreUnionImpl(suppliedFragments);
-        } else { // implied (candidateAccumulationPolicy == INTERSECTION)
+        else // implied (candidateAccumulationPolicy == INTERSECTION)
             return findAndScoreIntersectionImpl(suppliedFragments);
-        }
     }
 
     @NotNull
     private Map<HashWrapper<T>, Double> findAndScoreUnionImpl(@NotNull final Set<String> searchFragments) {
         Map<HashWrapper<T>, Double> accumulatedItems = new LinkedHashMap<>();
 
-        for (String suppliedFragment : searchFragments) {
-            walkAndScore(suppliedFragment, null).forEach((k, v) -> accumulatedItems.merge(k, v, (d1, d2) -> d1 + d2));
-        }
+        searchFragments.forEach(fragment ->
+                walkAndScore(fragment, null).forEach((k, v) ->
+                        accumulatedItems.merge(k, v, (d1, d2) -> d1 + d2))
+        );
 
         return accumulatedItems;
     }
@@ -573,6 +570,7 @@ public class QuickSearch<T> {
 
         for (String suppliedFragment : suppliedFragments) {
             Map<HashWrapper<T>, Double> fragmentItems = walkAndScore(suppliedFragment, accumulatedItems);
+
             if (fragmentItems.isEmpty())
                 return fragmentItems; // Can fail early
 
@@ -634,11 +632,10 @@ public class QuickSearch<T> {
                              @NotNull final Set<String> suppliedKeywords) {
         registerItem(item, suppliedKeywords);
 
-        if (itemKeywordsMap.containsKey(item)) {
+        if (itemKeywordsMap.containsKey(item))
             itemKeywordsMap.put(item, ReadOnlySet.fromCollections(itemKeywordsMap.get(item), suppliedKeywords));
-        } else {
+        else
             itemKeywordsMap.put(item, ReadOnlySet.fromCollection(suppliedKeywords));
-        }
     }
 
     private void removeItemImpl(@NotNull final HashWrapper<T> item) {
@@ -668,13 +665,12 @@ public class QuickSearch<T> {
      */
     protected void testKeywordsExtractorFunction(@NotNull final Function<String, Set<String>> function) {
         try {
-            if (function.apply("") == null || function.apply("testinput") == null) {
+            if (function.apply("") == null || function.apply("testinput") == null)
                 throw new IllegalArgumentException("Keywords extractor function failed non-null result test");
-            }
         } catch (IllegalArgumentException e) {
             throw e;
-        } catch (Exception e) {
-            throw new IllegalArgumentException("Exception while testing keywords extractor function", e);
+        } catch (Throwable t) {
+            throw new IllegalArgumentException("Exception while testing keywords extractor function", t);
         }
     }
 
@@ -691,8 +687,8 @@ public class QuickSearch<T> {
                 throw new IllegalArgumentException("Keyword normalizer function failed non-null output test");
         } catch (IllegalArgumentException e) {
             throw e;
-        } catch (Exception e) {
-            throw new IllegalArgumentException("Exception while testing keyword normalizer function", e);
+        } catch (Throwable t) {
+            throw new IllegalArgumentException("Exception while testing keyword normalizer function", t);
         }
     }
 
@@ -705,8 +701,8 @@ public class QuickSearch<T> {
     protected void testKeywordMatchScorerFunction(@NotNull final BiFunction<String, String, Double> function) {
         try {
             function.apply("testinput", "testinput");
-        } catch (Exception e) {
-            throw new IllegalArgumentException("Exception while testing keyword match scorer function", e);
+        } catch (Throwable t) {
+            throw new IllegalArgumentException("Exception while testing keyword match scorer function", t);
         }
     }
 
@@ -716,9 +712,7 @@ public class QuickSearch<T> {
 
     private void registerItem(@NotNull final HashWrapper<T> item,
                               @NotNull final Set<String> keywords) {
-        for (String keyword : keywords) {
-            createAndRegisterNode(null, keyword, item);
-        }
+        keywords.forEach(keyword -> createAndRegisterNode(null, keyword, item));
     }
 
     private void createAndRegisterNode(@Nullable final GraphNode<HashWrapper<T>> parent,
@@ -751,9 +745,8 @@ public class QuickSearch<T> {
 
                 keywordNode.removeItem(item);
 
-                if (keywordNode.getItems().isEmpty()) {
+                if (keywordNode.getItems().isEmpty())
                     collapseEdge(keywordNode, null);
-                }
             }
         }
     }

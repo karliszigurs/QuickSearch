@@ -73,12 +73,10 @@ public final class GraphNode<V> {
      * @param item item to add.
      */
     public void addItem(@NotNull final V item) {
-        if (items.isEmpty()) {
+        if (items.isEmpty())
             items = ReadOnlySet.fromSingle(item);
-            return;
-        }
-
-        items = ReadOnlySet.addAndCreate(items, item);
+        else
+            items = ReadOnlySet.addAndCreate(items, item);
     }
 
     /**
@@ -107,12 +105,10 @@ public final class GraphNode<V> {
      * @param parent parent to add.
      */
     public void addParent(@NotNull final GraphNode<V> parent) {
-        if (parents.isEmpty()) {
+        if (parents.isEmpty())
             parents = ReadOnlySet.fromSingle(parent);
-            return;
-        }
-
-        parents = ReadOnlySet.addAndCreate(parents, parent);
+        else
+            parents = ReadOnlySet.addAndCreate(parents, parent);
     }
 
     /**

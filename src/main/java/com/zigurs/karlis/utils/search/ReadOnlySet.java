@@ -146,10 +146,17 @@ public class ReadOnlySet<T> extends AbstractSet<T> {
      *
      * @return calculated hashcode
      */
+    @SuppressWarnings("ForLoopReplaceableByForEach")
     @Override
     public int hashCode() {
         if (hashCode != 0)
             return hashCode;
+
+        /*
+         * It must be dully noted that as we have an array
+         * to operate on directly, it's far more efficient
+         * than iterators, streams or foreach.
+         */
 
         int h = 0;
         for (int i = 0; i < array.length; i++)
@@ -229,6 +236,7 @@ public class ReadOnlySet<T> extends AbstractSet<T> {
     @NotNull
     public static <S> ReadOnlySet<S> fromSingle(@NotNull final S item) {
         Objects.requireNonNull(item);
+
         return new ReadOnlySet<>((S[]) new Object[]{item});
     }
 
@@ -255,16 +263,17 @@ public class ReadOnlySet<T> extends AbstractSet<T> {
         if (source instanceof ReadOnlySet) {
             ReadOnlySet<S> set = (ReadOnlySet<S>) source;
 
-            if (set.contains(item)) {
+            if (set.contains(item))
                 return set;
-            }
 
             Object[] arr = new Object[set.array.length + 1];
             System.arraycopy(set.array, 0, arr, 0, set.array.length);
             arr[arr.length - 1] = item;
 
+            // Direct assignment in the supplied set
             set.array = (S[]) arr;
             set.hashCode = 0;
+
             return set;
         } else {
             HashSet<S> set = new HashSet<>();
@@ -293,19 +302,16 @@ public class ReadOnlySet<T> extends AbstractSet<T> {
             ReadOnlySet<S> set = (ReadOnlySet<S>) source;
 
             if (set.size() == 1) {
-                if (set.array[0].equals(surplusItem)) {
+                if (set.array[0].equals(surplusItem))
                     return empty();
-                }
             } else {
                 removeViaCompacting(set, surplusItem);
             }
             return set;
         } else {
             HashSet<S> set = new HashSet<>();
-
             set.addAll(source);
             set.remove(surplusItem);
-
             return new ReadOnlySet<>((S[]) set.toArray());
         }
     }
@@ -337,9 +343,8 @@ public class ReadOnlySet<T> extends AbstractSet<T> {
     public static <S> ReadOnlySet<S> fromCollection(@NotNull final Collection<? extends S> source) {
         Objects.requireNonNull(source);
 
-        if (source.isEmpty()) {
+        if (source.isEmpty())
             return empty();
-        }
 
         HashSet<S> set = new HashSet<>();
         set.addAll(source);

@@ -16,7 +16,6 @@
 package com.zigurs.karlis.utils.search;
 
 import org.github.jamm.MemoryMeter;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.concurrent.CountDownLatch;
@@ -30,7 +29,6 @@ import static org.junit.Assert.assertTrue;
 
 public class QuickSearchBenchmarks extends QuickSearchTest {
 
-    @Ignore
     @Test
     public void intersectionSearchBenchmark() throws Exception {
         searchInstance = new QuickSearch<>(
@@ -41,18 +39,19 @@ public class QuickSearchBenchmarks extends QuickSearchTest {
                 INTERSECTION);
 
         long st = System.currentTimeMillis();
-        for (int i = 0; i < 3000; i++) {
+        for (int i = 0; i < 300; i++) {
             String[] items = USA_STATES[i % USA_STATES.length];
             addItem(items[0] + "-" + i, String.format("%s %s %s %s", items[0], items[1], items[2], items[3]));
         }
         System.out.println("Loaded in " + (System.currentTimeMillis() - st) + "ms");
 
-        final int iterations = 5000;
+        final int iterations = 500;
 
         searchIteration(iterations, "Warmup:", "a b c d e");
         searchIteration(iterations, "Simple:", "w");
         searchIteration(iterations, "Medium:", "wa sh");
         searchIteration(iterations, "Brutal:", "a b c d e g h i l m n p r s u v y");
+        assertTrue(true);
     }
 
     private void searchIteration(int iterations, String prefix, String searchString) {
@@ -64,7 +63,6 @@ public class QuickSearchBenchmarks extends QuickSearchTest {
         System.out.println(String.format("%s\t%,f k/sec", prefix, (double) iterations / ttSimple));
     }
 
-    @Ignore
     @Test
     public void multiThreadBenchmark() throws Exception {
         for (String[] items : USA_STATES) {
@@ -73,11 +71,12 @@ public class QuickSearchBenchmarks extends QuickSearchTest {
 
         multiThreadTestIteration("Warmup:");
         multiThreadTestIteration("Warm  :");
+        assertTrue(true);
     }
 
     private void multiThreadTestIteration(final String label) throws InterruptedException {
         int threads = 4;
-        int iterationsPerThread = 1000000;
+        int iterationsPerThread = 1000;
 
         CountDownLatch latch = new CountDownLatch(threads);
         AtomicLong wrote = new AtomicLong(0L);
@@ -136,7 +135,6 @@ public class QuickSearchBenchmarks extends QuickSearchTest {
         );
     }
 
-    @Ignore
     @Test
     public void operationsBenchmark() throws Exception {
         for (String[] items : USA_STATES) {
@@ -144,11 +142,12 @@ public class QuickSearchBenchmarks extends QuickSearchTest {
         }
         operationsBenchIteration("Warmup:");
         operationsBenchIteration("Warmed:");
+        assertTrue(true);
     }
 
     private void operationsBenchIteration(final String label) throws InterruptedException {
         int threads = 1;
-        int iterationsPerThread = 100000;
+        int iterationsPerThread = 1000;
         CountDownLatch latch = new CountDownLatch(threads);
 
         // ops threads
@@ -189,7 +188,6 @@ public class QuickSearchBenchmarks extends QuickSearchTest {
         ));
     }
 
-    @Ignore
     @Test
     public void measureMemoryUse() {
         searchInstance = new QuickSearch<>(
@@ -199,7 +197,8 @@ public class QuickSearchBenchmarks extends QuickSearchTest {
                 BACKTRACKING,
                 INTERSECTION);
 
-        for (int i = 0; i < 100_000; i++) {
+        final int itemsCount = 1000;
+        for (int i = 0; i < itemsCount; i++) {
             String[] items = USA_STATES[i % USA_STATES.length];
             addItem(items[0] + "-" + i, String.format("%s %s %s %s", items[0], items[1], items[2], items[3]));
         }
@@ -211,16 +210,16 @@ public class QuickSearchBenchmarks extends QuickSearchTest {
         System.out.println("Memory consumption is " + measured);
 
         /*
-         * Measured on Java 1.8.0_102
+         * Measured on Java 1.8.0_102 for 100_000 items set above
          */
 //        final long JDK_COLLECTIONS_TARGET = 117_416_608;
 //        final long GUAVA_MULTIMAP_TARGET = 104_140_960;
-        final long CUSTOM_TREE_TARGET = 54_255_008;
+//        final long CUSTOM_TREE_TARGET = 54_255_008;
+        final long SMALL_TEST_TARGET = 908_144;
 
-        assertTrue("Calculated size exceeds target", measured < (CUSTOM_TREE_TARGET * 1.1));
+        assertTrue("Calculated size exceeds target", measured < (SMALL_TEST_TARGET * 1.1));
     }
 
-    @Ignore
     @Test
     public void measureQueryMicrobench() {
         searchInstance = new QuickSearch<>(
@@ -230,8 +229,9 @@ public class QuickSearchBenchmarks extends QuickSearchTest {
                 BACKTRACKING,
                 INTERSECTION);
 
+        int itemsCount = 1000;
         long startTime = System.currentTimeMillis();
-        for (int i = 0; i < 100_000; i++) {
+        for (int i = 0; i < itemsCount; i++) {
             String[] items = USA_STATES[i % USA_STATES.length];
             addItem(items[0] + "-" + i, String.format("%s %s %s %s", items[0], items[1], items[2], items[3]));
         }
@@ -252,5 +252,6 @@ public class QuickSearchBenchmarks extends QuickSearchTest {
 //        final long CUSTOM_TREE_TARGET = 13000;
 
         System.out.println("Time taken " + (System.currentTimeMillis() - startTime));
+        assertTrue((System.currentTimeMillis() - startTime) < 5000);
     }
 }
