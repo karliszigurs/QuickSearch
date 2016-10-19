@@ -21,6 +21,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.io.IOException;
 import java.nio.charset.UnsupportedCharsetException;
 import java.util.*;
 
@@ -173,7 +174,7 @@ public class QuickSearchTest {
     public void testExtractingFunction2() {
         new QuickSearch<String>(
                 s -> {
-                    throw new UnsupportedCharsetException("Dummy exception");
+                    throw new NoSuchElementException("Dummy exception");
                 },
                 QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
                 QuickSearch.DEFAULT_MATCH_SCORER
