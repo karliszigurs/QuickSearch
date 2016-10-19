@@ -47,6 +47,6 @@ final class HashWrapper<T> {
 
     @Override
     public boolean equals(Object that) {
-        return (that instanceof HashWrapper) && hashCode() == item.hashCode() && item.equals(((HashWrapper) that).unwrap());
+        return (that instanceof HashWrapper) && hashCode() == that.hashCode() && item.equals(((HashWrapper) that).unwrap());
     }
 }

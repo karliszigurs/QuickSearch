@@ -324,7 +324,7 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void remove() throws Exception {
+    public void itemRemoved1() throws Exception {
         addItem("test1", "onex two three");
         addItem("test2", "onexx two three");
         addItem("test3", "one two three");
@@ -338,6 +338,13 @@ public class QuickSearchTest {
         assertTrue("Unexpected result size", searchInstance.findItems("one", 10).size() == 0);
 
         checkStats(0, 0, 0);
+    }
+
+    @Test
+    public void itemRemoved2() throws Exception {
+        addItem("toBeRemoved", "one two three");
+        searchInstance.removeItem(null);
+        assertEquals(23, searchInstance.getStats().getFragments());
     }
 
     @Test
@@ -898,6 +905,16 @@ public class QuickSearchTest {
         assertFalse(w.equals("test"));
         assertTrue(w.equals(new HashWrapper<>("cat")));
         assertFalse(w.equals(new HashWrapper<>("dog")));
+    }
+
+    @Test
+    public void hashWrapperEquals1() {
+        HashWrapper<String> w = new HashWrapper<>("FB");
+
+        assertFalse(w.equals(null));
+        assertFalse(w.equals("Ea"));
+        assertTrue(w.equals(new HashWrapper<>("FB")));
+        assertFalse(w.equals(new HashWrapper<>("Ea")));
     }
 
     @Test
