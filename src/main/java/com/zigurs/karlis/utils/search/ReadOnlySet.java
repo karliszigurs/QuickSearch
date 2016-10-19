@@ -55,7 +55,7 @@ public final class ReadOnlySet<T> extends AbstractSet<T> {
      * Set with one member.
      *
      * @param item item to wrap in set
-     * @param <S> type
+     * @param <S>  type
      * @return set of type with specified member
      */
     @NotNull
@@ -67,13 +67,13 @@ public final class ReadOnlySet<T> extends AbstractSet<T> {
 
     /**
      * Expand given collection with a specified item and return a set.
-     *
+     * <p>
      * Given as convenience method that performs better if operating on
      * ReadOnlySet already.
      *
      * @param source base collection
-     * @param item item to add
-     * @param <S> type
+     * @param item   item to add
+     * @param <S>    type
      * @return set of items
      */
     @NotNull
@@ -110,9 +110,9 @@ public final class ReadOnlySet<T> extends AbstractSet<T> {
      * Create a set consisting of supplied collection with the specified item removed.
      * Again, ideally operating on a ReadOnlySet itself as the source collection.
      *
-     * @param source source collection
+     * @param source      source collection
      * @param surplusItem item to remove
-     * @param <S> type
+     * @param <S>         type
      * @return set of original collection items minus specified item
      */
     @NotNull
@@ -155,7 +155,7 @@ public final class ReadOnlySet<T> extends AbstractSet<T> {
      * Create a read only set from a specified collection.
      *
      * @param source source collection
-     * @param <S> type
+     * @param <S>    type
      * @return read only set
      */
     @NotNull
@@ -174,9 +174,9 @@ public final class ReadOnlySet<T> extends AbstractSet<T> {
     /**
      * Create set from union of two collections.
      *
-     * @param source first source collection
+     * @param source  first source collection
      * @param source2 second source collection
-     * @param <S> type
+     * @param <S>     type
      * @return set of unique items across both collections
      */
     @NotNull
@@ -223,6 +223,11 @@ public final class ReadOnlySet<T> extends AbstractSet<T> {
         return false;
     }
 
+    @Override
+    public boolean equals(Object o) {
+        return super.equals(o);
+    }
+
     @NotNull
     @Override
     public Iterator<T> iterator() {
@@ -237,6 +242,14 @@ public final class ReadOnlySet<T> extends AbstractSet<T> {
         for (int i = 0; i < array.length; i++) {
             action.accept(array[i]);
         }
+    }
+
+    @Override
+    public int hashCode() {
+        int h = 0;
+        for (int i = 0; i < array.length; i++)
+            h += array[i].hashCode();
+        return h;
     }
 
     @NotNull
@@ -260,6 +273,9 @@ public final class ReadOnlySet<T> extends AbstractSet<T> {
 
         @Override
         public I next() {
+            if (index >= innerArray.length) {
+                throw new NoSuchElementException();
+            }
             return innerArray[index++];
         }
     }

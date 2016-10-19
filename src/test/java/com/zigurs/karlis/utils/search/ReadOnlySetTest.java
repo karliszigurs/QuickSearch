@@ -187,6 +187,20 @@ public class ReadOnlySetTest {
         }
     }
 
+    @Test(expected=NoSuchElementException.class)
+    public void iterator1() throws Exception {
+        Set<String> set = ReadOnlySet.empty();
+        for (int i = 0; i < 10; i++) {
+            set = ReadOnlySet.addAndCreate(set, "Item" + i);
+        }
+
+        Iterator<String> iterator = set.iterator();
+
+        while(true) {
+            iterator.next();
+        }
+    }
+
     @Test
     public void forEach() throws Exception {
         Set<String> set = ReadOnlySet.empty();
@@ -213,4 +227,56 @@ public class ReadOnlySetTest {
         assertEquals(1000, copy.size());
     }
 
+    @Test
+    public void equalsTest() {
+        Set<String> setOne = ReadOnlySet.fromSingle("one");
+        Set<String> setTwo = ReadOnlySet.fromSingle("two");
+        assertFalse(setOne.equals(setTwo));
+    }
+
+    @Test
+    public void equalsTest1() {
+        Set<String> setOne = ReadOnlySet.fromSingle("one");
+        Set<String> setTwo = ReadOnlySet.fromSingle("one");
+        assertTrue(setOne.equals(setTwo));
+        assertFalse(setOne.hashCode() == 0);
+        assertEquals(setOne.hashCode(), setTwo.hashCode());
+    }
+
+    @Test
+    public void equalsTest2() {
+        Set<String> setOne = ReadOnlySet.fromCollection(Arrays.asList("one", "two"));
+        Set<String> setTwo = ReadOnlySet.fromCollection(Arrays.asList("two", "one"));
+        assertTrue(setOne.equals(setTwo));
+        assertEquals(setOne.hashCode(), setTwo.hashCode());
+    }
+
+    @Test
+    public void equalsTest3() {
+        Set<String> setOne = ReadOnlySet.fromCollection(Arrays.asList("one", "two"));
+        Set<String> setTwo = ReadOnlySet.fromCollection(Arrays.asList("two", "three"));
+        assertFalse(setOne.equals(setTwo));
+    }
+
+    @Test
+    public void equalsTest4() {
+        Set<String> setOne = ReadOnlySet.fromCollection(Arrays.asList("one", "two"));
+        Set<String> setTwo = Collections.singleton("three");
+        assertFalse(setOne.equals(setTwo));
+    }
+
+    @Test
+    public void equalsTest5() {
+        Set<String> setOne = ReadOnlySet.fromCollection(Arrays.asList("one", "two"));
+        Set<String> setTwo = ReadOnlySet.fromSingle("three");
+        assertFalse(setOne.equals(setTwo));
+    }
+
+    @Test
+    public void equalsTest6() {
+        Set<String> setOne = ReadOnlySet.fromCollection(Arrays.asList("one", "two"));
+        Set<String> setTwo = new HashSet<>(Arrays.asList("one", "two"));
+        assertTrue(setOne.equals(setTwo));
+        assertEquals(setOne.hashCode(), setTwo.hashCode());
+    }
 }

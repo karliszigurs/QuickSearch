@@ -666,14 +666,14 @@ public class QuickSearch<T> {
      * @param <X>            type of objects to sort
      * @return sorted list consisting of first (up to limitResultsTo) elements in specified comparator order
      */
-    final <X> List<X> sortAndLimit(@NotNull Collection<? extends X> input,
-                                   int limitResultsTo,
-                                   @NotNull Comparator<X> comparator) {
-        limitResultsTo = Math.max(limitResultsTo, 0); // Safety check that limit is not negative
+    final <X> List<X> sortAndLimit(@NotNull final Collection<? extends X> input,
+                                   final int limitResultsTo,
+                                   @NotNull final Comparator<X> comparator) {
+        final int maxResults = Math.max(limitResultsTo, 0); // Safety check that limit is not negative
         LinkedList<X> result = new LinkedList<>();
 
         for (X entry : input) {
-            if (result.size() < limitResultsTo) {
+            if (result.size() < maxResults) {
                 insertInListInOrderedPos(result, entry, comparator);
             } else if (comparator.compare(entry, result.getLast()) < 0) {
                 insertInListInOrderedPos(result, entry, comparator);
