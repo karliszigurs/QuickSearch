@@ -23,20 +23,20 @@ import org.jetbrains.annotations.NotNull;
  * Internally we want to cache possibly heavy hashCode calculations
  * as we'll be juggling the objects between sets a bit.
  */
-final class HashWrapper<T> {
+public class HashWrapper<T> {
 
     @NotNull
     private final T item;
 
     private final int hashCode;
 
-    HashWrapper(@NotNull T item) {
+    public HashWrapper(@NotNull final T item) {
         this.item = item;
         hashCode = item.hashCode();
     }
 
     @NotNull
-    T unwrap() {
+    public T unwrap() {
         return item;
     }
 
@@ -47,6 +47,8 @@ final class HashWrapper<T> {
 
     @Override
     public boolean equals(Object that) {
-        return (that instanceof HashWrapper) && hashCode() == that.hashCode() && item.equals(((HashWrapper) that).unwrap());
+        return (that instanceof HashWrapper)
+                && hashCode() == that.hashCode()
+                && item.equals(((HashWrapper) that).unwrap());
     }
 }

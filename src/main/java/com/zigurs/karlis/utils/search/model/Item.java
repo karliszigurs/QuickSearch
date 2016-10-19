@@ -41,7 +41,7 @@ public class Item<T> {
      * @param itemKeywords set of non-null keywords associated with result
      * @param score        search result score for the result
      */
-    public Item(@NotNull T result, @NotNull Set<String> itemKeywords, double score) {
+    public Item(@NotNull final T result, @NotNull final Set<String> itemKeywords, final double score) {
         this.result = result;
         this.itemKeywords = itemKeywords;
         this.score = score;

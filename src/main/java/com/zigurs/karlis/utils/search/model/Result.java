@@ -34,10 +34,10 @@ public class Result<T> {
     /**
      * Construct an instance
      *
-     * @param searchString search string that generated this result set
+     * @param searchString  search string that generated this result set
      * @param responseItems found items
      */
-    public Result(@NotNull String searchString, @NotNull List<Item<T>> responseItems) {
+    public Result(@NotNull final String searchString, @NotNull final List<Item<T>> responseItems) {
         this.searchString = searchString;
         this.responseItems = responseItems;
     }

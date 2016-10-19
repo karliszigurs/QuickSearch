@@ -22,13 +22,13 @@ import org.jetbrains.annotations.NotNull;
  * <p>
  * Track item score during result set generation.
  */
-final class ScoreWrapper<T> {
+public class ScoreWrapper<T> {
 
     @NotNull
     private final HashWrapper<T> item;
     private final double score;
 
-    ScoreWrapper(@NotNull HashWrapper<T> item, double score) {
+    public ScoreWrapper(@NotNull final HashWrapper<T> item, final double score) {
         this.item = item;
         this.score = score;
     }

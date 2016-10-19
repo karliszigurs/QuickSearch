@@ -225,9 +225,9 @@ public class QuickSearch<T> {
      * @param keywordNormalizer  Normalizer function.
      * @param keywordMatchScorer Scorer function.
      */
-    public QuickSearch(@Nullable Function<String, Set<String>> keywordsExtractor,
-                       @Nullable Function<String, String> keywordNormalizer,
-                       @Nullable BiFunction<String, String, Double> keywordMatchScorer) {
+    public QuickSearch(@Nullable final Function<String, Set<String>> keywordsExtractor,
+                       @Nullable final Function<String, String> keywordNormalizer,
+                       @Nullable final BiFunction<String, String, Double> keywordMatchScorer) {
         this(keywordsExtractor,
                 keywordNormalizer,
                 keywordMatchScorer,
@@ -247,11 +247,11 @@ public class QuickSearch<T> {
      * @param unmatchedPolicy             Policy to apply to supplied keywords without direct match
      * @param candidateAccumulationPolicy Policy to generate broad or exact results set
      */
-    public QuickSearch(@Nullable Function<String, Set<String>> keywordsExtractor,
-                       @Nullable Function<String, String> keywordNormalizer,
-                       @Nullable BiFunction<String, String, Double> keywordMatchScorer,
-                       @Nullable UNMATCHED_POLICY unmatchedPolicy,
-                       @Nullable CANDIDATE_ACCUMULATION_POLICY candidateAccumulationPolicy) {
+    public QuickSearch(@Nullable final Function<String, Set<String>> keywordsExtractor,
+                       @Nullable final Function<String, String> keywordNormalizer,
+                       @Nullable final BiFunction<String, String, Double> keywordMatchScorer,
+                       @Nullable final UNMATCHED_POLICY unmatchedPolicy,
+                       @Nullable final CANDIDATE_ACCUMULATION_POLICY candidateAccumulationPolicy) {
         if (keywordsExtractor == null || keywordNormalizer == null || keywordMatchScorer == null)
             throw new IllegalArgumentException("Must provide a function");
 
@@ -289,7 +289,7 @@ public class QuickSearch<T> {
      * @param keywords Arbitrary list of keywords separated by space, comma, special characters, freeform text...
      * @return True if the item was added, false if no keywords to map against the item were found (therefore item was not added)
      */
-    public boolean addItem(@Nullable T item, @Nullable String keywords) {
+    public boolean addItem(@Nullable final T item, @Nullable final String keywords) {
         if (item == null || keywords == null || keywords.isEmpty())
             return false;
 
@@ -315,7 +315,7 @@ public class QuickSearch<T> {
      *
      * @param item Item to remove
      */
-    public void removeItem(@Nullable T item) {
+    public void removeItem(@Nullable final T item) {
         if (item == null)
             return;
 
@@ -334,7 +334,7 @@ public class QuickSearch<T> {
      * @return Optional containing (or not) the top scoring item
      */
     @NotNull
-    public Optional<T> findItem(@Nullable String searchString) {
+    public Optional<T> findItem(@Nullable final String searchString) {
         if (isVoidRequest(searchString, 1))
             return Optional.empty();
 
@@ -368,7 +368,7 @@ public class QuickSearch<T> {
      * @return List of 0 to numberOfTopItems elements
      */
     @NotNull
-    public List<T> findItems(@Nullable String searchString, int numberOfTopItems) {
+    public List<T> findItems(@Nullable final String searchString, final int numberOfTopItems) {
         if (isVoidRequest(searchString, numberOfTopItems))
             return Collections.emptyList();
 
@@ -403,7 +403,7 @@ public class QuickSearch<T> {
      * @return Possibly empty Optional wrapping item, keywords and score
      */
     @NotNull
-    public Optional<Item<T>> findItemWithDetail(@Nullable String searchString) {
+    public Optional<Item<T>> findItemWithDetail(@Nullable final String searchString) {
         if (isVoidRequest(searchString, 1)) {
             return Optional.empty();
         }
@@ -444,7 +444,7 @@ public class QuickSearch<T> {
      * @return Result object containing 0 to n top scoring items and corresponding metadata
      */
     @NotNull
-    public Result<T> findItemsWithDetail(@Nullable String searchString, int numberOfTopItems) {
+    public Result<T> findItemsWithDetail(@Nullable final String searchString, final int numberOfTopItems) {
         if (isVoidRequest(searchString, numberOfTopItems)) {
             return new Result<>(searchString != null ? searchString : "", Collections.emptyList());
         }
@@ -517,12 +517,13 @@ public class QuickSearch<T> {
      * Implementation methods
      */
 
-    private boolean isVoidRequest(@Nullable String searchString, int numItems) {
+    private boolean isVoidRequest(@Nullable final String searchString, final int numItems) {
         return searchString == null || searchString.isEmpty() || numItems < 1;
     }
 
     @NotNull
-    private List<ScoreWrapper<T>> findItemsImpl(@NotNull Set<String> searchKeywords, int maxItemsToList) {
+    private List<ScoreWrapper<T>> findItemsImpl(@NotNull final Set<String> searchKeywords,
+                                                final int maxItemsToList) {
         // search itself
         Map<HashWrapper<T>, Double> matches = findAndScoreImpl(searchKeywords);
 
@@ -545,7 +546,7 @@ public class QuickSearch<T> {
     }
 
     @NotNull
-    private Map<HashWrapper<T>, Double> findAndScoreImpl(@NotNull Set<String> suppliedFragments) {
+    private Map<HashWrapper<T>, Double> findAndScoreImpl(@NotNull final Set<String> suppliedFragments) {
         if (candidateAccumulationPolicy == UNION) {
             return findAndScoreUnionImpl(suppliedFragments);
         } else { // implied (candidateAccumulationPolicy == INTERSECTION)
@@ -554,7 +555,7 @@ public class QuickSearch<T> {
     }
 
     @NotNull
-    private Map<HashWrapper<T>, Double> findAndScoreUnionImpl(@NotNull Set<String> searchFragments) {
+    private Map<HashWrapper<T>, Double> findAndScoreUnionImpl(@NotNull final Set<String> searchFragments) {
         Map<HashWrapper<T>, Double> accumulatedItems = new LinkedHashMap<>();
 
         for (String suppliedFragment : searchFragments) {
@@ -565,7 +566,7 @@ public class QuickSearch<T> {
     }
 
     @NotNull
-    private Map<HashWrapper<T>, Double> findAndScoreIntersectionImpl(@NotNull Set<String> suppliedFragments) {
+    private Map<HashWrapper<T>, Double> findAndScoreIntersectionImpl(@NotNull final Set<String> suppliedFragments) {
         Map<HashWrapper<T>, Double> accumulatedItems = null;
 
         boolean firstFragment = true;
@@ -588,7 +589,8 @@ public class QuickSearch<T> {
         return accumulatedItems;
     }
 
-    private Map<HashWrapper<T>, Double> walkAndScore(String fragment, Map<HashWrapper<T>, Double> whiteList) {
+    private Map<HashWrapper<T>, Double> walkAndScore(@NotNull final String fragment,
+                                                     @Nullable final Map<HashWrapper<T>, Double> whiteList) {
         GraphNode<HashWrapper<T>> root = fragmentsItemsTree.get(fragment);
 
         if (root == null) {
@@ -602,11 +604,11 @@ public class QuickSearch<T> {
         return walkAndScore(fragment, root, new HashMap<>(), whiteList, new HashSet<>());
     }
 
-    private Map<HashWrapper<T>, Double> walkAndScore(String originalFragment,
-                                                     GraphNode<HashWrapper<T>> node,
-                                                     Map<HashWrapper<T>, Double> accumulated,
-                                                     Map<HashWrapper<T>, Double> whiteList,
-                                                     Set<String> visited) {
+    private Map<HashWrapper<T>, Double> walkAndScore(@NotNull final String originalFragment,
+                                                     @NotNull final GraphNode<HashWrapper<T>> node,
+                                                     @NotNull final Map<HashWrapper<T>, Double> accumulated,
+                                                     @Nullable final Map<HashWrapper<T>, Double> whiteList,
+                                                     @NotNull final Set<String> visited) {
         visited.add(node.getKey());
 
         if (!node.getItems().isEmpty()) {
@@ -628,7 +630,8 @@ public class QuickSearch<T> {
         return accumulated;
     }
 
-    private void addItemImpl(@NotNull HashWrapper<T> item, @NotNull Set<String> suppliedKeywords) {
+    private void addItemImpl(@NotNull final HashWrapper<T> item,
+                             @NotNull final Set<String> suppliedKeywords) {
         registerItem(item, suppliedKeywords);
 
         if (itemKeywordsMap.containsKey(item)) {
@@ -638,13 +641,13 @@ public class QuickSearch<T> {
         }
     }
 
-    private void removeItemImpl(@NotNull HashWrapper<T> item) {
+    private void removeItemImpl(@NotNull final HashWrapper<T> item) {
         unregisterItem(item);
         itemKeywordsMap.remove(item);
     }
 
     @NotNull
-    private Set<String> prepareKeywords(@NotNull String keywordsString) {
+    private Set<String> prepareKeywords(@NotNull final String keywordsString) {
         return keywordsExtractor.apply(keywordsString).stream()
                 .map(keywordNormalizer)
                 .filter(s -> !s.isEmpty())
@@ -663,7 +666,7 @@ public class QuickSearch<T> {
      * @param function Extractor function under test
      * @throws IllegalArgumentException Thrown if there was a null output or an exception while processing test inputs
      */
-    protected void testKeywordsExtractorFunction(@NotNull Function<String, Set<String>> function) {
+    protected void testKeywordsExtractorFunction(@NotNull final Function<String, Set<String>> function) {
         try {
             if (function.apply("") == null || function.apply("testinput") == null) {
                 throw new IllegalArgumentException("Keywords extractor function failed non-null result test");
@@ -682,7 +685,7 @@ public class QuickSearch<T> {
      * @param function Normalizer function under test
      * @throws IllegalArgumentException Thrown if there was a null output or exception during test invocations
      */
-    protected void testKeywordNormalizerFunction(@NotNull Function<String, String> function) {
+    protected void testKeywordNormalizerFunction(@NotNull final Function<String, String> function) {
         try {
             if (function.apply("") == null || function.apply("testinput") == null)
                 throw new IllegalArgumentException("Keyword normalizer function failed non-null output test");
@@ -699,7 +702,7 @@ public class QuickSearch<T> {
      * @param function Function under test
      * @throws IllegalArgumentException Thrown if there was an exception trying to score example inputs
      */
-    protected void testKeywordMatchScorerFunction(@NotNull BiFunction<String, String, Double> function) {
+    protected void testKeywordMatchScorerFunction(@NotNull final BiFunction<String, String, Double> function) {
         try {
             function.apply("testinput", "testinput");
         } catch (Exception e) {
@@ -711,13 +714,16 @@ public class QuickSearch<T> {
      * Tree/graph of keyword fragments
      */
 
-    private void registerItem(HashWrapper<T> item, Set<String> keywords) {
+    private void registerItem(@NotNull final HashWrapper<T> item,
+                              @NotNull final Set<String> keywords) {
         for (String keyword : keywords) {
             createAndRegisterNode(null, keyword, item);
         }
     }
 
-    private void createAndRegisterNode(GraphNode<HashWrapper<T>> parent, String identity, HashWrapper<T> item) {
+    private void createAndRegisterNode(@NotNull final GraphNode<HashWrapper<T>> parent,
+                                       @NotNull final String identity,
+                                       @NotNull final HashWrapper<T> item) {
         GraphNode<HashWrapper<T>> node = fragmentsItemsTree.get(identity);
 
         if (node == null) {
@@ -738,7 +744,7 @@ public class QuickSearch<T> {
             node.addParent(parent);
     }
 
-    private void unregisterItem(@NotNull HashWrapper<T> item) {
+    private void unregisterItem(@NotNull final HashWrapper<T> item) {
         if (itemKeywordsMap.containsKey(item)) {
             for (String keyword : itemKeywordsMap.get(item)) {
                 GraphNode<HashWrapper<T>> keywordNode = fragmentsItemsTree.get(keyword);
@@ -752,7 +758,8 @@ public class QuickSearch<T> {
         }
     }
 
-    private void collapseEdge(GraphNode<HashWrapper<T>> node, GraphNode<HashWrapper<T>> parent) {
+    private void collapseEdge(@NotNull final GraphNode<HashWrapper<T>> node,
+                              @NotNull final GraphNode<HashWrapper<T>> parent) {
         if (node == null) //already removed
             return;
 

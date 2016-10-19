@@ -40,7 +40,7 @@ public final class GraphNode<V> {
      *
      * @param identifier any string you like
      */
-    public GraphNode(@NotNull String identifier) {
+    public GraphNode(@NotNull final String identifier) {
         Objects.requireNonNull(identifier);
         this.key = identifier;
         this.items = ReadOnlySet.empty();
@@ -72,7 +72,7 @@ public final class GraphNode<V> {
      *
      * @param item item to add.
      */
-    public void addItem(V item) {
+    public void addItem(@NotNull final V item) {
         if (items.isEmpty()) {
             items = ReadOnlySet.fromSingle(item);
             return;
@@ -86,7 +86,7 @@ public final class GraphNode<V> {
      *
      * @param item item to remove.
      */
-    public void removeItem(V item) {
+    public void removeItem(@NotNull final V item) {
         items = ReadOnlySet.removeAndCreate(items, item);
     }
 
@@ -106,7 +106,7 @@ public final class GraphNode<V> {
      *
      * @param parent parent to add.
      */
-    public void addParent(GraphNode<V> parent) {
+    public void addParent(@NotNull final GraphNode<V> parent) {
         if (parents.isEmpty()) {
             parents = ReadOnlySet.fromSingle(parent);
             return;
@@ -120,7 +120,7 @@ public final class GraphNode<V> {
      *
      * @param parent parent to remove.
      */
-    public void removeParent(GraphNode<V> parent) {
+    public void removeParent(@NotNull final GraphNode<V> parent) {
         parents = ReadOnlySet.removeAndCreate(parents, parent);
     }
 }

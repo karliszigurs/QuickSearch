@@ -95,7 +95,7 @@ public class ReadOnlySet<T> extends AbstractSet<T> {
      */
     private T[] array;
 
-    private ReadOnlySet(@NotNull T[] array) {
+    private ReadOnlySet(@NotNull final T[] array) {
         this.array = array;
     }
 
@@ -105,7 +105,7 @@ public class ReadOnlySet<T> extends AbstractSet<T> {
     }
 
     @Override
-    public boolean contains(Object o) {
+    public boolean contains(final Object o) {
         Objects.requireNonNull(o);
 
         //noinspection ForLoopReplaceableByForEach
@@ -125,7 +125,7 @@ public class ReadOnlySet<T> extends AbstractSet<T> {
     }
 
     @Override
-    public void forEach(Consumer<? super T> action) {
+    public void forEach(final Consumer<? super T> action) {
         Objects.requireNonNull(action);
 
         //noinspection ForLoopReplaceableByForEach
