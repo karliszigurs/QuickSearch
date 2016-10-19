@@ -185,11 +185,7 @@ public class ReadOnlySet<T> extends AbstractSet<T> {
         if (set.size() != size())
             return false;
 
-        try {
-            return containsAll(set);
-        } catch (NullPointerException | ClassCastException unused) {
-            return false;
-        }
+        return containsAll(set);
     }
 
     private static class ArrayIterator<I> implements Iterator<I> {

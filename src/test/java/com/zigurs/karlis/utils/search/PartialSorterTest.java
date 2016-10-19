@@ -22,6 +22,7 @@ import java.util.function.LongSupplier;
 import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 
 public class PartialSorterTest {
@@ -152,5 +153,11 @@ public class PartialSorterTest {
         assertTrue(ttPartial < ttCollections);
         assertTrue(ttPartial < ttStreamed);
         assertTrue(ttPartial < ttParallel);
+    }
+
+    @Test
+    public void dummyTest() {
+        PartialSorter sorter = new PartialSorter();
+        assertNotEquals(0, sorter.hashCode());
     }
 }

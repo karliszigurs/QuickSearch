@@ -21,6 +21,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.nio.charset.UnsupportedCharsetException;
 import java.util.*;
 
 import static com.zigurs.karlis.utils.search.QuickSearch.CANDIDATE_ACCUMULATION_POLICY.INTERSECTION;
@@ -172,7 +173,7 @@ public class QuickSearchTest {
     public void testExtractingFunction2() {
         new QuickSearch<String>(
                 s -> {
-                    throw new IllegalArgumentException();
+                    throw new UnsupportedCharsetException("Dummy exception");
                 },
                 QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
                 QuickSearch.DEFAULT_MATCH_SCORER
@@ -211,7 +212,7 @@ public class QuickSearchTest {
         new QuickSearch<String>(
                 QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
                 s -> {
-                    throw new IllegalArgumentException();
+                    throw new IndexOutOfBoundsException();
                 },
                 QuickSearch.DEFAULT_MATCH_SCORER
         );

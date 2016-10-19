@@ -28,10 +28,6 @@ import java.util.*;
  */
 public class PartialSorter {
 
-    private PartialSorter() {
-        // No op
-    }
-
     /**
      * Sort function
      *
