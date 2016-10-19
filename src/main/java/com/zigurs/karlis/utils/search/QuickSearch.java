@@ -721,9 +721,9 @@ public class QuickSearch<T> {
         }
     }
 
-    private void createAndRegisterNode(@NotNull final GraphNode<HashWrapper<T>> parent,
+    private void createAndRegisterNode(@Nullable final GraphNode<HashWrapper<T>> parent,
                                        @NotNull final String identity,
-                                       @NotNull final HashWrapper<T> item) {
+                                       @Nullable final HashWrapper<T> item) {
         GraphNode<HashWrapper<T>> node = fragmentsItemsTree.get(identity);
 
         if (node == null) {
@@ -759,7 +759,7 @@ public class QuickSearch<T> {
     }
 
     private void collapseEdge(@NotNull final GraphNode<HashWrapper<T>> node,
-                              @NotNull final GraphNode<HashWrapper<T>> parent) {
+                              @Nullable final GraphNode<HashWrapper<T>> parent) {
         if (node == null) //already removed
             return;
 
