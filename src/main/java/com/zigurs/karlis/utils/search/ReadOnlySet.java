@@ -180,9 +180,7 @@ public class ReadOnlySet<T> extends AbstractSet<T> {
 
         try {
             return containsAll(set);
-        } catch (ClassCastException unused) {
-            return false;
-        } catch (NullPointerException unused) {
+        } catch (NullPointerException | ClassCastException unused) {
             return false;
         }
     }

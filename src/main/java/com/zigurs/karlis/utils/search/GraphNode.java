@@ -121,9 +121,6 @@ public final class GraphNode<V> {
      * @param parent parent to remove.
      */
     public void removeParent(GraphNode<V> parent) {
-        /*
-         * TODO - investigate removal of non-existent parents?
-         */
         parents = ReadOnlySet.removeAndCreate(parents, parent);
     }
 }

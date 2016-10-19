@@ -20,15 +20,15 @@ import org.jetbrains.annotations.NotNull;
 import java.util.Set;
 
 /**
- * Container for augumented search result item containing the keywords
- * associated with the item and the calculated search result score.
+ * Container for augumented search result result containing the keywords
+ * associated with the result and the calculated search result score.
  *
- * @param <T> wrapped response item type
+ * @param <T> wrapped response result type
  */
 public class Item<T> {
 
     @NotNull
-    private final T item;
+    private final T result;
     @NotNull
     private final Set<String> itemKeywords;
 
@@ -37,12 +37,12 @@ public class Item<T> {
     /**
      * Construct an instance.
      *
-     * @param item         item
-     * @param itemKeywords set of non-null keywords associated with item
-     * @param score        search result score for the item
+     * @param result       result
+     * @param itemKeywords set of non-null keywords associated with result
+     * @param score        search result score for the result
      */
-    public Item(@NotNull T item, @NotNull Set<String> itemKeywords, double score) {
-        this.item = item;
+    public Item(@NotNull T result, @NotNull Set<String> itemKeywords, double score) {
+        this.result = result;
         this.itemKeywords = itemKeywords;
         this.score = score;
     }
@@ -50,17 +50,17 @@ public class Item<T> {
     /**
      * Query.
      *
-     * @return wrapped item
+     * @return wrapped result
      */
     @NotNull
-    public T getItem() {
-        return item;
+    public T getResult() {
+        return result;
     }
 
     /**
      * Query.
      *
-     * @return item keywords, if supplied
+     * @return result keywords, if supplied
      */
     @NotNull
     public Set<String> getItemKeywords() {
@@ -70,7 +70,7 @@ public class Item<T> {
     /**
      * Query.
      *
-     * @return final score for the item in particular search
+     * @return final score for the result in particular search
      */
     public double getScore() {
         return score;

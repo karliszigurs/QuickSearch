@@ -124,7 +124,7 @@ public class QuickSearch<T> {
      * set of 4 strings [one,two,three,four] on the output.
      */
     public static final Function<String, Set<String>> DEFAULT_KEYWORDS_EXTRACTOR =
-            (s) -> Arrays.stream(s.replaceAll("[^\\w]+", " ").split("[\\s]+")).collect(Collectors.toSet());
+            s -> Arrays.stream(s.replaceAll("[^\\w]+", " ").split("[\\s]+")).collect(Collectors.toSet());
 
     /**
      * Function to sanitize search keywords before using them internally. Applied to both keywords
@@ -149,7 +149,7 @@ public class QuickSearch<T> {
      * <p>
      * Default implementation assumes that String.trim().toLowerCase() is sufficient.
      */
-    public static final Function<String, String> DEFAULT_KEYWORD_NORMALIZER = (s) -> s.trim().toLowerCase();
+    public static final Function<String, String> DEFAULT_KEYWORD_NORMALIZER = s -> s.trim().toLowerCase();
 
     /**
      * Function scoring user supplied input against corresponding keywords associated with search items.
@@ -227,8 +227,7 @@ public class QuickSearch<T> {
      */
     public QuickSearch(@Nullable Function<String, Set<String>> keywordsExtractor,
                        @Nullable Function<String, String> keywordNormalizer,
-                       @Nullable BiFunction<String, String, Double> keywordMatchScorer)
-            throws IllegalArgumentException {
+                       @Nullable BiFunction<String, String, Double> keywordMatchScorer) {
         this(keywordsExtractor,
                 keywordNormalizer,
                 keywordMatchScorer,
@@ -252,13 +251,12 @@ public class QuickSearch<T> {
                        @Nullable Function<String, String> keywordNormalizer,
                        @Nullable BiFunction<String, String, Double> keywordMatchScorer,
                        @Nullable UNMATCHED_POLICY unmatchedPolicy,
-                       @Nullable CANDIDATE_ACCUMULATION_POLICY candidateAccumulationPolicy) throws IllegalArgumentException {
-        if (keywordsExtractor == null
-                || keywordNormalizer == null
-                || keywordMatchScorer == null
-                || unmatchedPolicy == null
-                || candidateAccumulationPolicy == null)
-            throw new IllegalArgumentException("Invalid configuration arguments supplied");
+                       @Nullable CANDIDATE_ACCUMULATION_POLICY candidateAccumulationPolicy) {
+        if (keywordsExtractor == null || keywordNormalizer == null || keywordMatchScorer == null)
+            throw new IllegalArgumentException("Must provide a function");
+
+        if (unmatchedPolicy == null || candidateAccumulationPolicy == null)
+            throw new IllegalArgumentException("Must provide required policies");
 
         /*
          * Quick sanity check on the supplied functions to ensure
@@ -312,7 +310,7 @@ public class QuickSearch<T> {
     /**
      * Remove an item, if it exists. Calling this method ensures that specified item
      * and any keywords it was associated with is gone.
-     *
+     * <p>
      * Or it does nothing if no such item was present.
      *
      * @param item Item to remove
@@ -614,14 +612,14 @@ public class QuickSearch<T> {
         if (!node.getItems().isEmpty()) {
             Double score = keywordMatchScorer.apply(originalFragment, node.getKey());
 
-            node.getItems().forEach((item) -> {
+            node.getItems().forEach(item -> {
                 if (whiteList == null || whiteList.containsKey(item)) {
                     accumulated.merge(item, score, (d1, d2) -> d1 > d2 ? d1 : d2);
                 }
             });
         }
 
-        node.getParents().forEach((parent) -> {
+        node.getParents().forEach(parent -> {
             if (!visited.contains(parent.getKey())) {
                 walkAndScore(originalFragment, parent, accumulated, whiteList, visited);
             }
@@ -665,7 +663,7 @@ public class QuickSearch<T> {
      * @param function Extractor function under test
      * @throws IllegalArgumentException Thrown if there was a null output or an exception while processing test inputs
      */
-    protected void testKeywordsExtractorFunction(@NotNull Function<String, Set<String>> function) throws IllegalArgumentException {
+    protected void testKeywordsExtractorFunction(@NotNull Function<String, Set<String>> function) {
         try {
             if (function.apply("") == null || function.apply("testinput") == null) {
                 throw new IllegalArgumentException("Keywords extractor function failed non-null result test");
@@ -684,7 +682,7 @@ public class QuickSearch<T> {
      * @param function Normalizer function under test
      * @throws IllegalArgumentException Thrown if there was a null output or exception during test invocations
      */
-    protected void testKeywordNormalizerFunction(@NotNull Function<String, String> function) throws IllegalArgumentException {
+    protected void testKeywordNormalizerFunction(@NotNull Function<String, String> function) {
         try {
             if (function.apply("") == null || function.apply("testinput") == null)
                 throw new IllegalArgumentException("Keyword normalizer function failed non-null output test");
@@ -701,7 +699,7 @@ public class QuickSearch<T> {
      * @param function Function under test
      * @throws IllegalArgumentException Thrown if there was an exception trying to score example inputs
      */
-    protected void testKeywordMatchScorerFunction(@NotNull BiFunction<String, String, Double> function) throws IllegalArgumentException {
+    protected void testKeywordMatchScorerFunction(@NotNull BiFunction<String, String, Double> function) {
         try {
             function.apply("testinput", "testinput");
         } catch (Exception e) {
@@ -733,8 +731,11 @@ public class QuickSearch<T> {
             }
         }
 
-        if (item != null) node.addItem(item);
-        if (parent != null) node.addParent(parent);
+        if (item != null)
+            node.addItem(item);
+
+        if (parent != null)
+            node.addParent(parent);
     }
 
     private void unregisterItem(@NotNull HashWrapper<T> item) {

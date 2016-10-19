@@ -404,7 +404,7 @@ public class QuickSearchTest {
     public void augumentedItemFound() throws Exception {
         addItem("test", "one two three");
         assertTrue(searchInstance.findItemWithDetail("one").isPresent());
-        assertEquals("test", searchInstance.findItemWithDetail("one").get().getItem());
+        assertEquals("test", searchInstance.findItemWithDetail("one").get().getResult());
     }
 
     @Test
