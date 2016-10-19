@@ -83,11 +83,6 @@ public class ReadOnlySet<T> extends AbstractSet<T> {
         public ReadOnlySet safeCopy() {
             return EMPTY_SET;
         }
-
-        @Override
-        public int hashCode() {
-            return 0;
-        }
     };
 
     /**
@@ -162,7 +157,6 @@ public class ReadOnlySet<T> extends AbstractSet<T> {
         return hashCode = h;
     }
 
-
     /**
      * Follows AbstractSet.equals() semantics. That is, it is compared as a set
      * and matches if it contains the same elements.
@@ -172,7 +166,23 @@ public class ReadOnlySet<T> extends AbstractSet<T> {
      */
     @Override
     public boolean equals(Object o) {
-        return super.equals(o);
+        if (o == this)
+            return true;
+
+        if (!(o instanceof Set))
+            return false;
+
+        Set<?> set = (Set<?>) o;
+        if (set.size() != size())
+            return false;
+
+        try {
+            return containsAll(set);
+        } catch (ClassCastException unused) {
+            return false;
+        } catch (NullPointerException unused) {
+            return false;
+        }
     }
 
     private static class ArrayIterator<I> implements Iterator<I> {
