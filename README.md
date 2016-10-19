@@ -1,3 +1,4 @@
+[![Build Status](https://travis-ci.org/karliszigurs/QuickSearch.svg?branch=master)](https://travis-ci.org/karliszigurs/QuickSearch) [![SonarQube Coverage](https://img.shields.io/sonar/http/sonarqube.com/com.zigurs.karlis.utils.search:quicksearch/coverage.svg)](https://sonarqube.com/dashboard/index?id=com.zigurs.karlis.utils.search%3Aquicksearch) [![SonarQube Tech Debt](https://img.shields.io/sonar/http/sonarqube.com/com.zigurs.karlis.utils.search:quicksearch/tech_debt.svg)](https://sonarqube.com/dashboard/index?id=com.zigurs.karlis.utils.search%3Aquicksearch) [![Codacy grade](https://img.shields.io/codacy/grade/c0340f5e099740d4b27c830c282d073e.svg)](https://www.codacy.com/app/homolupus/QuickSearch/dashboard)
 # QuickSearch
 
 Simple and lightweight in-memory search library for Java 8 web and desktop applications. Single 20KB jar. 100% test coverage.
@@ -47,7 +48,7 @@ quickSearchInstance.addItem("Night at the Museum", "Family Larry Daley Ben Still
 quickSearchInstance.addItem("Cars", "Cars Family last race Piston Cup tie Strip The King Weathers Chick Hicks Lightning McQueen tiebreaker");
 
 // The following will return top hit of Casino Royale.
-String topName = quickSearchInstance.findTopItem("license"); // Finds Casino Royale
+String topName = quickSearchInstance.findItem("license"); // Finds Casino Royale
 
 /* The following will return Cars, Ice Age and Night at the Museum
    Cars will be the top scoring result due to 'cars' match. */
@@ -63,7 +64,7 @@ All internal data structures are pre-calculated and reside in memory. Following 
 
   * Searchable items should be relatively lightweight as they will be long lived.
     If you want to search over heavyweight items (e.g. pictures or ORM) it is best
-    to create an lightweight immutable object that contains only the minimum required to display search result.
+    to create an lightweight immutable object that contains only the minimum required to refer to fill payload.
   * QuickSearch does not contain any protection against running out of memory. This shouldn't be a problem,
     as in normal use even 10s of thousands of searchable items and keywords don't require more than a few
     tens of megabytes of heap. If you cannot ensure that you are removing no longer relevant entries it is
@@ -71,14 +72,10 @@ All internal data structures are pre-calculated and reside in memory. Following 
     
 ## Future features
 
-  * [ ] .js version
+  * [ ] .js/go version
   * [X] web service and quick search API (https://github.com/karliszigurs/QuickSearchServer)
   * [ ] fuzzy text matching
 
 ## Credits
 
 Karlis Zigurs, 2016
-
-### Cloudy things
-
-[![Build Status](https://travis-ci.org/karliszigurs/QuickSearch.svg?branch=master)](https://travis-ci.org/karliszigurs/QuickSearch)
