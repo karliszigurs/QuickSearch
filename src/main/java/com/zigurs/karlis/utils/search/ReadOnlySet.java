@@ -32,6 +32,8 @@ import java.util.function.Consumer;
  * Comes at a cost of being a bit thread unsafe, modifying itself, etc.
  * <p>
  * To be used in QuickSearch and behind write lock _ONLY_!
+ * <p>
+ * This class does not permit <tt>null</tt> elements.
  *
  * @param <T> type this set instance will operate on
  */
@@ -272,9 +274,10 @@ public class ReadOnlySet<T> extends AbstractSet<T> {
 
             return set;
         } else {
-            HashSet<S> set = new HashSet<>();
+            Set<S> set = new HashSet<>();
             set.addAll(source);
             set.add(item);
+            set = removeNullFromSet(set);
             return new ReadOnlySet<>((S[]) set.toArray());
         }
     }
@@ -305,9 +308,10 @@ public class ReadOnlySet<T> extends AbstractSet<T> {
             }
             return set;
         } else {
-            HashSet<S> set = new HashSet<>();
+            Set<S> set = new HashSet<>();
             set.addAll(source);
             set.remove(surplusItem);
+            set = removeNullFromSet(set);
             return new ReadOnlySet<>((S[]) set.toArray());
         }
     }
@@ -342,9 +346,23 @@ public class ReadOnlySet<T> extends AbstractSet<T> {
         if (source.isEmpty())
             return empty();
 
-        HashSet<S> set = new HashSet<>();
+        if (source instanceof ReadOnlySet)
+            return (ReadOnlySet<S>) source;
+
+        if (source instanceof Set) {
+            Set set = removeNullFromSet((Set) source);
+            return new ReadOnlySet<>((S[]) set.toArray());
+        }
+
+        Set<S> set = new HashSet<>();
         set.addAll(source);
+        set = removeNullFromSet(set);
         return new ReadOnlySet<>((S[]) set.toArray());
+    }
+
+    private static Set removeNullFromSet(Set source) {
+        source.remove(null);
+        return source;
     }
 
     /**
@@ -361,12 +379,28 @@ public class ReadOnlySet<T> extends AbstractSet<T> {
         Objects.requireNonNull(source);
         Objects.requireNonNull(source2);
 
-        if (source.isEmpty() && source2.isEmpty())
+        /*
+         * Avoid any actual work, if we can help it
+         */
+        boolean sourceEmpty = source.isEmpty();
+        boolean source2Empty = source2.isEmpty();
+
+        if (sourceEmpty && source2Empty)
             return empty();
 
-        HashSet<S> set = new HashSet<>();
+        if (sourceEmpty)
+            return fromCollection(source2);
+
+        if (source2Empty)
+            return fromCollection(source);
+
+        /*
+         * Ah well, brute force it is.
+         */
+        Set<S> set = new HashSet<>();
         set.addAll(source);
         set.addAll(source2);
+        set = removeNullFromSet(set);
         return new ReadOnlySet<>((S[]) set.toArray());
     }
 }
