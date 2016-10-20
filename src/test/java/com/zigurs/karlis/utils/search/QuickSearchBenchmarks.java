@@ -26,10 +26,11 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import static com.zigurs.karlis.utils.search.QuickSearch.CANDIDATE_ACCUMULATION_POLICY.INTERSECTION;
 import static com.zigurs.karlis.utils.search.QuickSearch.UNMATCHED_POLICY.BACKTRACKING;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public class QuickSearchBenchmarks extends QuickSearchTest {
+
+    private static boolean RUN_FULL_BENCHMARKS = true;
 
     @Test
     public void intersectionSearchBenchmark() throws Exception {
@@ -47,7 +48,7 @@ public class QuickSearchBenchmarks extends QuickSearchTest {
         }
         System.out.println("Loaded in " + (System.currentTimeMillis() - st) + "ms");
 
-        final int iterations = 500;
+        final int iterations = RUN_FULL_BENCHMARKS ? 100_000 : 1000;
 
         searchIteration(iterations, "Warmup:", "a b c d e");
         searchIteration(iterations, "Simple:", "w");
@@ -78,7 +79,7 @@ public class QuickSearchBenchmarks extends QuickSearchTest {
 
     private void multiThreadTestIteration(final String label) throws InterruptedException {
         int threads = 4;
-        int iterationsPerThread = 1_000;
+        int iterationsPerThread = RUN_FULL_BENCHMARKS ? 1_000_000 : 1_000;
 
         CountDownLatch latch = new CountDownLatch(threads);
         AtomicLong wrote = new AtomicLong(0L);
@@ -95,7 +96,7 @@ public class QuickSearchBenchmarks extends QuickSearchTest {
 
                 //noinspection EmptyCatchBlock
                 try {
-                    Thread.sleep(500);
+                    Thread.sleep(100);
                 } catch (InterruptedException e) {
                     return;
                 }
@@ -123,7 +124,6 @@ public class QuickSearchBenchmarks extends QuickSearchTest {
             System.out.println("Timed out before completing all iterations, results are invalid");
             threadsList.forEach(Thread::interrupt);
         }
-
 
         long totalTime = System.currentTimeMillis() - startTime;
 
@@ -165,7 +165,7 @@ public class QuickSearchBenchmarks extends QuickSearchTest {
 
     private void operationsBenchIteration(final String label) throws InterruptedException {
         int threads = 1;
-        int iterationsPerThread = 1000;
+        int iterationsPerThread = RUN_FULL_BENCHMARKS ? 1_000_000 : 1000;
         CountDownLatch latch = new CountDownLatch(threads);
 
         // ops threads
@@ -215,7 +215,8 @@ public class QuickSearchBenchmarks extends QuickSearchTest {
                 BACKTRACKING,
                 INTERSECTION);
 
-        final int itemsCount = 1000;
+        final int itemsCount = RUN_FULL_BENCHMARKS ? 100_000 : 1000;
+
         for (int i = 0; i < itemsCount; i++) {
             String[] items = USA_STATES[i % USA_STATES.length];
             addItem(items[0] + "-" + i, String.format("%s %s %s %s", items[0], items[1], items[2], items[3]));
@@ -234,44 +235,9 @@ public class QuickSearchBenchmarks extends QuickSearchTest {
 //        final long GUAVA_MULTIMAP_TARGET = 104_140_960; // 100k items
 //        final long CUSTOM_TREE_TARGET = 54_255_008; // 100k items
 //        final long CUSTOM_TREE_TARGET = 54_255_008; // 100k items
-//        final long CUSTOM_TREE_TARGET_INTERN = 21_848_000; // 100k items + keyword intern.
+        final long CUSTOM_TREE_TARGET_INTERN = 21_848_000; // 100k items + keyword intern.
         final long SMALL_TEST_TARGET = 587_865; // itemsCount = 1000;
 
-        assertTrue("Calculated size exceeds target", measured < (SMALL_TEST_TARGET * 1.1));
-    }
-
-    @Test
-    public void measureQueryMicrobench() {
-        searchInstance = new QuickSearch<>(
-                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
-                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
-                QuickSearch.DEFAULT_MATCH_SCORER,
-                BACKTRACKING,
-                INTERSECTION);
-
-        int itemsCount = 1000;
-        long startTime = System.currentTimeMillis();
-        for (int i = 0; i < itemsCount; i++) {
-            String[] items = USA_STATES[i % USA_STATES.length];
-            addItem(items[0] + "-" + i, String.format("%s %s %s %s", items[0], items[1], items[2], items[3]));
-        }
-        System.out.println("Added in " + (System.currentTimeMillis() - startTime));
-
-        startTime = System.currentTimeMillis();
-
-        for (int i = 0; i < 10_000; i++) {
-            String searchString = USA_STATES[i % USA_STATES.length][0];
-            assertFalse("No results found", searchInstance.findItems(searchString, 10).isEmpty());
-        }
-
-        /*
-         * Comparable only on my machine, therefore no assert.
-         */
-//        final long JDK_COLLECTIONS_TARGET = 13000;
-//        final long GUAVA_MULTIMAP_TARGET = 20000;
-//        final long CUSTOM_TREE_TARGET = 13000;
-
-        System.out.println("Time taken " + (System.currentTimeMillis() - startTime));
-        assertTrue((System.currentTimeMillis() - startTime) < 5000);
+        assertTrue("Calculated size exceeds target", measured < ((RUN_FULL_BENCHMARKS ? CUSTOM_TREE_TARGET_INTERN : SMALL_TEST_TARGET) * 1.1));
     }
 }
