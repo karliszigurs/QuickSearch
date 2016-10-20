@@ -293,7 +293,7 @@ public class QuickSearch<T> {
         if (item == null || keywords == null || keywords.isEmpty())
             return false;
 
-        Set<String> keywordsSet = prepareKeywords(keywords);
+        Set<String> keywordsSet = prepareKeywords(keywords, true);
 
         if (keywordsSet.isEmpty())
             return false;
@@ -338,7 +338,7 @@ public class QuickSearch<T> {
         if (invalidRequest(searchString, 1))
             return Optional.empty();
 
-        Set<String> searchKeywords = prepareKeywords(searchString);
+        Set<String> searchKeywords = prepareKeywords(searchString, false);
 
         if (searchKeywords.isEmpty())
             return Optional.empty();
@@ -371,7 +371,7 @@ public class QuickSearch<T> {
         if (invalidRequest(searchString, numberOfTopItems))
             return Collections.emptyList();
 
-        Set<String> searchKeywords = prepareKeywords(searchString);
+        Set<String> searchKeywords = prepareKeywords(searchString, false);
 
         if (searchKeywords.isEmpty())
             return Collections.emptyList();
@@ -406,7 +406,7 @@ public class QuickSearch<T> {
         if (invalidRequest(searchString, 1))
             return Optional.empty();
 
-        Set<String> searchKeywords = prepareKeywords(searchString);
+        Set<String> searchKeywords = prepareKeywords(searchString, false);
 
         if (searchKeywords.isEmpty())
             return Optional.empty();
@@ -446,7 +446,7 @@ public class QuickSearch<T> {
         if (invalidRequest(searchString, numberOfTopItems))
             return new Result<>(searchString != null ? searchString : "", Collections.emptyList());
 
-        Set<String> searchKeywords = prepareKeywords(searchString);
+        Set<String> searchKeywords = prepareKeywords(searchString, false);
 
         if (searchKeywords.isEmpty())
             return new Result<>(searchString, Collections.emptyList());
@@ -644,12 +644,12 @@ public class QuickSearch<T> {
     }
 
     @NotNull
-    private Set<String> prepareKeywords(@NotNull final String keywordsString) {
+    private Set<String> prepareKeywords(@NotNull final String keywordsString, boolean internKeywords) {
         return ReadOnlySet.fromCollection(
                 keywordsExtractor.apply(keywordsString).stream()
                 .map(keywordNormalizer)
                 .filter(s -> !s.isEmpty())
-                .map(String::intern)
+                .map(s -> internKeywords ? s.intern() : s)
                 .collect(Collectors.toSet()) // implies distinct
         );
     }
