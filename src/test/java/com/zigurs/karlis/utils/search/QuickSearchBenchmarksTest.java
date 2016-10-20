@@ -28,7 +28,7 @@ import static com.zigurs.karlis.utils.search.QuickSearch.CANDIDATE_ACCUMULATION_
 import static com.zigurs.karlis.utils.search.QuickSearch.UNMATCHED_POLICY.BACKTRACKING;
 import static org.junit.Assert.assertTrue;
 
-public class QuickSearchBenchmarks extends QuickSearchTest {
+public class QuickSearchBenchmarksTest extends QuickSearchTest {
 
     private static boolean RUN_FULL_BENCHMARKS = true;
 
