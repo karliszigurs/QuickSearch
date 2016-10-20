@@ -33,7 +33,7 @@ public class PartialSorter {
      * Sort function
      *
      * @param input          collection to select elements from
-     * @param limitResultsTo maximum size of generated ordered list
+     * @param limitResultsTo maximum size of generated ordered list, negative or 0 will return empty list
      * @param comparator     comparator to use (or use Comparator.naturalOrder())
      * @param <X>            type of objects to sort
      * @return sorted list consisting of first (up to limitResultsTo) elements in specified comparator order
@@ -44,11 +44,13 @@ public class PartialSorter {
         Objects.requireNonNull(input);
         Objects.requireNonNull(comparator);
 
-        final int maxResults = Math.max(limitResultsTo, 0); // Safety check that limit is not negative
+        if (limitResultsTo < 1)
+            return Collections.emptyList();
+
         LinkedList<X> result = new LinkedList<>();
 
         for (X entry : input) {
-            if (result.size() < maxResults) {
+            if (result.size() < limitResultsTo) {
                 insertInListInOrderedPos(result, entry, comparator);
             } else if (comparator.compare(entry, result.getLast()) < 0) {
                 insertInListInOrderedPos(result, entry, comparator);

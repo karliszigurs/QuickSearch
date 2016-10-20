@@ -530,7 +530,7 @@ public class QuickSearch<T> {
              * need to report back. On large sets of results this can bring notable
              * improvements in speed when compared to built-in sorting methods.
              */
-            return PartialSorter.sortAndLimit(matches.entrySet(), maxItemsToList, Map.Entry.comparingByValue(Comparator.reverseOrder())).stream()
+            return PartialSorter.sortAndLimit(matches.entrySet(), maxItemsToList, (o1, o2) -> o1.getValue().compareTo(o2.getValue()) < 0 ? 1 : -1).stream()
                     .map(e -> new ScoreWrapper<>(e.getKey(), e.getValue()))
                     .collect(Collectors.toList());
         } else {
@@ -647,10 +647,10 @@ public class QuickSearch<T> {
     private Set<String> prepareKeywords(@NotNull final String keywordsString, boolean internKeywords) {
         return ReadOnlySet.fromCollection(
                 keywordsExtractor.apply(keywordsString).stream()
-                .map(keywordNormalizer)
-                .filter(s -> !s.isEmpty())
-                .map(s -> internKeywords ? s.intern() : s)
-                .collect(Collectors.toSet()) // implies distinct
+                        .map(keywordNormalizer)
+                        .filter(s -> !s.isEmpty())
+                        .map(s -> internKeywords ? s.intern() : s)
+                        .collect(Collectors.toSet()) // implies distinct
         );
     }
 
