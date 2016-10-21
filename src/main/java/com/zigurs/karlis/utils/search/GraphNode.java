@@ -31,20 +31,20 @@ import java.util.Set;
  */
 public final class GraphNode<V> {
 
-    private final String key;
+    private final String fragment;
     private Set<V> items;
     private Set<GraphNode<V>> parents;
 
     /**
      * Create a node with immutable identity string.
      *
-     * @param identifier any string you like
+     * @param fragment any string you like
      */
-    public GraphNode(@NotNull final String identifier) {
-        Objects.requireNonNull(identifier);
-        this.key = identifier;
-        this.items = ReadOnlySet.empty();
-        this.parents = ReadOnlySet.empty();
+    public GraphNode(@NotNull final String fragment) {
+        Objects.requireNonNull(fragment);
+        this.fragment = fragment;
+        this.items = ImmutableSet.empty();
+        this.parents = ImmutableSet.empty();
     }
 
     /**
@@ -53,8 +53,8 @@ public final class GraphNode<V> {
      * @return selected identifier
      */
     @NotNull
-    public String getKey() {
-        return key;
+    public String getFragment() {
+        return fragment;
     }
 
     /**
@@ -74,9 +74,9 @@ public final class GraphNode<V> {
      */
     public void addItem(@NotNull final V item) {
         if (items.isEmpty())
-            items = ReadOnlySet.fromSingle(item);
+            items = ImmutableSet.fromSingle(item);
         else
-            items = ReadOnlySet.addAndCreate(items, item);
+            items = ImmutableSet.addAndCreate(items, item);
     }
 
     /**
@@ -85,7 +85,7 @@ public final class GraphNode<V> {
      * @param item item to remove.
      */
     public void removeItem(@NotNull final V item) {
-        items = ReadOnlySet.removeAndCreate(items, item);
+        items = ImmutableSet.removeAndCreate(items, item);
     }
 
     /**
@@ -106,9 +106,9 @@ public final class GraphNode<V> {
      */
     public void addParent(@NotNull final GraphNode<V> parent) {
         if (parents.isEmpty())
-            parents = ReadOnlySet.fromSingle(parent);
+            parents = ImmutableSet.fromSingle(parent);
         else
-            parents = ReadOnlySet.addAndCreate(parents, parent);
+            parents = ImmutableSet.addAndCreate(parents, parent);
     }
 
     /**
@@ -117,6 +117,6 @@ public final class GraphNode<V> {
      * @param parent parent to remove.
      */
     public void removeParent(@NotNull final GraphNode<V> parent) {
-        parents = ReadOnlySet.removeAndCreate(parents, parent);
+        parents = ImmutableSet.removeAndCreate(parents, parent);
     }
 }

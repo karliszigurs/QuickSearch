@@ -26,13 +26,12 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-import static com.zigurs.karlis.utils.search.QuickSearch.CANDIDATE_ACCUMULATION_POLICY.INTERSECTION;
-import static com.zigurs.karlis.utils.search.QuickSearch.UNMATCHED_POLICY.BACKTRACKING;
+import static com.zigurs.karlis.utils.search.QuickSearch.ACCUMULATION_POLICY.INTERSECTION;
 import static org.junit.Assert.assertTrue;
 
 public class QuickSearchBenchmarksTest {
 
-    private static boolean RUN_FULL_BENCHMARKS = true;
+    private static final boolean RUN_FULL_BENCHMARKS = true;
 
     private static final String[][] USA_STATES = QuickSearchTest.USA_STATES;
 
@@ -40,7 +39,7 @@ public class QuickSearchBenchmarksTest {
 
     @Before
     public void setUp() throws Exception {
-        searchInstance = new QuickSearch<>();
+        searchInstance = new QuickSearch.Builder<String>().build();
     }
 
     @After
@@ -50,12 +49,11 @@ public class QuickSearchBenchmarksTest {
 
     @Test
     public void intersectionSearchBenchmark() throws Exception {
-        searchInstance = new QuickSearch<>(
-                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
-                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
-                QuickSearch.DEFAULT_MATCH_SCORER,
-                BACKTRACKING,
-                INTERSECTION);
+        searchInstance = new
+                QuickSearch.Builder<String>()
+                .accumulationPolicy(INTERSECTION)
+                .withCache(Integer.MAX_VALUE)
+                .build();
 
         long st = System.currentTimeMillis();
         for (int i = 0; i < 300; i++) {
@@ -224,12 +222,10 @@ public class QuickSearchBenchmarksTest {
 
     @Test
     public void measureMemoryUse() {
-        searchInstance = new QuickSearch<>(
-                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
-                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
-                QuickSearch.DEFAULT_MATCH_SCORER,
-                BACKTRACKING,
-                INTERSECTION);
+        searchInstance = new
+                QuickSearch.Builder<String>()
+                .accumulationPolicy(INTERSECTION)
+                .build();
 
         final int itemsCount = RUN_FULL_BENCHMARKS ? 100_000 : 1000;
 
@@ -258,9 +254,76 @@ public class QuickSearchBenchmarksTest {
 //        final long GUAVA_MULTIMAP_TARGET = 104_140_960; // 100k items
 //        final long CUSTOM_TREE_TARGET = 54_255_008; // 100k items
 //        final long CUSTOM_TREE_TARGET = 54_255_008; // 100k items
-//        final long CUSTOM_TREE_TARGET_INTERN = 21_848_000; // 100k items + keyword intern.
-//        final long SMALL_TEST_TARGET = 587_865; // itemsCount = 1000;
+        final long CUSTOM_TREE_TARGET_INTERN = 19_448_040; // 100k items + keyword intern.
+        final long SMALL_TEST_TARGET = 563_896; // itemsCount = 1000;
 
-//        assertTrue("Calculated size exceeds target", measured < ((RUN_FULL_BENCHMARKS ? CUSTOM_TREE_TARGET_INTERN : SMALL_TEST_TARGET) * 1.1));
+        assertTrue("Calculated size exceeds target", measured < ((RUN_FULL_BENCHMARKS ? CUSTOM_TREE_TARGET_INTERN : SMALL_TEST_TARGET) * 1.1));
+    }
+
+    @Test
+    public void measureMemoryWithCacheUse() {
+        searchInstance = new
+                QuickSearch.Builder<String>()
+                .accumulationPolicy(INTERSECTION)
+                .withCache(Integer.MAX_VALUE) // Unlimited caching
+                .build();
+
+        final int itemsCount = RUN_FULL_BENCHMARKS ? 100_000 : 1000;
+
+        for (int i = 0; i < itemsCount; i++) {
+            String[] items = USA_STATES[i % USA_STATES.length];
+            searchInstance.addItem(items[0] + "-" + i, String.format("%s %s %s %s", items[0], items[1], items[2], items[3]));
+        }
+
+        // Force population of caches
+        for (char character = 'a'; character <= 'z'; character++) {
+            for (char character2 = 'a'; character2 <= 'z'; character2++) {
+                searchInstance.findItem(String.valueOf(character) + String.valueOf(character2));
+            }
+        }
+
+        MemoryMeter meter = new MemoryMeter().withGuessing(MemoryMeter.Guess.ALWAYS_UNSAFE);
+
+        long measured = meter.measureDeep(searchInstance);
+
+        System.out.println("Memory consumption is " + measured);
+        final long CUSTOM_TREE_TARGET_INTERN = 144_819_056;
+        final long SMALL_TEST_TARGET = 1_886_272; // itemsCount = 1000;
+
+        assertTrue("Calculated size exceeds target", measured < ((RUN_FULL_BENCHMARKS ? CUSTOM_TREE_TARGET_INTERN : SMALL_TEST_TARGET) * 1.1));
+    }
+
+
+    @Test
+    public void exerciseCache() {
+        searchInstance = new
+                QuickSearch.Builder<String>()
+                .accumulationPolicy(INTERSECTION)
+                .withCache(25 * 1024 * 1024)
+                .build();
+
+        final int itemsCount = RUN_FULL_BENCHMARKS ? 100_000 : 1000;
+
+        for (int i = 0; i < itemsCount; i++) {
+            String[] items = USA_STATES[i % USA_STATES.length];
+            searchInstance.addItem(items[0] + "-" + i, String.format("%s %s %s %s", items[0], items[1], items[2], items[3]));
+        }
+
+        // Force population of caches
+        for (char character = 'a'; character <= 'z'; character++) {
+            for (char character2 = 'a'; character2 <= 'z'; character2++) {
+                searchInstance.findItem(String.valueOf(character) + String.valueOf(character2));
+            }
+        }
+
+        MemoryMeter meter = new MemoryMeter().withGuessing(MemoryMeter.Guess.ALWAYS_UNSAFE);
+
+        long measured = meter.measureDeep(searchInstance);
+
+        System.out.println("Memory consumption is " + measured);
+        final long CUSTOM_TREE_TARGET_INTERN = 144_819_056;
+        final long SMALL_TEST_TARGET = 1_886_272; // itemsCount = 1000;
+
+        assertTrue("Calculated size exceeds target", measured < ((RUN_FULL_BENCHMARKS ? CUSTOM_TREE_TARGET_INTERN : SMALL_TEST_TARGET) * 1.1));
     }
 }

@@ -25,20 +25,20 @@ import org.jetbrains.annotations.NotNull;
 public class ScoreWrapper<T> {
 
     @NotNull
-    private final HashWrapper<T> item;
+    private final T item;
     private final double score;
 
-    public ScoreWrapper(@NotNull final HashWrapper<T> item, final double score) {
+    public ScoreWrapper(@NotNull final T item, final double score) {
         this.item = item;
         this.score = score;
     }
 
     @NotNull
-    HashWrapper<T> unwrap() {
+    public T unwrap() {
         return item;
     }
 
-    double getScore() {
+    public double getScore() {
         return score;
     }
 }
