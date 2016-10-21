@@ -26,6 +26,42 @@ import static org.junit.Assert.*;
 public class PartialSorterTest {
 
     @Test
+    public void limits() {
+        List<Double> testSet = new ArrayList<>();
+
+        for (int i = 0; i < 10; i++) {
+            testSet.add((double) i);
+        }
+
+        List<Double> list = PartialSorter.sortAndLimit(testSet, 1, Comparator.naturalOrder());
+        assertEquals(1, list.size());
+    }
+
+    @Test
+    public void limits1() {
+        List<Double> testSet = new ArrayList<>();
+
+        for (int i = 0; i < 10; i++) {
+            testSet.add((double) i);
+        }
+
+        List<Double> list = PartialSorter.sortAndLimit(testSet, 0, Comparator.naturalOrder());
+        assertEquals(0, list.size());
+    }
+
+    @Test
+    public void limits2() {
+        List<Double> testSet = new ArrayList<>();
+
+        for (int i = 0; i < 10; i++) {
+            testSet.add((double) i);
+        }
+
+        List<Double> list = PartialSorter.sortAndLimit(testSet, -1, Comparator.naturalOrder());
+        assertEquals(0, list.size());
+    }
+
+    @Test
     public void customSorting() {
         List<Double> testSet = new ArrayList<>();
 

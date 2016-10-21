@@ -23,9 +23,8 @@ import org.junit.Test;
 
 import java.util.*;
 
-import static com.zigurs.karlis.utils.search.QuickSearch.CANDIDATE_ACCUMULATION_POLICY.INTERSECTION;
-import static com.zigurs.karlis.utils.search.QuickSearch.CANDIDATE_ACCUMULATION_POLICY.UNION;
-import static com.zigurs.karlis.utils.search.QuickSearch.UNMATCHED_POLICY.BACKTRACKING;
+import static com.zigurs.karlis.utils.search.QuickSearch.ACCUMULATION_POLICY.INTERSECTION;
+import static com.zigurs.karlis.utils.search.QuickSearch.ACCUMULATION_POLICY.UNION;
 import static com.zigurs.karlis.utils.search.QuickSearch.UNMATCHED_POLICY.EXACT;
 import static org.junit.Assert.*;
 
@@ -88,7 +87,7 @@ public class QuickSearchTest {
 
     @Before
     public void setUp() throws Exception {
-        searchInstance = new QuickSearch<>();
+        searchInstance = QuickSearch.<String>builder().build();
     }
 
     @After
@@ -96,136 +95,138 @@ public class QuickSearchTest {
         searchInstance = null;
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test(expected = NullPointerException.class)
     public void missingExtractor() {
-        QuickSearch<String> qs = new QuickSearch<>(
-                null,
-                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
-                QuickSearch.DEFAULT_MATCH_SCORER
-        );
-        assertNotNull(qs.getStats());
+        assertNotNull(QuickSearch.builder()
+                .keywordExtractor(null)
+                .build());
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test(expected = NullPointerException.class)
     public void missingNormaliser() {
-        QuickSearch<String> qs = new QuickSearch<>(
-                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
-                null,
-                QuickSearch.DEFAULT_MATCH_SCORER
-        );
-        assertNotNull(qs.getStats());
+        assertNotNull(QuickSearch.builder()
+                .keywordNormalizer(null)
+                .build());
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test(expected = NullPointerException.class)
     public void missingScorer() {
-        QuickSearch<String> qs = new QuickSearch<>(
-                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
-                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
-                null
-        );
-        assertNotNull(qs.getStats());
+        assertNotNull(QuickSearch.builder()
+                .keywordMatchScorer(null)
+                .build());
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test(expected = NullPointerException.class)
     public void invalidMatchingPolicy() {
-        QuickSearch<String> qs = new QuickSearch<>(
-                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
-                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
-                QuickSearch.DEFAULT_MATCH_SCORER,
-                null,
-                UNION
-        );
-        assertNotNull(qs.getStats());
+        assertNotNull(QuickSearch.builder()
+                .unmatchedPolicy(null)
+                .build());
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test(expected = NullPointerException.class)
     public void invalidCandidatePolicy() {
-        QuickSearch<String> qs = new QuickSearch<>(
-                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
-                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
-                QuickSearch.DEFAULT_MATCH_SCORER,
-                EXACT,
-                null
-        );
-        assertNotNull(qs.getStats());
+        assertNotNull(QuickSearch.builder()
+                .accumulationPolicy(null)
+                .build());
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void testExtractingFunction() {
-        new QuickSearch<>(
-                s -> null,
-                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
-                QuickSearch.DEFAULT_MATCH_SCORER
-        );
+        assertNotNull(QuickSearch.builder()
+                .keywordExtractor(s -> null)
+                .build());
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void testExtractingFunction1() {
-        new QuickSearch<String>(
-                s -> s.length() > 0 ? null : Collections.emptySet(),
-                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
-                QuickSearch.DEFAULT_MATCH_SCORER
-        );
+        assertNotNull(QuickSearch.builder()
+                .keywordExtractor(s -> s.length() > 0 ? null : Collections.emptySet())
+                .build());
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void testExtractingFunction2() {
-        new QuickSearch<String>(
-                s -> {
-                    throw new NoSuchElementException("Dummy exception");
-                },
-                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
-                QuickSearch.DEFAULT_MATCH_SCORER
-        );
+        assertNotNull(QuickSearch.builder()
+                .keywordExtractor(s -> {
+                    throw new NoSuchElementException("dummy");
+                })
+                .build());
+    }
+
+    @Test
+    public void checkExtractingFunctionFilters() {
+        searchInstance = QuickSearch.<String>builder()
+                .keywordExtractor(s -> new HashSet<>(Arrays.asList("", "one", "blue", "yellow", null)))
+                .build();
+        addItem("test", "onetwo three");
+        searchInstance.findItem("one");
     }
 
     @Test
     public void testKeywordsFiltering() {
-        new QuickSearch<String>(
-                s -> new HashSet<>(Arrays.asList(s.split(","))),
-                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
-                QuickSearch.DEFAULT_MATCH_SCORER
-        ).findItem("red,black,,blue");
+        assertNotNull(QuickSearch.builder()
+                .keywordExtractor(s -> new HashSet<>(Arrays.asList(s.split(","))))
+                .build());
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void testNormalizerFunction() {
-        new QuickSearch<String>(
-                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
-                s -> null,
-                QuickSearch.DEFAULT_MATCH_SCORER
-        );
+        assertNotNull(QuickSearch.builder()
+                .keywordNormalizer(s -> null)
+                .build());
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void testNormalizerFunction1() {
-        new QuickSearch<String>(
-                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
-                s -> s.length() > 0 ? null : s,
-                QuickSearch.DEFAULT_MATCH_SCORER
-        );
+        assertNotNull(QuickSearch.builder()
+                .keywordNormalizer(s -> s.length() > 0 ? null : s)
+                .build());
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void testNormalizerFunction2() {
-        new QuickSearch<String>(
-                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
-                s -> {
-                    throw new IndexOutOfBoundsException();
-                },
-                QuickSearch.DEFAULT_MATCH_SCORER
-        );
+        assertNotNull(QuickSearch.builder()
+                .keywordNormalizer(s -> {
+                    throw new IndexOutOfBoundsException("dummy");
+                })
+                .build());
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void testScorerFunction() {
-        new QuickSearch<String>(
-                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
-                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
-                (s1, s2) -> {
+        assertNotNull(QuickSearch.builder()
+                .keywordMatchScorer((s1, s2) -> {
                     throw new IndexOutOfBoundsException("testing");
-                }
-        );
+                })
+                .build());
+    }
+
+    @Test
+    public void buildWithCache() {
+        assertNotNull(QuickSearch.builder()
+                .withCache()
+                .build());
+    }
+
+    @Test
+    public void buildWithCache1() {
+        assertNotNull(QuickSearch.builder()
+                .withCache(Integer.MAX_VALUE)
+                .build());
+    }
+
+    @Test
+    public void buildWithCache2() {
+        assertNotNull(QuickSearch.builder()
+                .withCache(0)
+                .build());
+    }
+
+    @Test
+    public void buildWithCache3() {
+        assertNotNull(QuickSearch.builder()
+                .withCache(-1)
+                .build());
     }
 
     @Test
@@ -302,6 +303,17 @@ public class QuickSearchTest {
         searchInstance.removeItem(null);
         assertEquals(23, searchInstance.getStats().getFragments());
     }
+
+    @Test
+    public void itemRemoved3() throws Exception {
+        searchInstance = QuickSearch.<String>builder().withCache().build();
+
+        addItem("toBeRemoved", "one two three");
+        searchInstance.findItem("o");
+        searchInstance.removeItem("toBeRemoved");
+        assertEquals(0, searchInstance.getStats().getFragments());
+    }
+
 
     @Test
     public void removeTwice() throws Exception {
@@ -548,11 +560,9 @@ public class QuickSearchTest {
 
     @Test
     public void alternativeScorerFunction() throws Exception {
-        QuickSearch<String> alternativeConfig = new QuickSearch<>(
-                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
-                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
-                (s1, s2) -> (double) (s1.length() * s1.length())
-        );
+        QuickSearch<String> alternativeConfig = QuickSearch.<String>builder()
+                .keywordMatchScorer((s1, s2) -> (double) (s1.length() * s1.length()))
+                .build();
 
         String exerciseString = "aquickbrownfoxjumpsoverthelazydog";
 
@@ -668,12 +678,9 @@ public class QuickSearchTest {
 
     @Test
     public void intersectionWorks() throws Exception {
-        searchInstance = new QuickSearch<>(
-                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
-                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
-                QuickSearch.DEFAULT_MATCH_SCORER,
-                BACKTRACKING,
-                INTERSECTION);
+        searchInstance = QuickSearch.<String>builder()
+                .accumulationPolicy(INTERSECTION)
+                .build();
 
         addItem("test1", "one two");
         addItem("test2", "two three");
@@ -692,12 +699,9 @@ public class QuickSearchTest {
 
     @Test
     public void intersectionWorks1() throws Exception {
-        searchInstance = new QuickSearch<>(
-                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
-                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
-                QuickSearch.DEFAULT_MATCH_SCORER,
-                BACKTRACKING,
-                INTERSECTION);
+        searchInstance = QuickSearch.<String>builder()
+                .accumulationPolicy(INTERSECTION)
+                .build();
 
         addItem("test1", "one two");
         addItem("test2", "two three");
@@ -710,12 +714,9 @@ public class QuickSearchTest {
 
     @Test
     public void intersectionWorks2() throws Exception {
-        searchInstance = new QuickSearch<>(
-                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
-                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
-                QuickSearch.DEFAULT_MATCH_SCORER,
-                BACKTRACKING,
-                INTERSECTION);
+        searchInstance = QuickSearch.<String>builder()
+                .accumulationPolicy(INTERSECTION)
+                .build();
 
         addItem("test1", "one two");
         addItem("test2", "two three");
@@ -726,12 +727,9 @@ public class QuickSearchTest {
 
     @Test
     public void intersectionWorks3() throws Exception {
-        searchInstance = new QuickSearch<>(
-                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
-                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
-                QuickSearch.DEFAULT_MATCH_SCORER,
-                BACKTRACKING,
-                INTERSECTION);
+        searchInstance = QuickSearch.<String>builder()
+                .accumulationPolicy(INTERSECTION)
+                .build();
 
         addItem("test1", "one two");
         addItem("test2", "two three");
@@ -742,12 +740,9 @@ public class QuickSearchTest {
 
     @Test
     public void intersectionWorks4() throws Exception {
-        searchInstance = new QuickSearch<>(
-                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
-                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
-                QuickSearch.DEFAULT_MATCH_SCORER,
-                BACKTRACKING,
-                INTERSECTION);
+        searchInstance = QuickSearch.<String>builder()
+                .accumulationPolicy(INTERSECTION)
+                .build();
 
         addItem("test1", "one two");
         addItem("test2", "two three");
@@ -785,13 +780,10 @@ public class QuickSearchTest {
 
     @Test
     public void exactMatching() throws Exception {
-        searchInstance = new QuickSearch<>(
-                QuickSearch.DEFAULT_KEYWORDS_EXTRACTOR,
-                QuickSearch.DEFAULT_KEYWORD_NORMALIZER,
-                QuickSearch.DEFAULT_MATCH_SCORER,
-                EXACT,
-                UNION
-        );
+        searchInstance = QuickSearch.<String>builder()
+                .accumulationPolicy(UNION)
+                .unmatchedPolicy(EXACT)
+                .build();
 
         addItem("keyword", "keyword");
         addItem("keyboard", "keyboard");
@@ -828,7 +820,7 @@ public class QuickSearchTest {
                 "Fantasy", "tolkien fantasy hardbound middle earth lord of the rings"));
 
         // create a quick search for StoreItems
-        QuickSearch<StoreItem> search = new QuickSearch<>();
+        QuickSearch<StoreItem> search = QuickSearch.<StoreItem>builder().build();
 
         // populate quick search data
         for (StoreItem item : items) {
@@ -852,42 +844,13 @@ public class QuickSearchTest {
         assertEquals(0, searchInstance.getStats().getItems());
     }
 
-    @SuppressWarnings({"ObjectEqualsNull", "EqualsBetweenInconvertibleTypes"})
-    @Test
-    public void hashWrapperEquals() {
-        HashWrapper<String> w = new HashWrapper<>("cat");
-
-        assertFalse(w.equals(null));
-        assertFalse(w.equals("test"));
-        assertTrue(w.equals(new HashWrapper<>("cat")));
-        assertFalse(w.equals(new HashWrapper<>("dog")));
-    }
-
-    @SuppressWarnings({"ObjectEqualsNull", "EqualsBetweenInconvertibleTypes"})
-    @Test
-    public void hashWrapperEquals1() {
-        HashWrapper<String> w = new HashWrapper<>("FB");
-
-        assertFalse(w.equals(null));
-        assertFalse(w.equals("Ea"));
-        assertTrue(w.equals(new HashWrapper<>("FB")));
-        assertFalse(w.equals(new HashWrapper<>("Ea")));
-    }
-
-    @Test
-    public void hashWrapperHash() {
-        String testString = "testString";
-
-        assertTrue(new HashWrapper<>(testString).hashCode() == testString.hashCode());
-    }
-
     @Test
     public void enums() {
         // Silly to do it like this, but catches last few untouched code paths
-        assertNotNull(QuickSearch.CANDIDATE_ACCUMULATION_POLICY.valueOf("UNION"));
-        assertNotNull(QuickSearch.CANDIDATE_ACCUMULATION_POLICY.valueOf("INTERSECTION"));
+        assertNotNull(QuickSearch.ACCUMULATION_POLICY.valueOf("UNION"));
+        assertNotNull(QuickSearch.ACCUMULATION_POLICY.valueOf("INTERSECTION"));
 
-        for (QuickSearch.CANDIDATE_ACCUMULATION_POLICY policy : QuickSearch.CANDIDATE_ACCUMULATION_POLICY.values()) {
+        for (QuickSearch.ACCUMULATION_POLICY policy : QuickSearch.ACCUMULATION_POLICY.values()) {
             assertNotNull(policy.toString());
         }
 
