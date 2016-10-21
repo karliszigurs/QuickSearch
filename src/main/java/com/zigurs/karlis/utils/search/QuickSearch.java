@@ -24,7 +24,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
-import java.util.concurrent.Callable;
 import java.util.concurrent.locks.StampedLock;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -181,10 +180,8 @@ public class QuickSearch<T> {
     private final Map<T, ImmutableSet<String>> itemKeywordsMap = new HashMap<>();
     @NotNull
     private final StampedLock lock = new StampedLock();
-    @NotNull
-    private final BiFunction<GraphNode<T>, Function<GraphNode<T>, Map<T, Double>>, Map<T, Double>> supplierFunction;
-    @NotNull
-    private final Callable contentsChangedCall; /* TODO - surely, there's a better interface to use here */
+    @Nullable
+    private final Cache<T> cache;
 
     /**
      * Private constructor, use builder instead.
@@ -220,13 +217,7 @@ public class QuickSearch<T> {
          * provide internal supplier and null clearer.
          */
 
-        if (builder.cache != null) {
-            this.supplierFunction = builder.cache;
-            this.contentsChangedCall = builder.cache;
-        } else {
-            this.supplierFunction = (node, function) -> function.apply(node);
-            this.contentsChangedCall = () -> null;
-        }
+        this.cache = builder.cache;
     }
 
     /**
@@ -445,11 +436,8 @@ public class QuickSearch<T> {
     }
 
     private void clearCache() {
-        try {
-            contentsChangedCall.call();
-        } catch (Exception e) {
-            /* No operation */
-        }
+        if (cache != null)
+            cache.clear();
     }
 
     /**
@@ -561,7 +549,10 @@ public class QuickSearch<T> {
             }
         }
 
-        return supplierFunction.apply(root, node -> walkAndScore(node.getFragment(), node, new HashMap<>(), new HashSet<>()));
+        if (cache != null)
+            return cache.getFromCacheOrSupplier(root, node -> walkAndScore(node.getFragment(), node, new HashMap<>(), new HashSet<>()));
+        else
+            return walkAndScore(root.getFragment(), root, new HashMap<>(), new HashSet<>());
     }
 
     private Map<T, Double> walkAndScore(@NotNull final String originalFragment,

@@ -26,9 +26,8 @@ public class NodeTreeCache<T> implements Cache<T> {
         maxAllowedEntries = cacheLimitInBytes / 200;
     }
 
-    @Override
-    public Map<T, Double> apply(@NotNull GraphNode<T> node,
-                                @NotNull Function<GraphNode<T>, Map<T, Double>> supplier) {
+    public Map<T, Double> getFromCacheOrSupplier(@NotNull GraphNode<T> node,
+                                                 @NotNull Function<GraphNode<T>, Map<T, Double>> supplier) {
         if (isCacheable(node.getFragment())) {
             Map<T, Double> cached = cache.get(node.getFragment());
 
@@ -61,7 +60,6 @@ public class NodeTreeCache<T> implements Cache<T> {
                     .sorted(Comparator.reverseOrder())
                     .forEach(key -> {
                         if (currentEntries > maxAllowedEntries) {
-                            System.out.println("Removing " + key);
                             Map<T, Double> map = cache.get(key);
                             currentEntries -= map.size();
                             cache.remove(key);
@@ -71,11 +69,6 @@ public class NodeTreeCache<T> implements Cache<T> {
     }
 
     @Override
-    public Object call() throws Exception {
-        clear();
-        return null;
-    }
-
     public void clear() {
         if (currentEntries > 0) {
             cache.clear();
