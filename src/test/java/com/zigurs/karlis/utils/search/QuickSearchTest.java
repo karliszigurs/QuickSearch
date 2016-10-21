@@ -84,7 +84,7 @@ public class QuickSearchTest {
             {"WY", "Wyoming", "Cheyenne", "July 10, 1890"}
     };
 
-    protected QuickSearch<String> searchInstance;
+    private QuickSearch<String> searchInstance;
 
     @Before
     public void setUp() throws Exception {
@@ -319,7 +319,7 @@ public class QuickSearchTest {
             searchInstance.removeItem("test" + i);
         }
 
-        assertTrue("Unexpected result size", searchInstance.findItems("one", 10).size() == 0);
+        assertEquals("Unexpected result size", 0, searchInstance.findItems("one", 10).size());
     }
 
     @Test

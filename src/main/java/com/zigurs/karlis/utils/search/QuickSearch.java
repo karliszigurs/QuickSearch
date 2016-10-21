@@ -22,6 +22,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.StampedLock;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -202,6 +203,8 @@ public class QuickSearch<T> {
     private final Map<HashWrapper<T>, ReadOnlySet<String>> itemKeywordsMap = new HashMap<>();
     @NotNull
     private final StampedLock lock = new StampedLock();
+    @Nullable
+    private final NodeTreeCache<T> cache;
 
     /*
      * Constructors
@@ -224,6 +227,7 @@ public class QuickSearch<T> {
      * @param keywordsExtractor  Extractor function.
      * @param keywordNormalizer  Normalizer function.
      * @param keywordMatchScorer Scorer function.
+     * @throws IllegalArgumentException if supplied functions are not behaving as expected
      */
     public QuickSearch(@Nullable final Function<String, Set<String>> keywordsExtractor,
                        @Nullable final Function<String, String> keywordNormalizer,
@@ -246,6 +250,7 @@ public class QuickSearch<T> {
      * @param keywordMatchScorer          Scorer function.
      * @param unmatchedPolicy             Policy to apply to supplied keywords without direct match
      * @param candidateAccumulationPolicy Policy to generate broad or exact results set
+     * @throws IllegalArgumentException if supplied functions are not behaving as expected
      */
     public QuickSearch(@Nullable final Function<String, Set<String>> keywordsExtractor,
                        @Nullable final Function<String, String> keywordNormalizer,
@@ -272,6 +277,8 @@ public class QuickSearch<T> {
 
         this.unmatchedPolicy = unmatchedPolicy;
         this.candidateAccumulationPolicy = candidateAccumulationPolicy;
+
+        cache = new NodeTreeCache<>();
     }
 
     /*
@@ -555,7 +562,7 @@ public class QuickSearch<T> {
         Map<HashWrapper<T>, Double> accumulatedItems = new LinkedHashMap<>();
 
         searchFragments.forEach(fragment ->
-                walkAndScore(fragment, null).forEach((k, v) ->
+                walkAndScore(fragment).forEach((k, v) ->
                         accumulatedItems.merge(k, v, (d1, d2) -> d1 + d2))
         );
 
@@ -569,7 +576,7 @@ public class QuickSearch<T> {
         boolean firstFragment = true;
 
         for (String suppliedFragment : suppliedFragments) {
-            Map<HashWrapper<T>, Double> fragmentItems = walkAndScore(suppliedFragment, accumulatedItems);
+            Map<HashWrapper<T>, Double> fragmentItems = walkAndScore(suppliedFragment);
 
             if (fragmentItems.isEmpty())
                 return fragmentItems; // Can fail early
@@ -587,25 +594,26 @@ public class QuickSearch<T> {
         return accumulatedItems;
     }
 
-    private Map<HashWrapper<T>, Double> walkAndScore(@NotNull final String fragment,
-                                                     @Nullable final Map<HashWrapper<T>, Double> whiteList) {
+    private Map<HashWrapper<T>, Double> walkAndScore(@NotNull final String fragment) {
         GraphNode<HashWrapper<T>> root = fragmentsItemsTree.get(fragment);
 
         if (root == null) {
             if (unmatchedPolicy == BACKTRACKING && fragment.length() > 1) {
-                return walkAndScore(fragment.substring(0, fragment.length() - 1), whiteList);
+                return walkAndScore(fragment.substring(0, fragment.length() - 1));
             } else {
                 return Collections.emptyMap();
             }
         }
 
-        return walkAndScore(fragment, root, new HashMap<>(), whiteList, new HashSet<>());
+        if (cache != null)
+            return cache.fromCacheOrSupplier(root, rootNode -> walkAndScore(rootNode.getKey(), rootNode, new HashMap<>(), new HashSet<>()));
+        else
+            return walkAndScore(root.getKey(), root, new HashMap<>(), new HashSet<>());
     }
 
     private Map<HashWrapper<T>, Double> walkAndScore(@NotNull final String originalFragment,
                                                      @NotNull final GraphNode<HashWrapper<T>> node,
                                                      @NotNull final Map<HashWrapper<T>, Double> accumulated,
-                                                     @Nullable final Map<HashWrapper<T>, Double> whiteList,
                                                      @NotNull final Set<String> visited) {
         visited.add(node.getKey());
 
@@ -613,15 +621,13 @@ public class QuickSearch<T> {
             Double score = keywordMatchScorer.apply(originalFragment, node.getKey());
 
             node.getItems().forEach(item -> {
-                if (whiteList == null || whiteList.containsKey(item)) {
-                    accumulated.merge(item, score, (d1, d2) -> d1 > d2 ? d1 : d2);
-                }
+                accumulated.merge(item, score, (d1, d2) -> d1 > d2 ? d1 : d2);
             });
         }
 
         node.getParents().forEach(parent -> {
             if (!visited.contains(parent.getKey())) {
-                walkAndScore(originalFragment, parent, accumulated, whiteList, visited);
+                walkAndScore(originalFragment, parent, accumulated, visited);
             }
         });
 
@@ -716,6 +722,7 @@ public class QuickSearch<T> {
     private void registerItem(@NotNull final HashWrapper<T> item,
                               @NotNull final Set<String> keywords) {
         keywords.forEach(keyword -> createAndRegisterNode(null, keyword, item));
+        clearCache();
     }
 
     private void createAndRegisterNode(@Nullable final GraphNode<HashWrapper<T>> parent,
@@ -752,6 +759,7 @@ public class QuickSearch<T> {
                     collapseEdge(keywordNode, null);
             }
         }
+        clearCache();
     }
 
     private void collapseEdge(@Nullable final GraphNode<HashWrapper<T>> node,
@@ -769,6 +777,57 @@ public class QuickSearch<T> {
             if (node.getKey().length() > 1) {
                 collapseEdge(fragmentsItemsTree.get(node.getKey().substring(0, node.getKey().length() - 1)), node);
                 collapseEdge(fragmentsItemsTree.get(node.getKey().substring(1)), node);
+            }
+        }
+    }
+
+    private void clearCache() {
+        if (cache != null)
+            cache.clear();
+    }
+
+    /*
+     * Simple adaptive cache that will scale back what it caches each time it hits the
+     * limit it is allowed to cache.
+     */
+    private class NodeTreeCache<V> {
+
+        private final Map<String, Map<HashWrapper<V>, Double>> cache = new ConcurrentHashMap<>();
+        private final long MAX_ALLOWED_ENTRIES = (10 * 1024 * 1024) / 200;
+
+        private long currentEntries = 0;
+        private long currentCacheLimit = 5;
+
+        public Map<HashWrapper<V>, Double> fromCacheOrSupplier(@NotNull GraphNode<HashWrapper<V>> node,
+                                                               @NotNull Function<GraphNode<HashWrapper<V>>, Map<HashWrapper<V>, Double>> supplier) {
+            if (isCacheable(node.getKey())) {
+                Map<HashWrapper<V>, Double> cached = cache.get(node.getKey());
+
+                if (cached == null) {
+                    cached = supplier.apply(node);
+                    cache.put(node.getKey(), new HashMap<>(cached));
+                    currentEntries += cached.size();
+
+                    if (currentEntries > MAX_ALLOWED_ENTRIES && currentCacheLimit > 1) {
+                        clear();
+                        currentCacheLimit--;
+                    }
+                }
+
+                return cached;
+            } else {
+                return supplier.apply(node);
+            }
+        }
+
+        private boolean isCacheable(String key) {
+            return key.length() <= currentCacheLimit;
+        }
+
+        public void clear() {
+            if (currentEntries > 0) {
+                cache.clear();
+                currentEntries = 0;
             }
         }
     }

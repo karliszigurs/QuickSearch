@@ -77,7 +77,7 @@ public class ReadOnlySet<T> extends AbstractSet<T> {
 
         @Override
         public void forEach(Consumer action) {
-            // Noop
+            /* No operation */
         }
 
         @NotNull
@@ -95,7 +95,7 @@ public class ReadOnlySet<T> extends AbstractSet<T> {
     /**
      * Array with elements in this set.
      */
-    private T[] array;
+    private final T[] array;
 
     private ReadOnlySet(@NotNull final T[] array) {
         this.array = array;
@@ -112,11 +112,12 @@ public class ReadOnlySet<T> extends AbstractSet<T> {
 
         //noinspection ForLoopReplaceableByForEach
         for (int i = 0; i < array.length; i++) {
-            /* Try to skip elements by cheaper (presumably) hash check first */
-            if (array[i].hashCode() == o.hashCode() && array[i].equals(o)) {
+            /* Try cheaper checks first */
+            if (array[i] == o || (array[i].hashCode() == o.hashCode() && array[i].equals(o))) {
                 return true;
             }
         }
+
         return false;
     }
 
@@ -184,6 +185,7 @@ public class ReadOnlySet<T> extends AbstractSet<T> {
             return false;
 
         Set<?> set = (Set<?>) o;
+
         if (set.size() != size())
             return false;
 
@@ -264,15 +266,11 @@ public class ReadOnlySet<T> extends AbstractSet<T> {
             if (set.contains(item))
                 return set;
 
-            Object[] arr = new Object[set.array.length + 1];
-            System.arraycopy(set.array, 0, arr, 0, set.array.length);
-            arr[arr.length - 1] = item;
+            Object[] destination = new Object[set.array.length + 1];
+            System.arraycopy(set.array, 0, destination, 0, set.array.length);
+            destination[destination.length - 1] = item;
 
-            // Direct assignment in the supplied set
-            set.array = (S[]) arr;
-            set.hashCode = 0;
-
-            return set;
+            return new ReadOnlySet<>((S[]) destination);
         } else {
             Set<S> set = new HashSet<>();
             set.addAll(source);
@@ -298,15 +296,7 @@ public class ReadOnlySet<T> extends AbstractSet<T> {
         Objects.requireNonNull(surplusItem);
 
         if (source instanceof ReadOnlySet) {
-            ReadOnlySet<S> set = (ReadOnlySet<S>) source;
-
-            if (set.size() == 1) {
-                if (set.array[0].equals(surplusItem))
-                    return empty();
-            } else {
-                removeViaCompacting(set, surplusItem);
-            }
-            return set;
+            return removeViaCompacting((ReadOnlySet<S>) source, surplusItem);
         } else {
             Set<S> set = new HashSet<>();
             set.addAll(source);
@@ -316,18 +306,33 @@ public class ReadOnlySet<T> extends AbstractSet<T> {
         }
     }
 
-    private static <S> void removeViaCompacting(@NotNull final ReadOnlySet<S> set,
-                                                @NotNull final S surplusItem) {
-        /*
-         * Update the set via the hard way, by compacting the array
-         */
-        for (int i = 0; i < set.array.length; i++) {
-            if (set.array[i].hashCode() == surplusItem.hashCode() && set.array[i].equals(surplusItem)) {
-                System.arraycopy(set.array, i + 1, set.array, i, set.array.length - (i + 1));
-                set.array = Arrays.copyOf(set.array, set.array.length - 1);
-                set.hashCode = 0;
+    private static <S> ReadOnlySet<S> removeViaCompacting(@NotNull final ReadOnlySet<S> set,
+                                                          @NotNull final S surplusItem) {
+        S[] source = set.array;
+        Object[] destination = new Object[source.length - 1];
+
+        int destPtr = 0;
+        for (int i = 0; i < source.length; i++) {
+            if (itemsEqual(source[i], surplusItem)) {
+                if (destPtr < destination.length) // more to copy
+                    System.arraycopy(source, i + 1, destination, i, source.length - (i + 1));
+                return new ReadOnlySet<>((S[]) destination);
+            } else if (destPtr < destination.length) { // end of copy without match
+                destination[destPtr++] = source[i];
             }
         }
+
+        /* No items were removed */
+        return set;
+
+//
+//        for (int i = 0; i < set.array.length; i++) {
+//            if (set.array[i].hashCode() == surplusItem.hashCode() && set.array[i].equals(surplusItem)) {
+//                System.arraycopy(set.array, i + 1, set.array, i, set.array.length - (i + 1));
+//                set.array = Arrays.copyOf(set.array, set.array.length - 1);
+//                set.hashCode = 0;
+//            }
+//        }
         // If the set wasn't compacted in the loop above, there was no item
         // to remove, so, it remains as-is
     }
@@ -358,11 +363,6 @@ public class ReadOnlySet<T> extends AbstractSet<T> {
         set.addAll(source);
         set = removeNullFromSet(set);
         return new ReadOnlySet<>((S[]) set.toArray());
-    }
-
-    private static Set removeNullFromSet(Set source) {
-        source.remove(null);
-        return source;
     }
 
     /**
@@ -402,5 +402,20 @@ public class ReadOnlySet<T> extends AbstractSet<T> {
         set.addAll(source2);
         set = removeNullFromSet(set);
         return new ReadOnlySet<>((S[]) set.toArray());
+    }
+
+    private static Set removeNullFromSet(Set source) {
+        source.remove(null);
+        return source;
+    }
+
+    private static <S> boolean itemsEqual(S one, S two) {
+        if (one == two)
+            return true;
+
+        if (one.hashCode() != two.hashCode())
+            return false;
+
+        return one.equals(two);
     }
 }
