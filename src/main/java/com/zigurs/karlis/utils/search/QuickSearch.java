@@ -16,7 +16,7 @@
 package com.zigurs.karlis.utils.search;
 
 import com.zigurs.karlis.utils.search.cache.Cache;
-import com.zigurs.karlis.utils.search.cache.NodeTreeCache;
+import com.zigurs.karlis.utils.search.cache.SimpleNodeCache;
 import com.zigurs.karlis.utils.search.model.Item;
 import com.zigurs.karlis.utils.search.model.Result;
 import com.zigurs.karlis.utils.search.model.Stats;
@@ -93,6 +93,31 @@ import static com.zigurs.karlis.utils.search.QuickSearch.UNMATCHED_POLICY.BACKTR
 public class QuickSearch<T> {
 
     /**
+     * Matching policy to apply to unmatched keywords. In case of EXACT only
+     * exact supplied keyword matches will be considered, in case of BACKTRACKING
+     * any keywords with no matches will be incrementally shortened until first
+     * candidate match is found (e.g. supplied 'terminal' will be shortened until it
+     * reaches 'ter' where it can match against 'terra').
+     */
+    public enum UNMATCHED_POLICY {
+        EXACT, BACKTRACKING
+    }
+
+    /**
+     * If multiple keywords are supplied select strategy to accumulate result set.
+     * <p>
+     * UNION will consider all items found for each keyword in the result,
+     * INTERSECTION will consider only items that are matched by all the supplied
+     * keywords.
+     * <p>
+     * INTERSECTION is significantly more performant as it discards
+     * candidates as early as possible.
+     */
+    public enum ACCUMULATION_POLICY {
+        UNION, INTERSECTION
+    }
+
+    /**
      * Function to 'clean up' supplied keyword and user input strings. We assume that the input is
      * going to be ether free form or malformed, therefore this allows to apply required actions to generate
      * a 'clean' set of keywords from the input string.
@@ -159,15 +184,14 @@ public class QuickSearch<T> {
         return matchScore;
     };
 
-    @NotNull
-    private final BiFunction<String, String, Double> keywordMatchScorer;
-    @NotNull
-    private final Function<String, String> keywordNormalizer;
-
     /*
      * Instance properties
      */
 
+    @NotNull
+    private final BiFunction<String, String, Double> keywordMatchScorer;
+    @NotNull
+    private final Function<String, String> keywordNormalizer;
     @NotNull
     private final Function<String, Set<String>> keywordsExtractor;
     @NotNull
@@ -188,7 +212,7 @@ public class QuickSearch<T> {
      *
      * @param builder supplies configuration
      */
-    private QuickSearch(@NotNull final Builder<T> builder) {
+    private QuickSearch(@NotNull final QuickSearchBuilder builder) {
         keywordsExtractor = builder.keywordsExtractor;
         keywordNormalizer = builder.keywordNormalizer;
         keywordMatchScorer = builder.keywordMatchScorer;
@@ -217,8 +241,15 @@ public class QuickSearch<T> {
          * provide internal supplier and null clearer.
          */
 
-        this.cache = builder.cache;
+        if (builder.cacheLimit > 0)
+            this.cache = new SimpleNodeCache<>(builder.cacheLimit);
+        else
+            cache = null;
     }
+
+    /*
+     * Public interface
+     */
 
     /**
      * Add an item with corresponding keywords, e.g. an online store item Shoe with
@@ -268,10 +299,6 @@ public class QuickSearch<T> {
             lock.unlockWrite(writeLock);
         }
     }
-
-    /*
-     * Public interface
-     */
 
     /**
      * Find top matching item for the supplied search string
@@ -435,11 +462,6 @@ public class QuickSearch<T> {
         }
     }
 
-    private void clearCache() {
-        if (cache != null)
-            cache.clear();
-    }
-
     /**
      * Returns an overview of contained maps sizes.
      *
@@ -461,6 +483,14 @@ public class QuickSearch<T> {
 
         return stats;
     }
+
+    public String getCacheStats() {
+        return cache != null ? cache.getCacheStats() : "";
+    }
+
+    /*
+     * Implementation methods
+     */
 
     private boolean isInvalidRequest(@Nullable final String searchString, final int numItems) {
         return searchString == null || searchString.isEmpty() || numItems < 1;
@@ -489,15 +519,11 @@ public class QuickSearch<T> {
         }
     }
 
-    /*
-     * Implementation methods
-     */
-
     @NotNull
     private Map<T, Double> findAndScoreImpl(@NotNull final Set<String> suppliedFragments) {
         if (accumulationPolicy == UNION)
             return findAndScoreUnionImpl(suppliedFragments);
-        else // implied (accumulationPolicy == INTERSECTION)
+        else // implied (withAccumulationPolicy == INTERSECTION)
             return findAndScoreIntersectionImpl(suppliedFragments);
     }
 
@@ -550,7 +576,7 @@ public class QuickSearch<T> {
         }
 
         if (cache != null)
-            return cache.getFromCacheOrSupplier(root, node -> walkAndScore(node.getFragment(), node, new HashMap<>(), new HashSet<>()));
+            return cache.getFromCacheOrSupplier(root, rootNode -> walkAndScore(rootNode.getFragment(), rootNode, new HashMap<>(), new HashSet<>()));
         else
             return walkAndScore(root.getFragment(), root, new HashMap<>(), new HashSet<>());
     }
@@ -594,6 +620,11 @@ public class QuickSearch<T> {
         clearCache();
     }
 
+    private void clearCache() {
+        if (cache != null)
+            cache.clear();
+    }
+
     @NotNull
     private Set<String> prepareKeywords(@NotNull final String keywordsString, boolean internKeywords) {
         return ImmutableSet.fromCollection(
@@ -608,7 +639,6 @@ public class QuickSearch<T> {
 
     /*
      * Constructor parameter function tests.
-     * Available as protected if modification of the tests is required.
      */
 
     /**
@@ -618,7 +648,7 @@ public class QuickSearch<T> {
      * @param function Extractor function under test
      * @throws IllegalArgumentException Thrown if there was a null output or an exception while processing test inputs
      */
-    protected void testKeywordsExtractorFunction(@NotNull final Function<String, Set<String>> function) {
+    private void testKeywordsExtractorFunction(@NotNull final Function<String, Set<String>> function) {
         try {
             if (function.apply("") == null || function.apply("testinput") == null)
                 throw new IllegalArgumentException("Keywords extractor function failed non-null result test");
@@ -636,7 +666,7 @@ public class QuickSearch<T> {
      * @param function Normalizer function under test
      * @throws IllegalArgumentException Thrown if there was a null output or exception during test invocations
      */
-    protected void testKeywordNormalizerFunction(@NotNull final Function<String, String> function) {
+    private void testKeywordNormalizerFunction(@NotNull final Function<String, String> function) {
         try {
             if (function.apply("") == null || function.apply("testinput") == null)
                 throw new IllegalArgumentException("Keyword normalizer function failed non-null output test");
@@ -653,7 +683,7 @@ public class QuickSearch<T> {
      * @param function Function under test
      * @throws IllegalArgumentException Thrown if there was an exception trying to score example inputs
      */
-    protected void testKeywordMatchScorerFunction(@NotNull final BiFunction<String, String, Double> function) {
+    private void testKeywordMatchScorerFunction(@NotNull final BiFunction<String, String, Double> function) {
         try {
             function.apply("testinput", "testinput");
         } catch (Exception e) {
@@ -729,38 +759,11 @@ public class QuickSearch<T> {
      * Configuration and builder
      */
 
-    public static <T> Builder<T> builder() {
-        return new Builder<>();
+    public static QuickSearchBuilder builder() {
+        return new QuickSearchBuilder();
     }
 
-    /**
-     * Matching policy to apply to unmatched keywords. In case of EXACT only
-     * exact supplied keyword matches will be considered, in case of BACKTRACKING
-     * any keywords with no matches will be incrementally shortened until first
-     * candidate match is found (e.g. supplied 'terminal' will be shortened until it
-     * reaches 'ter' where it can match against 'terra').
-     */
-    public enum UNMATCHED_POLICY {
-        EXACT, BACKTRACKING
-
-    }
-
-    /**
-     * If multiple keywords are supplied select strategy to accumulate result set.
-     * <p>
-     * UNION will consider all items found for each keyword in the result,
-     * INTERSECTION will consider only items that are matched by all the supplied
-     * keywords.
-     * <p>
-     * INTERSECTION is significantly more performant as it discards
-     * candidates as early as possible.
-     */
-    public enum ACCUMULATION_POLICY {
-        UNION, INTERSECTION
-
-    }
-
-    public static class Builder<T> {
+    public static class QuickSearchBuilder {
 
         private static final int DEFAULT_CACHE_HEAP_LIMIT = 100 * 1024 * 1024;
 
@@ -769,47 +772,51 @@ public class QuickSearch<T> {
         private Function<String, Set<String>> keywordsExtractor = DEFAULT_KEYWORDS_EXTRACTOR;
         private UNMATCHED_POLICY unmatchedPolicy = BACKTRACKING;
         private ACCUMULATION_POLICY accumulationPolicy = UNION;
-        private BiFunction<GraphNode<T>, Function<GraphNode<T>, Map<T, Double>>, Map<T, Double>> cacheSupplier = null;
-        private Cache<T> cache = null;
+        private int cacheLimit = 0;
 
-        public Builder<T> keywordMatchScorer(BiFunction<String, String, Double> scorer) {
+        public QuickSearchBuilder withKeywordMatchScorer(BiFunction<String, String, Double> scorer) {
             keywordMatchScorer = scorer;
             return this;
         }
 
-        public Builder<T> keywordNormalizer(Function<String, String> normalizer) {
+        public QuickSearchBuilder withKeywordNormalizer(Function<String, String> normalizer) {
             keywordNormalizer = normalizer;
             return this;
         }
 
-        public Builder<T> keywordExtractor(Function<String, Set<String>> extractor) {
+        public QuickSearchBuilder withKeywordExtractor(Function<String, Set<String>> extractor) {
             keywordsExtractor = extractor;
             return this;
         }
 
-        public Builder<T> unmatchedPolicy(UNMATCHED_POLICY policy) {
+        public QuickSearchBuilder withUnmatchedPolicy(UNMATCHED_POLICY policy) {
             unmatchedPolicy = policy;
             return this;
         }
 
-        public Builder<T> accumulationPolicy(ACCUMULATION_POLICY policy) {
+        public QuickSearchBuilder withAccumulationPolicy(ACCUMULATION_POLICY policy) {
             accumulationPolicy = policy;
             return this;
         }
 
-        public Builder<T> withCache() {
-            return withCache(DEFAULT_CACHE_HEAP_LIMIT);
-        }
+        public QuickSearchBuilder withCacheLimit(int limitInHeapBytes) {
+            if (limitInHeapBytes == -1) {
+                cacheLimit = Integer.MAX_VALUE;
+                return this;
+            }
 
-        public Builder<T> withCache(int limitInHeapBytes) {
             if (limitInHeapBytes < 1)
                 return this;
 
-            cache = new NodeTreeCache<>(limitInHeapBytes);
+            cacheLimit = limitInHeapBytes;
             return this;
         }
 
-        public QuickSearch<T> build() {
+        public QuickSearchBuilder withCache() {
+            return withCacheLimit(DEFAULT_CACHE_HEAP_LIMIT);
+        }
+
+        public <T> QuickSearch<T> build() {
             return new QuickSearch<>(this);
         }
     }

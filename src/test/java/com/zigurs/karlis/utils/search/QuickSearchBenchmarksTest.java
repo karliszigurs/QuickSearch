@@ -28,12 +28,11 @@ import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 public class QuickSearchBenchmarksTest {
 
-    private static final boolean RUN_FULL_BENCHMARKS = false;
+    private static final boolean RUN_FULL_BENCHMARKS = true;
 
     private static final String[][] USA_STATES = QuickSearchTest.USA_STATES;
 
@@ -62,28 +61,78 @@ public class QuickSearchBenchmarksTest {
 
     @Test
     public void benchmarkWithUnlimitedCache() throws Exception {
-        QuickSearch<String> searchInstance = QuickSearch.<String>builder()
-                .withCache(Integer.MAX_VALUE)
+        QuickSearch<String> searchInstance = QuickSearch.builder()
+                .withCacheLimit(-1)
                 .build();
 
-        multiKeywordBenchmarkRun(searchInstance, 1.0, 10.0, 10.0, 0.1);
+        if (RUN_FULL_BENCHMARKS) {
+            multiKeywordBenchmarkRun(searchInstance, 10.0, 75.0, 75.0, 3.0);
+            assertEquals(
+                    "{ \"hits\": 2499980, \"misses\": 20, \"uncacheable\": 0, \"evictions\": 0, \"size\": 3246, \"keysCached\": 20, \"maxSize\": 35791394, \"disabled\": false, \"keyLimit\": 10 }",
+                    searchInstance.getCacheStats()
+            );
+        } else {
+            multiKeywordBenchmarkRun(searchInstance, 1.0, 10.0, 10.0, 1.0);
+            assertEquals(
+                    "{ \"hits\": 24980, \"misses\": 20, \"uncacheable\": 0, \"evictions\": 0, \"size\": 3246, \"keysCached\": 20, \"maxSize\": 35791394, \"disabled\": false, \"keyLimit\": 10 }",
+                    searchInstance.getCacheStats()
+            );
+        }
     }
 
     @Test
     public void benchmarkWithDefaultCache() throws Exception {
-        QuickSearch<String> searchInstance = QuickSearch.<String>builder()
+        QuickSearch<String> searchInstance = QuickSearch.builder()
                 .withCache()
                 .build();
 
-        multiKeywordBenchmarkRun(searchInstance, 1.0, 10.0, 10.0, 0.1);
+        if (RUN_FULL_BENCHMARKS) {
+            multiKeywordBenchmarkRun(searchInstance, 10.0, 75.0, 75.0, 3.0);
+            assertEquals(
+                    "{ \"hits\": 2499980, \"misses\": 20, \"uncacheable\": 0, \"evictions\": 0, \"size\": 3246, \"keysCached\": 20, \"maxSize\": 1747626, \"disabled\": false, \"keyLimit\": 10 }",
+                    searchInstance.getCacheStats()
+            );
+        } else {
+            multiKeywordBenchmarkRun(searchInstance, 1.0, 10.0, 10.0, 1.0);
+            assertEquals(
+                    "{ \"hits\": 24980, \"misses\": 20, \"uncacheable\": 0, \"evictions\": 0, \"size\": 3246, \"keysCached\": 20, \"maxSize\": 1747626, \"disabled\": false, \"keyLimit\": 10 }",
+                    searchInstance.getCacheStats()
+            );
+        }
+    }
+
+    @Test
+    public void benchmarkWithSillyCache() throws Exception {
+        QuickSearch<String> searchInstance = QuickSearch.builder()
+                .withCacheLimit(1024)
+                .build();
+
+        if (RUN_FULL_BENCHMARKS) {
+            multiKeywordBenchmarkRun(searchInstance, 1.0, 30.0, 30.0, 0.1);
+            assertEquals(
+                    "{ \"hits\": 0, \"misses\": 10, \"uncacheable\": 2499990, \"evictions\": 10, \"size\": 0, \"keysCached\": 0, \"maxSize\": 17, \"disabled\": true, \"keyLimit\": 0 }",
+                    searchInstance.getCacheStats()
+            );
+        } else {
+            multiKeywordBenchmarkRun(searchInstance, 0.1, 5.0, 5.0, 0.1);
+            assertEquals(
+                    "{ \"hits\": 0, \"misses\": 10, \"uncacheable\": 24990, \"evictions\": 10, \"size\": 0, \"keysCached\": 0, \"maxSize\": 17, \"disabled\": true, \"keyLimit\": 0 }",
+                    searchInstance.getCacheStats()
+            );
+        }
     }
 
     @Test
     public void benchmarkWithoutCache() throws Exception {
-        QuickSearch<String> searchInstance = QuickSearch.<String>builder()
+        QuickSearch<String> searchInstance = QuickSearch.builder()
                 .build();
 
-        multiKeywordBenchmarkRun(searchInstance, 1.0, 10.0, 10.0, 0.1);
+        if (RUN_FULL_BENCHMARKS)
+            multiKeywordBenchmarkRun(searchInstance, 1.0, 30.0, 30.0, 0.1);
+        else
+            multiKeywordBenchmarkRun(searchInstance, 0.1, 5.0, 5.0, 0.1);
+
+        assertEquals("", searchInstance.getCacheStats());
     }
 
     private void multiKeywordBenchmarkRun(final QuickSearch<String> searchInstance,
@@ -101,7 +150,7 @@ public class QuickSearchBenchmarksTest {
         assertTrue("Data loading taken unexpectedly long", (System.currentTimeMillis() - startTime) < 1000);
 
         final double tWarm = searchIteration(searchInstance, iterations, "Warmup:", "a b c d e");
-        final double tSimple = searchIteration(searchInstance, iterations, "Simple:", "w");
+        final double tSimple = searchIteration(searchInstance, iterations, "Simple:", "montgomery");
         final double tMedium = searchIteration(searchInstance, iterations, "Medium:", "wa sh");
         final double tBrutal = searchIteration(searchInstance, iterations, "Brutal:", "a b c d e g h i l m n p r s u v y");
 
@@ -131,7 +180,7 @@ public class QuickSearchBenchmarksTest {
 
     @Test
     public void benchmarkOperations() throws Exception {
-        QuickSearch<String> searchInstance = QuickSearch.<String>builder().build();
+        QuickSearch<String> searchInstance = QuickSearch.builder().build();
 
         for (String[] items : USA_STATES) {
             searchInstance.addItem(items[0], String.format("%s %s %s", items[1], items[2], items[3]));
@@ -192,7 +241,7 @@ public class QuickSearchBenchmarksTest {
 
     @Test
     public void benchmarkSimpleReads() throws Exception {
-        QuickSearch<String> searchInstance = QuickSearch.<String>builder().build();
+        QuickSearch<String> searchInstance = QuickSearch.builder().withCache().build();
 
         for (String[] items : USA_STATES) {
             searchInstance.addItem(items[0], String.format("%s %s %s", items[1], items[2], items[3]));
@@ -203,20 +252,14 @@ public class QuickSearchBenchmarksTest {
         assertTrue(benchmarkReadsMT(searchInstance, "Warm-2:", 2) > 10.0);
         assertTrue(benchmarkReadsMT(searchInstance, "Warm-4:", 4) > 10.0);
         assertTrue(benchmarkReadsMT(searchInstance, "Warm-8:", 8) > 10.0);
-
-        if (!RUN_FULL_BENCHMARKS) {
-            assertTrue(benchmarkReadsMT(searchInstance, "War-16:", 16) > 10.0);
-            assertTrue(benchmarkReadsMT(searchInstance, "Wa-128:", 128) > 10.0);
-            assertTrue(benchmarkReadsMT(searchInstance, "Wa-128:", 512) > 10.0);
-        }
     }
 
     @Test
     public void exerciseScheduler() throws Exception {
         /*
-         * Tests the scheduler and caches more than anything else... Still, fun one.
+         * Tests the scheduler and cpu caches more than anything else... Still, fun one.
          */
-        QuickSearch<String> searchInstance = QuickSearch.<String>builder().build();
+        QuickSearch<String> searchInstance = QuickSearch.builder().build();
 
         for (String[] items : USA_STATES) {
             searchInstance.addItem(items[0], String.format("%s %s %s", items[1], items[2], items[3]));
@@ -242,7 +285,6 @@ public class QuickSearchBenchmarksTest {
 
         double aggregateThroughput = (((double) iterationsPerThread / totalTime) * threads);
 
-        //TODO format
         System.out.println(String.format(
                 "%s\tAggregate throughput (%d threads): %,.2fk ops / sec",
                 label,
@@ -298,25 +340,34 @@ public class QuickSearchBenchmarksTest {
 
     @Test
     public void measureMemoryUseWithCache() {
-        final long measured = measureMemoryUseImpl(true, 25 * 1024 * 1024);
-        assertTrue("Instance size exceeds target", measured < ((RUN_FULL_BENCHMARKS ? 20 : 1) + 25) * 1024 * 1024);
+        final int capMB = 80;
+        final long measured = measureMemoryUseImpl(true, capMB * 1024 * 1024);
+        assertTrue("Instance size exceeds target", measured < (((RUN_FULL_BENCHMARKS ? capMB : 0) + 20) * 1024 * 1024) * 1.1);
+    }
+
+    @Test
+    public void measureMemoryUseWithCacheDisabledItself() {
+        final long measured = measureMemoryUseImpl(true, 20 * 1024 * 1024);
+        assertTrue("Instance size exceeds target", measured < ((20 * 1024 * 1024) * 1.1));
     }
 
     @Test
     public void measureMemoryUseWithUnlimitedCache() {
         final long measured = measureMemoryUseImpl(true, Integer.MAX_VALUE);
-        /* TODO - reasonable targets here? */
-        assertTrue("Instance size exceeds target", measured < 300 * 1024 * 1024);
+        /* Currently as-measured, to detect regressions. */
+        assertTrue("Instance size exceeds target", measured < 150 * 1024 * 1024);
     }
 
     public long measureMemoryUseImpl(boolean useCache, int cacheSize) {
         QuickSearch<String> searchInstance;
         if (useCache)
-            searchInstance = QuickSearch.<String>builder().withCache(cacheSize).build();
+            searchInstance = QuickSearch.builder().withCacheLimit(cacheSize).build();
         else
-            searchInstance = QuickSearch.<String>builder().build();
+            searchInstance = QuickSearch.builder().build();
 
         final int itemsCount = RUN_FULL_BENCHMARKS ? 100_000 : 1000;
+
+        final long startTime = System.currentTimeMillis();
 
         for (int i = 0; i < itemsCount; i++) {
             String[] items = USA_STATES[i % USA_STATES.length];
@@ -326,15 +377,26 @@ public class QuickSearchBenchmarksTest {
         // Force population of caches, if active
         for (char character = 'a'; character <= 'z'; character++) {
             for (char character2 = 'a'; character2 <= 'z'; character2++) {
-                searchInstance.findItem(String.valueOf(character));
-                searchInstance.findItem(String.valueOf(character2));
                 searchInstance.findItem(String.valueOf(character) + String.valueOf(character2));
+                searchInstance.findItem(String.valueOf(character2));
+                searchInstance.findItem(String.valueOf(character));
             }
         }
+
+        // Force population of caches, if active
+        for (char character = 'a'; character <= 'z'; character++) {
+            searchInstance.findItem(String.valueOf(character));
+        }
+
+        final long endTime = System.currentTimeMillis() - startTime;
+
+        System.out.println(String.format("Inserting and querying took %,dms", endTime));
+
 
         MemoryMeter meter = new MemoryMeter().withGuessing(MemoryMeter.Guess.ALWAYS_UNSAFE);
         final long measured = meter.measureDeep(searchInstance);
         System.out.println(String.format("Measured instance size: %,d bytes", measured));
+        System.out.println(searchInstance.getCacheStats());
         return measured;
     }
 

@@ -87,7 +87,7 @@ public class QuickSearchTest {
 
     @Before
     public void setUp() throws Exception {
-        searchInstance = QuickSearch.<String>builder().build();
+        searchInstance = QuickSearch.builder().build();
     }
 
     @After
@@ -98,56 +98,56 @@ public class QuickSearchTest {
     @Test(expected = NullPointerException.class)
     public void missingExtractor() {
         assertNotNull(QuickSearch.builder()
-                .keywordExtractor(null)
+                .withKeywordExtractor(null)
                 .build());
     }
 
     @Test(expected = NullPointerException.class)
     public void missingNormaliser() {
         assertNotNull(QuickSearch.builder()
-                .keywordNormalizer(null)
+                .withKeywordNormalizer(null)
                 .build());
     }
 
     @Test(expected = NullPointerException.class)
     public void missingScorer() {
         assertNotNull(QuickSearch.builder()
-                .keywordMatchScorer(null)
+                .withKeywordMatchScorer(null)
                 .build());
     }
 
     @Test(expected = NullPointerException.class)
     public void invalidMatchingPolicy() {
         assertNotNull(QuickSearch.builder()
-                .unmatchedPolicy(null)
+                .withUnmatchedPolicy(null)
                 .build());
     }
 
     @Test(expected = NullPointerException.class)
     public void invalidCandidatePolicy() {
         assertNotNull(QuickSearch.builder()
-                .accumulationPolicy(null)
+                .withAccumulationPolicy(null)
                 .build());
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void testExtractingFunction() {
         assertNotNull(QuickSearch.builder()
-                .keywordExtractor(s -> null)
+                .withKeywordExtractor(s -> null)
                 .build());
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void testExtractingFunction1() {
         assertNotNull(QuickSearch.builder()
-                .keywordExtractor(s -> s.length() > 0 ? null : Collections.emptySet())
+                .withKeywordExtractor(s -> s.length() > 0 ? null : Collections.emptySet())
                 .build());
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void testExtractingFunction2() {
         assertNotNull(QuickSearch.builder()
-                .keywordExtractor(s -> {
+                .withKeywordExtractor(s -> {
                     throw new NoSuchElementException("dummy");
                 })
                 .build());
@@ -155,8 +155,8 @@ public class QuickSearchTest {
 
     @Test
     public void checkExtractingFunctionFilters() {
-        searchInstance = QuickSearch.<String>builder()
-                .keywordExtractor(s -> new HashSet<>(Arrays.asList("", "one", "blue", "yellow", null)))
+        searchInstance = QuickSearch.builder()
+                .withKeywordExtractor(s -> new HashSet<>(Arrays.asList("", "one", "blue", "yellow", null)))
                 .build();
         addItem("test", "onetwo three");
         searchInstance.findItem("one");
@@ -165,28 +165,28 @@ public class QuickSearchTest {
     @Test
     public void testKeywordsFiltering() {
         assertNotNull(QuickSearch.builder()
-                .keywordExtractor(s -> new HashSet<>(Arrays.asList(s.split(","))))
+                .withKeywordExtractor(s -> new HashSet<>(Arrays.asList(s.split(","))))
                 .build());
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void testNormalizerFunction() {
         assertNotNull(QuickSearch.builder()
-                .keywordNormalizer(s -> null)
+                .withKeywordNormalizer(s -> null)
                 .build());
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void testNormalizerFunction1() {
         assertNotNull(QuickSearch.builder()
-                .keywordNormalizer(s -> s.length() > 0 ? null : s)
+                .withKeywordNormalizer(s -> s.length() > 0 ? null : s)
                 .build());
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void testNormalizerFunction2() {
         assertNotNull(QuickSearch.builder()
-                .keywordNormalizer(s -> {
+                .withKeywordNormalizer(s -> {
                     throw new IndexOutOfBoundsException("dummy");
                 })
                 .build());
@@ -195,7 +195,7 @@ public class QuickSearchTest {
     @Test(expected = IllegalArgumentException.class)
     public void testScorerFunction() {
         assertNotNull(QuickSearch.builder()
-                .keywordMatchScorer((s1, s2) -> {
+                .withKeywordMatchScorer((s1, s2) -> {
                     throw new IndexOutOfBoundsException("testing");
                 })
                 .build());
@@ -211,21 +211,21 @@ public class QuickSearchTest {
     @Test
     public void buildWithCache1() {
         assertNotNull(QuickSearch.builder()
-                .withCache(Integer.MAX_VALUE)
+                .withCacheLimit(Integer.MAX_VALUE)
                 .build());
     }
 
     @Test
     public void buildWithCache2() {
         assertNotNull(QuickSearch.builder()
-                .withCache(0)
+                .withCacheLimit(0)
                 .build());
     }
 
     @Test
     public void buildWithCache3() {
         assertNotNull(QuickSearch.builder()
-                .withCache(-1)
+                .withCacheLimit(-1)
                 .build());
     }
 
@@ -306,7 +306,7 @@ public class QuickSearchTest {
 
     @Test
     public void itemRemoved3() throws Exception {
-        searchInstance = QuickSearch.<String>builder().withCache().build();
+        searchInstance = QuickSearch.builder().withCache().build();
 
         addItem("toBeRemoved", "one two three");
         searchInstance.findItem("o");
@@ -560,8 +560,8 @@ public class QuickSearchTest {
 
     @Test
     public void alternativeScorerFunction() throws Exception {
-        QuickSearch<String> alternativeConfig = QuickSearch.<String>builder()
-                .keywordMatchScorer((s1, s2) -> (double) (s1.length() * s1.length()))
+        QuickSearch<String> alternativeConfig = QuickSearch.builder()
+                .withKeywordMatchScorer((s1, s2) -> (double) (s1.length() * s1.length()))
                 .build();
 
         String exerciseString = "aquickbrownfoxjumpsoverthelazydog";
@@ -678,8 +678,8 @@ public class QuickSearchTest {
 
     @Test
     public void intersectionWorks() throws Exception {
-        searchInstance = QuickSearch.<String>builder()
-                .accumulationPolicy(INTERSECTION)
+        searchInstance = QuickSearch.builder()
+                .withAccumulationPolicy(INTERSECTION)
                 .build();
 
         addItem("test1", "one two");
@@ -699,8 +699,8 @@ public class QuickSearchTest {
 
     @Test
     public void intersectionWorks1() throws Exception {
-        searchInstance = QuickSearch.<String>builder()
-                .accumulationPolicy(INTERSECTION)
+        searchInstance = QuickSearch.builder()
+                .withAccumulationPolicy(INTERSECTION)
                 .build();
 
         addItem("test1", "one two");
@@ -714,8 +714,8 @@ public class QuickSearchTest {
 
     @Test
     public void intersectionWorks2() throws Exception {
-        searchInstance = QuickSearch.<String>builder()
-                .accumulationPolicy(INTERSECTION)
+        searchInstance = QuickSearch.builder()
+                .withAccumulationPolicy(INTERSECTION)
                 .build();
 
         addItem("test1", "one two");
@@ -727,8 +727,8 @@ public class QuickSearchTest {
 
     @Test
     public void intersectionWorks3() throws Exception {
-        searchInstance = QuickSearch.<String>builder()
-                .accumulationPolicy(INTERSECTION)
+        searchInstance = QuickSearch.builder()
+                .withAccumulationPolicy(INTERSECTION)
                 .build();
 
         addItem("test1", "one two");
@@ -740,8 +740,8 @@ public class QuickSearchTest {
 
     @Test
     public void intersectionWorks4() throws Exception {
-        searchInstance = QuickSearch.<String>builder()
-                .accumulationPolicy(INTERSECTION)
+        searchInstance = QuickSearch.builder()
+                .withAccumulationPolicy(INTERSECTION)
                 .build();
 
         addItem("test1", "one two");
@@ -780,9 +780,9 @@ public class QuickSearchTest {
 
     @Test
     public void exactMatching() throws Exception {
-        searchInstance = QuickSearch.<String>builder()
-                .accumulationPolicy(UNION)
-                .unmatchedPolicy(EXACT)
+        searchInstance = QuickSearch.builder()
+                .withAccumulationPolicy(UNION)
+                .withUnmatchedPolicy(EXACT)
                 .build();
 
         addItem("keyword", "keyword");
