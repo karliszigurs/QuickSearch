@@ -279,7 +279,7 @@ public class QuickSearchBenchmarksTest {
             try {
                 benchmarkReadsMTThread(searchInstance, iterationsPerThread, label);
             } catch (InterruptedException e) {
-                return;
+                /* No operation */
             }
         }, 120);
 
@@ -295,9 +295,9 @@ public class QuickSearchBenchmarksTest {
         return aggregateThroughput;
     }
 
-    private double benchmarkReadsMTThread(final QuickSearch<String> searchInstance,
-                                          final int iterations,
-                                          final String label) throws InterruptedException {
+    private void benchmarkReadsMTThread(final QuickSearch<String> searchInstance,
+                                        final int iterations,
+                                        final String label) throws InterruptedException {
         final long startTime = System.currentTimeMillis();
 
         for (int i = 0; i < iterations; i++) {
@@ -317,8 +317,6 @@ public class QuickSearchBenchmarksTest {
                         throughput
                 )
         );
-
-        return throughput;
     }
 
     @Test
@@ -431,9 +429,7 @@ public class QuickSearchBenchmarksTest {
 
         /* try to kill wandering threads */
         if (latch.getCount() > 0) {
-            for (Thread thread : threads) {
-                thread.interrupt();
-            }
+            threads.forEach(Thread::interrupt);
             throw new InterruptedException("Threads did not finish properly");
         }
 

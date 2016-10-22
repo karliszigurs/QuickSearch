@@ -68,7 +68,7 @@ public class ImmutableSetTest {
 
     @Test
     public void addAndCreate2() throws Exception {
-        Collection<String> single = Arrays.asList("cat");
+        Collection<String> single = Collections.singleton("cat");
         Set<String> set = ImmutableSet.addAndCreate(single, "dog");
         assertFalse(set.isEmpty());
         assertEquals(2, set.size());
@@ -107,7 +107,7 @@ public class ImmutableSetTest {
 
     @Test
     public void removeAndCreate3() throws Exception {
-        Collection<String> single = Arrays.asList("cat");
+        Collection<String> single = Collections.singleton("cat");
         Set<String> set = ImmutableSet.removeAndCreate(single, "dog");
         assertFalse(set.isEmpty());
         assertEquals(1, set.size());

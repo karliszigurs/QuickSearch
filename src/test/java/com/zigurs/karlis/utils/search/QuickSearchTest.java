@@ -15,6 +15,7 @@
  */
 package com.zigurs.karlis.utils.search;
 
+import com.zigurs.karlis.utils.search.model.Item;
 import com.zigurs.karlis.utils.search.model.Result;
 import com.zigurs.karlis.utils.search.model.Stats;
 import org.junit.After;
@@ -415,8 +416,10 @@ public class QuickSearchTest {
     @Test
     public void augumentedItemFound() throws Exception {
         addItem("test", "one two three");
-        assertTrue(searchInstance.findItemWithDetail("one").isPresent());
-        assertEquals("test", searchInstance.findItemWithDetail("one").get().getResult());
+
+        Optional<Item<String>> result = searchInstance.findItemWithDetail("one");
+        assertTrue(result.isPresent());
+        assertEquals("test", result.get().getResult());
     }
 
     @Test
