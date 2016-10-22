@@ -33,7 +33,7 @@ import static org.junit.Assert.assertTrue;
 
 public class QuickSearchBenchmarksTest {
 
-    private static final boolean RUN_FULL_BENCHMARKS = true;
+    private static final boolean RUN_FULL_BENCHMARKS = false;
 
     private static final String[][] USA_STATES = QuickSearchTest.USA_STATES;
 
@@ -203,6 +203,28 @@ public class QuickSearchBenchmarksTest {
         assertTrue(benchmarkReadsMT(searchInstance, "Warm-2:", 2) > 10.0);
         assertTrue(benchmarkReadsMT(searchInstance, "Warm-4:", 4) > 10.0);
         assertTrue(benchmarkReadsMT(searchInstance, "Warm-8:", 8) > 10.0);
+
+        if (!RUN_FULL_BENCHMARKS) {
+            assertTrue(benchmarkReadsMT(searchInstance, "War-16:", 16) > 10.0);
+            assertTrue(benchmarkReadsMT(searchInstance, "Wa-128:", 128) > 10.0);
+            assertTrue(benchmarkReadsMT(searchInstance, "Wa-128:", 512) > 10.0);
+        }
+    }
+
+    @Test
+    public void exerciseScheduler() throws Exception {
+        /*
+         * Tests the scheduler and caches more than anything else... Still, fun one.
+         */
+        QuickSearch<String> searchInstance = QuickSearch.<String>builder().build();
+
+        for (String[] items : USA_STATES) {
+            searchInstance.addItem(items[0], String.format("%s %s %s", items[1], items[2], items[3]));
+        }
+
+        assertTrue(benchmarkReadsMT(searchInstance, "War-16:", 16) > 10.0);
+        assertTrue(benchmarkReadsMT(searchInstance, "Wa-128:", 128) > 10.0);
+        assertTrue(benchmarkReadsMT(searchInstance, "Wa-512:", 512) > 10.0);
     }
 
     private double benchmarkReadsMT(final QuickSearch<String> searchInstance,
@@ -216,9 +238,9 @@ public class QuickSearchBenchmarksTest {
             } catch (InterruptedException e) {
                 return;
             }
-        }, 60);
+        }, 120);
 
-        double aggregateThroughput = ((iterationsPerThread / totalTime) * threads);
+        double aggregateThroughput = (((double) iterationsPerThread / totalTime) * threads);
 
         //TODO format
         System.out.println(String.format(
@@ -269,7 +291,6 @@ public class QuickSearchBenchmarksTest {
 //        final long CUSTOM_TREE_TARGET = 54_255_008; // 100k items, no cache
         final long CUSTOM_TREE_TARGET_INTERN = 19_448_040; // 100k items, no cache + keyword intern.
         final long CUSTOM_SMALL_TREE_TARGET_INTERN = 563_848; // itemsCount = 1000;
-
 
         final long measured = measureMemoryUseImpl(false, 0);
         assertTrue("Instance size exceeds target", measured < ((RUN_FULL_BENCHMARKS ? CUSTOM_TREE_TARGET_INTERN : CUSTOM_SMALL_TREE_TARGET_INTERN) * 1.1));
