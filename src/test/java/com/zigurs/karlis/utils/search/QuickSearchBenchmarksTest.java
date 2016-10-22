@@ -17,6 +17,7 @@ package com.zigurs.karlis.utils.search;
 
 import org.github.jamm.MemoryMeter;
 import org.jetbrains.annotations.NotNull;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestWatcher;
@@ -30,9 +31,10 @@ import java.util.concurrent.TimeUnit;
 
 import static org.junit.Assert.*;
 
+@Ignore
 public class QuickSearchBenchmarksTest {
 
-    private static final boolean RUN_FULL_BENCHMARKS = true;
+    private static final boolean RUN_FULL_BENCHMARKS = false;
 
     private static final String[][] USA_STATES = QuickSearchTest.USA_STATES;
 
