@@ -18,10 +18,7 @@ package com.zigurs.karlis.utils.search.cache;
 import com.zigurs.karlis.utils.search.GraphNode;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Stack;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.StampedLock;
 import java.util.function.Function;
@@ -63,7 +60,7 @@ public class SimpleNodeCache<T> implements Cache<T> {
     private long uncacheable = 0;
     private long evictions = 0;
 
-    public SimpleNodeCache(int cacheLimitInBytes) {
+    public SimpleNodeCache(final int cacheLimitInBytes) {
         /*
          * Average of 60 bytes per entry as empirically measured, may
          * differ slightly in ether direction depending on the exact dataset.
@@ -74,8 +71,9 @@ public class SimpleNodeCache<T> implements Cache<T> {
         MAX_ALLOWED_ENTRIES = cacheLimitInBytes / 60;
     }
 
-    public Map<T, Double> getFromCacheOrSupplier(@NotNull GraphNode<T> node,
-                                                 @NotNull Function<GraphNode<T>, Map<T, Double>> supplier) {
+    @Override
+    public Map<T, Double> getFromCacheOrSupplier(@NotNull final GraphNode<T> node,
+                                                 @NotNull final Function<GraphNode<T>, Map<T, Double>> supplier) {
         // this isn't quite proper thread safe yet...
         if (!cacheDisabled && isCacheable(node.getFragment())) {
             Map<T, Double> cached;
@@ -127,7 +125,7 @@ public class SimpleNodeCache<T> implements Cache<T> {
              * We just want to check things at the end of the queue,
              * so that least accessed items could be trimmed.
              */
-            Stack<Map.Entry<String, Map<T, Double>>> stack = new Stack<>();
+            Deque<Map.Entry<String, Map<T, Double>>> stack = new ArrayDeque<>(cache.size());
             cache.entrySet().forEach(stack::push);
 
             while (currentEntries.get() > MAX_ALLOWED_ENTRIES) {
@@ -138,7 +136,7 @@ public class SimpleNodeCache<T> implements Cache<T> {
             }
 
             /*
-             * And clear the cache of all elements that are
+             * Also clear the cache of all elements that are
              * now under the threshold of cacheable.
              */
             while (trimmedAllowedSize && !stack.isEmpty()) {
@@ -152,7 +150,7 @@ public class SimpleNodeCache<T> implements Cache<T> {
         }
     }
 
-    private boolean isCacheable(String key) {
+    private boolean isCacheable(@NotNull final String key) {
         return key.length() <= keyLengthLimit;
     }
 
