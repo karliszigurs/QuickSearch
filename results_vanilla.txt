@@ -1,0 +1,1000 @@
+[INFO] Scanning for projects...
+[INFO] Inspecting build with total of 1 modules...
+[INFO] Installing Nexus Staging features:
+[INFO]   ... total of 1 executions of maven-deploy-plugin replaced with nexus-staging-maven-plugin
+[INFO]                                                                         
+[INFO] ------------------------------------------------------------------------
+[INFO] Building com.zigurs.karlis.utils.search:quicksearch 1.6-SNAPSHOT
+[INFO] ------------------------------------------------------------------------
+[INFO] 
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ quicksearch ---
+[INFO] Deleting /home/karliszigurs/my/QuickSearch/target
+[INFO] 
+[INFO] --- jacoco-maven-plugin:0.7.7.201606060606:prepare-agent (default-prepare-agent) @ quicksearch ---
+[INFO] argLine set to -javaagent:/home/karliszigurs/.m2/repository/org/jacoco/org.jacoco.agent/0.7.7.201606060606/org.jacoco.agent-0.7.7.201606060606-runtime.jar=destfile=/home/karliszigurs/my/QuickSearch/target/jacoco.exec
+[INFO] 
+[INFO] --- maven-resources-plugin:2.3:resources (default-resources) @ quicksearch ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /home/karliszigurs/my/QuickSearch/src/main/resources
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.5.1:compile (default-compile) @ quicksearch ---
+[INFO] Changes detected - recompiling the module!
+[INFO] Compiling 10 source files to /home/karliszigurs/my/QuickSearch/target/classes
+[INFO] 
+[INFO] --- maven-resources-plugin:2.3:testResources (default-testResources) @ quicksearch ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory /home/karliszigurs/my/QuickSearch/src/test/resources
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.5.1:testCompile (default-testCompile) @ quicksearch ---
+[INFO] Changes detected - recompiling the module!
+[INFO] Compiling 4 source files to /home/karliszigurs/my/QuickSearch/target/test-classes
+[INFO] 
+[INFO] --- maven-surefire-plugin:2.10:test (default-test) @ quicksearch ---
+[INFO] Surefire report directory: /home/karliszigurs/my/QuickSearch/target/surefire-reports
+
+-------------------------------------------------------
+ T E S T S
+-------------------------------------------------------
+Running com.zigurs.karlis.utils.search.PartialSorterTest
+Warmup:  440us PartialSorter;	2,973us Collections::sort;	2,696us Stream::sorted;	2,701us ParallelStream::sorted;
+Warmer:  124us PartialSorter;	2,001us Collections::sort;	1,866us Stream::sorted;	1,273us ParallelStream::sorted;
+Warm:    124us PartialSorter;	2,024us Collections::sort;	1,938us Stream::sorted;	1,245us ParallelStream::sorted;
+Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.28 sec
+Running com.zigurs.karlis.utils.search.QuickSearchTest
+Tests run: 76, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.272 sec
+Running com.zigurs.karlis.utils.search.QuickSearchBenchmarksTest
+Starting benchmarkWithoutCacheUnion (QuickSearchBenchmarksTest)
+Run 1
+Warmup:	2.46k ops / sec
+Simple:	315.46k ops / sec
+Medium:	81.70k ops / sec
+Brutal:	0.84k ops / sec
+Run 2
+Warmup:	2.45k ops / sec
+Simple:	390.63k ops / sec
+Medium:	81.50k ops / sec
+Brutal:	0.83k ops / sec
+Run 3
+Warmup:	2.46k ops / sec
+Simple:	395.26k ops / sec
+Medium:	82.58k ops / sec
+Brutal:	0.84k ops / sec
+Run 4
+Warmup:	2.45k ops / sec
+Simple:	413.22k ops / sec
+Medium:	84.18k ops / sec
+Brutal:	0.82k ops / sec
+Run 5
+Warmup:	2.46k ops / sec
+Simple:	396.83k ops / sec
+Medium:	81.30k ops / sec
+Brutal:	0.82k ops / sec
+Finished benchmarkWithoutCacheUnion (QuickSearchBenchmarksTest)
+Starting exerciseScheduler (QuickSearchBenchmarksTest)
+War-16:		Thread took 12962ms, 48.22k ops / sec
+War-16:		Thread took 12936ms, 48.31k ops / sec
+War-16:		Thread took 13047ms, 47.90k ops / sec
+War-16:		Thread took 13060ms, 47.86k ops / sec
+War-16:		Thread took 13185ms, 47.40k ops / sec
+War-16:		Thread took 13107ms, 47.68k ops / sec
+War-16:		Thread took 13222ms, 47.27k ops / sec
+War-16:		Thread took 13342ms, 46.84k ops / sec
+War-16:		Thread took 13396ms, 46.66k ops / sec
+War-16:		Thread took 13422ms, 46.57k ops / sec
+War-16:		Thread took 13443ms, 46.49k ops / sec
+War-16:		Thread took 13516ms, 46.24k ops / sec
+War-16:		Thread took 13555ms, 46.11k ops / sec
+War-16:		Thread took 13448ms, 46.48k ops / sec
+War-16:		Thread took 13585ms, 46.01k ops / sec
+War-16:		Thread took 13577ms, 46.03k ops / sec
+War-16:	Aggregate throughput (16 threads): 734.92k ops / sec
+Wa-128:		Thread took 6465ms, 12.08k ops / sec
+Wa-128:		Thread took 7363ms, 10.61k ops / sec
+Wa-128:		Thread took 7475ms, 10.45k ops / sec
+Wa-128:		Thread took 7635ms, 10.23k ops / sec
+Wa-128:		Thread took 8443ms, 9.25k ops / sec
+Wa-128:		Thread took 8221ms, 9.50k ops / sec
+Wa-128:		Thread took 8635ms, 9.05k ops / sec
+Wa-128:		Thread took 8429ms, 9.27k ops / sec
+Wa-128:		Thread took 8783ms, 8.90k ops / sec
+Wa-128:		Thread took 8560ms, 9.13k ops / sec
+Wa-128:		Thread took 9424ms, 8.29k ops / sec
+Wa-128:		Thread took 9085ms, 8.60k ops / sec
+Wa-128:		Thread took 7680ms, 10.17k ops / sec
+Wa-128:		Thread took 9473ms, 8.25k ops / sec
+Wa-128:		Thread took 9063ms, 8.62k ops / sec
+Wa-128:		Thread took 10530ms, 7.42k ops / sec
+Wa-128:		Thread took 9758ms, 8.01k ops / sec
+Wa-128:		Thread took 9704ms, 8.05k ops / sec
+Wa-128:		Thread took 10452ms, 7.47k ops / sec
+Wa-128:		Thread took 10485ms, 7.45k ops / sec
+Wa-128:		Thread took 9870ms, 7.92k ops / sec
+Wa-128:		Thread took 8897ms, 8.78k ops / sec
+Wa-128:		Thread took 10786ms, 7.24k ops / sec
+Wa-128:		Thread took 10759ms, 7.26k ops / sec
+Wa-128:		Thread took 8829ms, 8.85k ops / sec
+Wa-128:		Thread took 10227ms, 7.64k ops / sec
+Wa-128:		Thread took 10921ms, 7.15k ops / sec
+Wa-128:		Thread took 10998ms, 7.10k ops / sec
+Wa-128:		Thread took 10489ms, 7.45k ops / sec
+Wa-128:		Thread took 9296ms, 8.40k ops / sec
+Wa-128:		Thread took 10553ms, 7.40k ops / sec
+Wa-128:		Thread took 10685ms, 7.31k ops / sec
+Wa-128:		Thread took 11019ms, 7.09k ops / sec
+Wa-128:		Thread took 9419ms, 8.29k ops / sec
+Wa-128:		Thread took 10669ms, 7.32k ops / sec
+Wa-128:		Thread took 10318ms, 7.57k ops / sec
+Wa-128:		Thread took 10637ms, 7.34k ops / sec
+Wa-128:		Thread took 11247ms, 6.95k ops / sec
+Wa-128:		Thread took 11240ms, 6.95k ops / sec
+Wa-128:		Thread took 10788ms, 7.24k ops / sec
+Wa-128:		Thread took 11303ms, 6.91k ops / sec
+Wa-128:		Thread took 11253ms, 6.94k ops / sec
+Wa-128:		Thread took 10754ms, 7.26k ops / sec
+Wa-128:		Thread took 10838ms, 7.21k ops / sec
+Wa-128:		Thread took 11433ms, 6.83k ops / sec
+Wa-128:		Thread took 11578ms, 6.75k ops / sec
+Wa-128:		Thread took 11591ms, 6.74k ops / sec
+Wa-128:		Thread took 9721ms, 8.04k ops / sec
+Wa-128:		Thread took 11551ms, 6.76k ops / sec
+Wa-128:		Thread took 11350ms, 6.88k ops / sec
+Wa-128:		Thread took 11723ms, 6.66k ops / sec
+Wa-128:		Thread took 11728ms, 6.66k ops / sec
+Wa-128:		Thread took 11651ms, 6.71k ops / sec
+Wa-128:		Thread took 11775ms, 6.63k ops / sec
+Wa-128:		Thread took 11480ms, 6.81k ops / sec
+Wa-128:		Thread took 11593ms, 6.74k ops / sec
+Wa-128:		Thread took 11514ms, 6.79k ops / sec
+Wa-128:		Thread took 11265ms, 6.94k ops / sec
+Wa-128:		Thread took 10788ms, 7.24k ops / sec
+Wa-128:		Thread took 11926ms, 6.55k ops / sec
+Wa-128:		Thread took 11938ms, 6.54k ops / sec
+Wa-128:		Thread took 11587ms, 6.74k ops / sec
+Wa-128:		Thread took 11333ms, 6.89k ops / sec
+Wa-128:		Thread took 11683ms, 6.69k ops / sec
+Wa-128:		Thread took 10956ms, 7.13k ops / sec
+Wa-128:		Thread took 11452ms, 6.82k ops / sec
+Wa-128:		Thread took 10307ms, 7.58k ops / sec
+Wa-128:		Thread took 10931ms, 7.15k ops / sec
+Wa-128:		Thread took 10908ms, 7.16k ops / sec
+Wa-128:		Thread took 12374ms, 6.31k ops / sec
+Wa-128:		Thread took 12085ms, 6.46k ops / sec
+Wa-128:		Thread took 12349ms, 6.33k ops / sec
+Wa-128:		Thread took 11671ms, 6.69k ops / sec
+Wa-128:		Thread took 11674ms, 6.69k ops / sec
+Wa-128:		Thread took 11644ms, 6.71k ops / sec
+Wa-128:		Thread took 12287ms, 6.36k ops / sec
+Wa-128:		Thread took 11621ms, 6.72k ops / sec
+Wa-128:		Thread took 11642ms, 6.71k ops / sec
+Wa-128:		Thread took 11930ms, 6.55k ops / sec
+Wa-128:		Thread took 12323ms, 6.34k ops / sec
+Wa-128:		Thread took 11440ms, 6.83k ops / sec
+Wa-128:		Thread took 11512ms, 6.79k ops / sec
+Wa-128:		Thread took 12223ms, 6.39k ops / sec
+Wa-128:		Thread took 11926ms, 6.55k ops / sec
+Wa-128:		Thread took 12355ms, 6.32k ops / sec
+Wa-128:		Thread took 12400ms, 6.30k ops / sec
+Wa-128:		Thread took 10442ms, 7.48k ops / sec
+Wa-128:		Thread took 12273ms, 6.37k ops / sec
+Wa-128:		Thread took 12164ms, 6.42k ops / sec
+Wa-128:		Thread took 11515ms, 6.78k ops / sec
+Wa-128:		Thread took 10756ms, 7.26k ops / sec
+Wa-128:		Thread took 10866ms, 7.19k ops / sec
+Wa-128:		Thread took 12077ms, 6.47k ops / sec
+Wa-128:		Thread took 12165ms, 6.42k ops / sec
+Wa-128:		Thread took 12359ms, 6.32k ops / sec
+Wa-128:		Thread took 12050ms, 6.48k ops / sec
+Wa-128:		Thread took 11701ms, 6.68k ops / sec
+Wa-128:		Thread took 10788ms, 7.24k ops / sec
+Wa-128:		Thread took 12130ms, 6.44k ops / sec
+Wa-128:		Thread took 11372ms, 6.87k ops / sec
+Wa-128:		Thread took 11872ms, 6.58k ops / sec
+Wa-128:		Thread took 12615ms, 6.19k ops / sec
+Wa-128:		Thread took 12330ms, 6.34k ops / sec
+Wa-128:		Thread took 12599ms, 6.20k ops / sec
+Wa-128:		Thread took 11425ms, 6.84k ops / sec
+Wa-128:		Thread took 11608ms, 6.73k ops / sec
+Wa-128:		Thread took 12291ms, 6.36k ops / sec
+Wa-128:		Thread took 12002ms, 6.51k ops / sec
+Wa-128:		Thread took 11902ms, 6.56k ops / sec
+Wa-128:		Thread took 12340ms, 6.33k ops / sec
+Wa-128:		Thread took 12700ms, 6.15k ops / sec
+Wa-128:		Thread took 11016ms, 7.09k ops / sec
+Wa-128:		Thread took 12529ms, 6.24k ops / sec
+Wa-128:		Thread took 12021ms, 6.50k ops / sec
+Wa-128:		Thread took 12576ms, 6.21k ops / sec
+Wa-128:		Thread took 12054ms, 6.48k ops / sec
+Wa-128:		Thread took 11596ms, 6.74k ops / sec
+Wa-128:		Thread took 12064ms, 6.48k ops / sec
+Wa-128:		Thread took 12199ms, 6.40k ops / sec
+Wa-128:		Thread took 12747ms, 6.13k ops / sec
+Wa-128:		Thread took 12697ms, 6.15k ops / sec
+Wa-128:		Thread took 10875ms, 7.18k ops / sec
+Wa-128:		Thread took 12124ms, 6.44k ops / sec
+Wa-128:		Thread took 12313ms, 6.34k ops / sec
+Wa-128:		Thread took 11320ms, 6.90k ops / sec
+Wa-128:		Thread took 11183ms, 6.99k ops / sec
+Wa-128:		Thread took 12429ms, 6.29k ops / sec
+Wa-128:		Thread took 12171ms, 6.42k ops / sec
+Wa-128:	Aggregate throughput (128 threads): 770.65k ops / sec
+Wa-512:		Thread took 164ms, 119.09k ops / sec
+Wa-512:		Thread took 187ms, 104.44k ops / sec
+Wa-512:		Thread took 284ms, 68.77k ops / sec
+Wa-512:		Thread took 185ms, 105.57k ops / sec
+Wa-512:		Thread took 408ms, 47.87k ops / sec
+Wa-512:		Thread took 348ms, 56.12k ops / sec
+Wa-512:		Thread took 443ms, 44.09k ops / sec
+Wa-512:		Thread took 464ms, 42.09k ops / sec
+Wa-512:		Thread took 334ms, 58.48k ops / sec
+Wa-512:		Thread took 518ms, 37.70k ops / sec
+Wa-512:		Thread took 622ms, 31.40k ops / sec
+Wa-512:		Thread took 609ms, 32.07k ops / sec
+Wa-512:		Thread took 642ms, 30.42k ops / sec
+Wa-512:		Thread took 736ms, 26.54k ops / sec
+Wa-512:		Thread took 688ms, 28.39k ops / sec
+Wa-512:		Thread took 714ms, 27.35k ops / sec
+Wa-512:		Thread took 788ms, 24.79k ops / sec
+Wa-512:		Thread took 708ms, 27.59k ops / sec
+Wa-512:		Thread took 711ms, 27.47k ops / sec
+Wa-512:		Thread took 664ms, 29.41k ops / sec
+Wa-512:		Thread took 840ms, 23.25k ops / sec
+Wa-512:		Thread took 825ms, 23.67k ops / sec
+Wa-512:		Thread took 678ms, 28.81k ops / sec
+Wa-512:		Thread took 600ms, 32.55k ops / sec
+Wa-512:		Thread took 663ms, 29.46k ops / sec
+Wa-512:		Thread took 795ms, 24.57k ops / sec
+Wa-512:		Thread took 784ms, 24.91k ops / sec
+Wa-512:		Thread took 797ms, 24.51k ops / sec
+Wa-512:		Thread took 825ms, 23.67k ops / sec
+Wa-512:		Thread took 899ms, 21.73k ops / sec
+Wa-512:		Thread took 664ms, 29.41k ops / sec
+Wa-512:		Thread took 893ms, 21.87k ops / sec
+Wa-512:		Thread took 694ms, 28.14k ops / sec
+Wa-512:		Thread took 617ms, 31.65k ops / sec
+Wa-512:		Thread took 867ms, 22.53k ops / sec
+Wa-512:		Thread took 754ms, 25.90k ops / sec
+Wa-512:		Thread took 865ms, 22.58k ops / sec
+Wa-512:		Thread took 1064ms, 18.36k ops / sec
+Wa-512:		Thread took 916ms, 21.32k ops / sec
+Wa-512:		Thread took 781ms, 25.01k ops / sec
+Wa-512:		Thread took 500ms, 39.06k ops / sec
+Wa-512:		Thread took 980ms, 19.93k ops / sec
+Wa-512:		Thread took 627ms, 31.15k ops / sec
+Wa-512:		Thread took 1034ms, 18.89k ops / sec
+Wa-512:		Thread took 459ms, 42.55k ops / sec
+Wa-512:		Thread took 749ms, 26.08k ops / sec
+Wa-512:		Thread took 1005ms, 19.43k ops / sec
+Wa-512:		Thread took 1204ms, 16.22k ops / sec
+Wa-512:		Thread took 1089ms, 17.93k ops / sec
+Wa-512:		Thread took 1055ms, 18.51k ops / sec
+Wa-512:		Thread took 798ms, 24.47k ops / sec
+Wa-512:		Thread took 795ms, 24.57k ops / sec
+Wa-512:		Thread took 938ms, 20.82k ops / sec
+Wa-512:		Thread took 1211ms, 16.13k ops / sec
+Wa-512:		Thread took 1078ms, 18.12k ops / sec
+Wa-512:		Thread took 857ms, 22.79k ops / sec
+Wa-512:		Thread took 977ms, 19.99k ops / sec
+Wa-512:		Thread took 765ms, 25.53k ops / sec
+Wa-512:		Thread took 1183ms, 16.51k ops / sec
+Wa-512:		Thread took 473ms, 41.29k ops / sec
+Wa-512:		Thread took 1005ms, 19.43k ops / sec
+Wa-512:		Thread took 1200ms, 16.28k ops / sec
+Wa-512:		Thread took 777ms, 25.14k ops / sec
+Wa-512:		Thread took 773ms, 25.27k ops / sec
+Wa-512:		Thread took 1256ms, 15.55k ops / sec
+Wa-512:		Thread took 969ms, 20.16k ops / sec
+Wa-512:		Thread took 871ms, 22.42k ops / sec
+Wa-512:		Thread took 1405ms, 13.90k ops / sec
+Wa-512:		Thread took 771ms, 25.33k ops / sec
+Wa-512:		Thread took 1054ms, 18.53k ops / sec
+Wa-512:		Thread took 1269ms, 15.39k ops / sec
+Wa-512:		Thread took 816ms, 23.94k ops / sec
+Wa-512:		Thread took 1221ms, 16.00k ops / sec
+Wa-512:		Thread took 1138ms, 17.16k ops / sec
+Wa-512:		Thread took 1248ms, 15.65k ops / sec
+Wa-512:		Thread took 948ms, 20.60k ops / sec
+Wa-512:		Thread took 1317ms, 14.83k ops / sec
+Wa-512:		Thread took 1022ms, 19.11k ops / sec
+Wa-512:		Thread took 1044ms, 18.71k ops / sec
+Wa-512:		Thread took 864ms, 22.61k ops / sec
+Wa-512:		Thread took 1080ms, 18.08k ops / sec
+Wa-512:		Thread took 1515ms, 12.89k ops / sec
+Wa-512:		Thread took 1264ms, 15.45k ops / sec
+Wa-512:		Thread took 924ms, 21.14k ops / sec
+Wa-512:		Thread took 498ms, 39.22k ops / sec
+Wa-512:		Thread took 1282ms, 15.23k ops / sec
+Wa-512:		Thread took 645ms, 30.28k ops / sec
+Wa-512:		Thread took 1592ms, 12.27k ops / sec
+Wa-512:		Thread took 812ms, 24.05k ops / sec
+Wa-512:		Thread took 1228ms, 15.90k ops / sec
+Wa-512:		Thread took 1554ms, 12.57k ops / sec
+Wa-512:		Thread took 660ms, 29.59k ops / sec
+Wa-512:		Thread took 1477ms, 13.22k ops / sec
+Wa-512:		Thread took 656ms, 29.77k ops / sec
+Wa-512:		Thread took 1834ms, 10.65k ops / sec
+Wa-512:		Thread took 1169ms, 16.71k ops / sec
+Wa-512:		Thread took 1780ms, 10.97k ops / sec
+Wa-512:		Thread took 1211ms, 16.13k ops / sec
+Wa-512:		Thread took 1161ms, 16.82k ops / sec
+Wa-512:		Thread took 978ms, 19.97k ops / sec
+Wa-512:		Thread took 1465ms, 13.33k ops / sec
+Wa-512:		Thread took 743ms, 26.29k ops / sec
+Wa-512:		Thread took 1564ms, 12.49k ops / sec
+Wa-512:		Thread took 1501ms, 13.01k ops / sec
+Wa-512:		Thread took 1240ms, 15.75k ops / sec
+Wa-512:		Thread took 1512ms, 12.92k ops / sec
+Wa-512:		Thread took 926ms, 21.09k ops / sec
+Wa-512:		Thread took 1411ms, 13.84k ops / sec
+Wa-512:		Thread took 886ms, 22.04k ops / sec
+Wa-512:		Thread took 1395ms, 14.00k ops / sec
+Wa-512:		Thread took 1454ms, 13.43k ops / sec
+Wa-512:		Thread took 626ms, 31.20k ops / sec
+Wa-512:		Thread took 1246ms, 15.67k ops / sec
+Wa-512:		Thread took 1542ms, 12.67k ops / sec
+Wa-512:		Thread took 1400ms, 13.95k ops / sec
+Wa-512:		Thread took 1112ms, 17.56k ops / sec
+Wa-512:		Thread took 899ms, 21.73k ops / sec
+Wa-512:		Thread took 1179ms, 16.57k ops / sec
+Wa-512:		Thread took 692ms, 28.22k ops / sec
+Wa-512:		Thread took 954ms, 20.47k ops / sec
+Wa-512:		Thread took 1837ms, 10.63k ops / sec
+Wa-512:		Thread took 1616ms, 12.09k ops / sec
+Wa-512:		Thread took 1266ms, 15.43k ops / sec
+Wa-512:		Thread took 1157ms, 16.88k ops / sec
+Wa-512:		Thread took 1166ms, 16.75k ops / sec
+Wa-512:		Thread took 1427ms, 13.69k ops / sec
+Wa-512:		Thread took 1242ms, 15.73k ops / sec
+Wa-512:		Thread took 1288ms, 15.16k ops / sec
+Wa-512:		Thread took 1004ms, 19.45k ops / sec
+Wa-512:		Thread took 1325ms, 14.74k ops / sec
+Wa-512:		Thread took 996ms, 19.61k ops / sec
+Wa-512:		Thread took 1646ms, 11.87k ops / sec
+Wa-512:		Thread took 509ms, 38.37k ops / sec
+Wa-512:		Thread took 1177ms, 16.59k ops / sec
+Wa-512:		Thread took 1076ms, 18.15k ops / sec
+Wa-512:		Thread took 992ms, 19.69k ops / sec
+Wa-512:		Thread took 387ms, 50.47k ops / sec
+Wa-512:		Thread took 860ms, 22.71k ops / sec
+Wa-512:		Thread took 1081ms, 18.07k ops / sec
+Wa-512:		Thread took 654ms, 29.86k ops / sec
+Wa-512:		Thread took 1374ms, 14.21k ops / sec
+Wa-512:		Thread took 658ms, 29.68k ops / sec
+Wa-512:		Thread took 1189ms, 16.43k ops / sec
+Wa-512:		Thread took 1241ms, 15.74k ops / sec
+Wa-512:		Thread took 908ms, 21.51k ops / sec
+Wa-512:		Thread took 369ms, 52.93k ops / sec
+Wa-512:		Thread took 872ms, 22.40k ops / sec
+Wa-512:		Thread took 881ms, 22.17k ops / sec
+Wa-512:		Thread took 1376ms, 14.19k ops / sec
+Wa-512:		Thread took 1383ms, 14.12k ops / sec
+Wa-512:		Thread took 486ms, 40.19k ops / sec
+Wa-512:		Thread took 1212ms, 16.11k ops / sec
+Wa-512:		Thread took 1143ms, 17.09k ops / sec
+Wa-512:		Thread took 997ms, 19.59k ops / sec
+Wa-512:		Thread took 1272ms, 15.35k ops / sec
+Wa-512:		Thread took 457ms, 42.74k ops / sec
+Wa-512:		Thread took 794ms, 24.60k ops / sec
+Wa-512:		Thread took 1106ms, 17.66k ops / sec
+Wa-512:		Thread took 789ms, 24.75k ops / sec
+Wa-512:		Thread took 883ms, 22.12k ops / sec
+Wa-512:		Thread took 888ms, 21.99k ops / sec
+Wa-512:		Thread took 1055ms, 18.51k ops / sec
+Wa-512:		Thread took 989ms, 19.75k ops / sec
+Wa-512:		Thread took 1067ms, 18.30k ops / sec
+Wa-512:		Thread took 663ms, 29.46k ops / sec
+Wa-512:		Thread took 1007ms, 19.40k ops / sec
+Wa-512:		Thread took 1314ms, 14.86k ops / sec
+Wa-512:		Thread took 728ms, 26.83k ops / sec
+Wa-512:		Thread took 688ms, 28.39k ops / sec
+Wa-512:		Thread took 1433ms, 13.63k ops / sec
+Wa-512:		Thread took 1134ms, 17.22k ops / sec
+Wa-512:		Thread took 1099ms, 17.77k ops / sec
+Wa-512:		Thread took 712ms, 27.43k ops / sec
+Wa-512:		Thread took 1319ms, 14.81k ops / sec
+Wa-512:		Thread took 970ms, 20.14k ops / sec
+Wa-512:		Thread took 1459ms, 13.39k ops / sec
+Wa-512:		Thread took 566ms, 34.51k ops / sec
+Wa-512:		Thread took 1128ms, 17.31k ops / sec
+Wa-512:		Thread took 1355ms, 14.41k ops / sec
+Wa-512:		Thread took 845ms, 23.11k ops / sec
+Wa-512:		Thread took 1146ms, 17.04k ops / sec
+Wa-512:		Thread took 933ms, 20.93k ops / sec
+Wa-512:		Thread took 1220ms, 16.01k ops / sec
+Wa-512:		Thread took 1163ms, 16.79k ops / sec
+Wa-512:		Thread took 1128ms, 17.31k ops / sec
+Wa-512:		Thread took 801ms, 24.38k ops / sec
+Wa-512:		Thread took 1165ms, 16.76k ops / sec
+Wa-512:		Thread took 1156ms, 16.90k ops / sec
+Wa-512:		Thread took 1131ms, 17.27k ops / sec
+Wa-512:		Thread took 1173ms, 16.65k ops / sec
+Wa-512:		Thread took 1382ms, 14.13k ops / sec
+Wa-512:		Thread took 844ms, 23.14k ops / sec
+Wa-512:		Thread took 727ms, 26.87k ops / sec
+Wa-512:		Thread took 1094ms, 17.85k ops / sec
+Wa-512:		Thread took 1043ms, 18.73k ops / sec
+Wa-512:		Thread took 1307ms, 14.94k ops / sec
+Wa-512:		Thread took 1463ms, 13.35k ops / sec
+Wa-512:		Thread took 590ms, 33.10k ops / sec
+Wa-512:		Thread took 982ms, 19.89k ops / sec
+Wa-512:		Thread took 1051ms, 18.58k ops / sec
+Wa-512:		Thread took 866ms, 22.55k ops / sec
+Wa-512:		Thread took 942ms, 20.73k ops / sec
+Wa-512:		Thread took 1310ms, 14.91k ops / sec
+Wa-512:		Thread took 1056ms, 18.50k ops / sec
+Wa-512:		Thread took 738ms, 26.46k ops / sec
+Wa-512:		Thread took 1248ms, 15.65k ops / sec
+Wa-512:		Thread took 862ms, 22.66k ops / sec
+Wa-512:		Thread took 1387ms, 14.08k ops / sec
+Wa-512:		Thread took 417ms, 46.84k ops / sec
+Wa-512:		Thread took 1072ms, 18.22k ops / sec
+Wa-512:		Thread took 927ms, 21.07k ops / sec
+Wa-512:		Thread took 1113ms, 17.55k ops / sec
+Wa-512:		Thread took 1326ms, 14.73k ops / sec
+Wa-512:		Thread took 1387ms, 14.08k ops / sec
+Wa-512:		Thread took 1338ms, 14.60k ops / sec
+Wa-512:		Thread took 1170ms, 16.69k ops / sec
+Wa-512:		Thread took 1370ms, 14.26k ops / sec
+Wa-512:		Thread took 1376ms, 14.19k ops / sec
+Wa-512:		Thread took 1249ms, 15.64k ops / sec
+Wa-512:		Thread took 921ms, 21.21k ops / sec
+Wa-512:		Thread took 1337ms, 14.61k ops / sec
+Wa-512:		Thread took 833ms, 23.45k ops / sec
+Wa-512:		Thread took 1051ms, 18.58k ops / sec
+Wa-512:		Thread took 733ms, 26.65k ops / sec
+Wa-512:		Thread took 756ms, 25.83k ops / sec
+Wa-512:		Thread took 873ms, 22.37k ops / sec
+Wa-512:		Thread took 608ms, 32.12k ops / sec
+Wa-512:		Thread took 653ms, 29.91k ops / sec
+Wa-512:		Thread took 1427ms, 13.69k ops / sec
+Wa-512:		Thread took 830ms, 23.53k ops / sec
+Wa-512:		Thread took 787ms, 24.82k ops / sec
+Wa-512:		Thread took 1108ms, 17.63k ops / sec
+Wa-512:		Thread took 813ms, 24.02k ops / sec
+Wa-512:		Thread took 894ms, 21.85k ops / sec
+Wa-512:		Thread took 849ms, 23.00k ops / sec
+Wa-512:		Thread took 880ms, 22.19k ops / sec
+Wa-512:		Thread took 553ms, 35.32k ops / sec
+Wa-512:		Thread took 812ms, 24.05k ops / sec
+Wa-512:		Thread took 685ms, 28.51k ops / sec
+Wa-512:		Thread took 433ms, 45.11k ops / sec
+Wa-512:		Thread took 871ms, 22.42k ops / sec
+Wa-512:		Thread took 844ms, 23.14k ops / sec
+Wa-512:		Thread took 692ms, 28.22k ops / sec
+Wa-512:		Thread took 506ms, 38.60k ops / sec
+Wa-512:		Thread took 695ms, 28.10k ops / sec
+Wa-512:		Thread took 479ms, 40.77k ops / sec
+Wa-512:		Thread took 581ms, 33.62k ops / sec
+Wa-512:		Thread took 909ms, 21.49k ops / sec
+Wa-512:		Thread took 490ms, 39.86k ops / sec
+Wa-512:		Thread took 482ms, 40.52k ops / sec
+Wa-512:		Thread took 565ms, 34.57k ops / sec
+Wa-512:		Thread took 699ms, 27.94k ops / sec
+Wa-512:		Thread took 493ms, 39.62k ops / sec
+Wa-512:		Thread took 425ms, 45.96k ops / sec
+Wa-512:		Thread took 474ms, 41.20k ops / sec
+Wa-512:		Thread took 495ms, 39.46k ops / sec
+Wa-512:		Thread took 538ms, 36.30k ops / sec
+Wa-512:		Thread took 272ms, 71.81k ops / sec
+Wa-512:		Thread took 718ms, 27.20k ops / sec
+Wa-512:		Thread took 694ms, 28.14k ops / sec
+Wa-512:		Thread took 519ms, 37.63k ops / sec
+Wa-512:		Thread took 588ms, 33.22k ops / sec
+Wa-512:		Thread took 658ms, 29.68k ops / sec
+Wa-512:		Thread took 524ms, 37.27k ops / sec
+Wa-512:		Thread took 778ms, 25.10k ops / sec
+Wa-512:		Thread took 853ms, 22.90k ops / sec
+Wa-512:		Thread took 840ms, 23.25k ops / sec
+Wa-512:		Thread took 871ms, 22.42k ops / sec
+Wa-512:		Thread took 780ms, 25.04k ops / sec
+Wa-512:		Thread took 380ms, 51.40k ops / sec
+Wa-512:		Thread took 845ms, 23.11k ops / sec
+Wa-512:		Thread took 1020ms, 19.15k ops / sec
+Wa-512:		Thread took 891ms, 21.92k ops / sec
+Wa-512:		Thread took 471ms, 41.47k ops / sec
+Wa-512:		Thread took 760ms, 25.70k ops / sec
+Wa-512:		Thread took 749ms, 26.08k ops / sec
+Wa-512:		Thread took 908ms, 21.51k ops / sec
+Wa-512:		Thread took 517ms, 37.78k ops / sec
+Wa-512:		Thread took 838ms, 23.31k ops / sec
+Wa-512:		Thread took 834ms, 23.42k ops / sec
+Wa-512:		Thread took 853ms, 22.90k ops / sec
+Wa-512:		Thread took 691ms, 28.26k ops / sec
+Wa-512:		Thread took 921ms, 21.21k ops / sec
+Wa-512:		Thread took 749ms, 26.08k ops / sec
+Wa-512:		Thread took 953ms, 20.49k ops / sec
+Wa-512:		Thread took 807ms, 24.20k ops / sec
+Wa-512:		Thread took 760ms, 25.70k ops / sec
+Wa-512:		Thread took 885ms, 22.07k ops / sec
+Wa-512:		Thread took 785ms, 24.88k ops / sec
+Wa-512:		Thread took 966ms, 20.22k ops / sec
+Wa-512:		Thread took 793ms, 24.63k ops / sec
+Wa-512:		Thread took 928ms, 21.05k ops / sec
+Wa-512:		Thread took 638ms, 30.61k ops / sec
+Wa-512:		Thread took 855ms, 22.84k ops / sec
+Wa-512:		Thread took 974ms, 20.05k ops / sec
+Wa-512:		Thread took 1013ms, 19.28k ops / sec
+Wa-512:		Thread took 1159ms, 16.85k ops / sec
+Wa-512:		Thread took 488ms, 40.02k ops / sec
+Wa-512:		Thread took 1164ms, 16.78k ops / sec
+Wa-512:		Thread took 818ms, 23.88k ops / sec
+Wa-512:		Thread took 525ms, 37.20k ops / sec
+Wa-512:		Thread took 835ms, 23.39k ops / sec
+Wa-512:		Thread took 964ms, 20.26k ops / sec
+Wa-512:		Thread took 982ms, 19.89k ops / sec
+Wa-512:		Thread took 520ms, 37.56k ops / sec
+Wa-512:		Thread took 1095ms, 17.84k ops / sec
+Wa-512:		Thread took 810ms, 24.11k ops / sec
+Wa-512:		Thread took 390ms, 50.08k ops / sec
+Wa-512:		Thread took 675ms, 28.93k ops / sec
+Wa-512:		Thread took 650ms, 30.05k ops / sec
+Wa-512:		Thread took 823ms, 23.73k ops / sec
+Wa-512:		Thread took 804ms, 24.29k ops / sec
+Wa-512:		Thread took 843ms, 23.17k ops / sec
+Wa-512:		Thread took 964ms, 20.26k ops / sec
+Wa-512:		Thread took 962ms, 20.30k ops / sec
+Wa-512:		Thread took 847ms, 23.06k ops / sec
+Wa-512:		Thread took 459ms, 42.55k ops / sec
+Wa-512:		Thread took 1068ms, 18.29k ops / sec
+Wa-512:		Thread took 1019ms, 19.17k ops / sec
+Wa-512:		Thread took 898ms, 21.75k ops / sec
+Wa-512:		Thread took 545ms, 35.84k ops / sec
+Wa-512:		Thread took 1073ms, 18.20k ops / sec
+Wa-512:		Thread took 825ms, 23.67k ops / sec
+Wa-512:		Thread took 828ms, 23.59k ops / sec
+Wa-512:		Thread took 921ms, 21.21k ops / sec
+Wa-512:		Thread took 894ms, 21.85k ops / sec
+Wa-512:		Thread took 563ms, 34.69k ops / sec
+Wa-512:		Thread took 916ms, 21.32k ops / sec
+Wa-512:		Thread took 989ms, 19.75k ops / sec
+Wa-512:		Thread took 682ms, 28.64k ops / sec
+Wa-512:		Thread took 961ms, 20.32k ops / sec
+Wa-512:		Thread took 1173ms, 16.65k ops / sec
+Wa-512:		Thread took 932ms, 20.96k ops / sec
+Wa-512:		Thread took 518ms, 37.70k ops / sec
+Wa-512:		Thread took 681ms, 28.68k ops / sec
+Wa-512:		Thread took 543ms, 35.97k ops / sec
+Wa-512:		Thread took 1117ms, 17.49k ops / sec
+Wa-512:		Thread took 748ms, 26.11k ops / sec
+Wa-512:		Thread took 787ms, 24.82k ops / sec
+Wa-512:		Thread took 907ms, 21.53k ops / sec
+Wa-512:		Thread took 736ms, 26.54k ops / sec
+Wa-512:		Thread took 798ms, 24.47k ops / sec
+Wa-512:		Thread took 843ms, 23.17k ops / sec
+Wa-512:		Thread took 900ms, 21.70k ops / sec
+Wa-512:		Thread took 634ms, 30.81k ops / sec
+Wa-512:		Thread took 624ms, 31.30k ops / sec
+Wa-512:		Thread took 640ms, 30.52k ops / sec
+Wa-512:		Thread took 525ms, 37.20k ops / sec
+Wa-512:		Thread took 749ms, 26.08k ops / sec
+Wa-512:		Thread took 775ms, 25.20k ops / sec
+Wa-512:		Thread took 827ms, 23.62k ops / sec
+Wa-512:		Thread took 1039ms, 18.80k ops / sec
+Wa-512:		Thread took 836ms, 23.36k ops / sec
+Wa-512:		Thread took 711ms, 27.47k ops / sec
+Wa-512:		Thread took 725ms, 26.94k ops / sec
+Wa-512:		Thread took 1016ms, 19.22k ops / sec
+Wa-512:		Thread took 776ms, 25.17k ops / sec
+Wa-512:		Thread took 814ms, 23.99k ops / sec
+Wa-512:		Thread took 938ms, 20.82k ops / sec
+Wa-512:		Thread took 1050ms, 18.60k ops / sec
+Wa-512:		Thread took 1021ms, 19.13k ops / sec
+Wa-512:		Thread took 782ms, 24.98k ops / sec
+Wa-512:		Thread took 732ms, 26.68k ops / sec
+Wa-512:		Thread took 860ms, 22.71k ops / sec
+Wa-512:		Thread took 992ms, 19.69k ops / sec
+Wa-512:		Thread took 1001ms, 19.51k ops / sec
+Wa-512:		Thread took 1069ms, 18.27k ops / sec
+Wa-512:		Thread took 876ms, 22.30k ops / sec
+Wa-512:		Thread took 999ms, 19.55k ops / sec
+Wa-512:		Thread took 875ms, 22.32k ops / sec
+Wa-512:		Thread took 909ms, 21.49k ops / sec
+Wa-512:		Thread took 839ms, 23.28k ops / sec
+Wa-512:		Thread took 742ms, 26.32k ops / sec
+Wa-512:		Thread took 958ms, 20.39k ops / sec
+Wa-512:		Thread took 998ms, 19.57k ops / sec
+Wa-512:		Thread took 963ms, 20.28k ops / sec
+Wa-512:		Thread took 759ms, 25.73k ops / sec
+Wa-512:		Thread took 383ms, 50.99k ops / sec
+Wa-512:		Thread took 928ms, 21.05k ops / sec
+Wa-512:		Thread took 984ms, 19.85k ops / sec
+Wa-512:		Thread took 1212ms, 16.11k ops / sec
+Wa-512:		Thread took 1223ms, 15.97k ops / sec
+Wa-512:		Thread took 653ms, 29.91k ops / sec
+Wa-512:		Thread took 1335ms, 14.63k ops / sec
+Wa-512:		Thread took 1051ms, 18.58k ops / sec
+Wa-512:		Thread took 1000ms, 19.53k ops / sec
+Wa-512:		Thread took 896ms, 21.80k ops / sec
+Wa-512:		Thread took 499ms, 39.14k ops / sec
+Wa-512:		Thread took 1010ms, 19.34k ops / sec
+Wa-512:		Thread took 570ms, 34.26k ops / sec
+Wa-512:		Thread took 1384ms, 14.11k ops / sec
+Wa-512:		Thread took 1111ms, 17.58k ops / sec
+Wa-512:		Thread took 738ms, 26.46k ops / sec
+Wa-512:		Thread took 1072ms, 18.22k ops / sec
+Wa-512:		Thread took 1677ms, 11.65k ops / sec
+Wa-512:		Thread took 1051ms, 18.58k ops / sec
+Wa-512:		Thread took 960ms, 20.34k ops / sec
+Wa-512:		Thread took 922ms, 21.18k ops / sec
+Wa-512:		Thread took 1148ms, 17.01k ops / sec
+Wa-512:		Thread took 1614ms, 12.10k ops / sec
+Wa-512:		Thread took 446ms, 43.79k ops / sec
+Wa-512:		Thread took 1751ms, 11.15k ops / sec
+Wa-512:		Thread took 1491ms, 13.10k ops / sec
+Wa-512:		Thread took 323ms, 60.47k ops / sec
+Wa-512:		Thread took 394ms, 49.57k ops / sec
+Wa-512:		Thread took 935ms, 20.89k ops / sec
+Wa-512:		Thread took 1293ms, 15.11k ops / sec
+Wa-512:		Thread took 874ms, 22.35k ops / sec
+Wa-512:		Thread took 1135ms, 17.21k ops / sec
+Wa-512:		Thread took 1280ms, 15.26k ops / sec
+Wa-512:		Thread took 1458ms, 13.40k ops / sec
+Wa-512:		Thread took 1134ms, 17.22k ops / sec
+Wa-512:		Thread took 1377ms, 14.18k ops / sec
+Wa-512:		Thread took 1914ms, 10.20k ops / sec
+Wa-512:		Thread took 904ms, 21.61k ops / sec
+Wa-512:		Thread took 1434ms, 13.62k ops / sec
+Wa-512:		Thread took 1136ms, 17.19k ops / sec
+Wa-512:		Thread took 1618ms, 12.07k ops / sec
+Wa-512:		Thread took 1745ms, 11.19k ops / sec
+Wa-512:		Thread took 1704ms, 11.46k ops / sec
+Wa-512:		Thread took 695ms, 28.10k ops / sec
+Wa-512:		Thread took 1106ms, 17.66k ops / sec
+Wa-512:		Thread took 1136ms, 17.19k ops / sec
+Wa-512:		Thread took 1344ms, 14.53k ops / sec
+Wa-512:		Thread took 723ms, 27.01k ops / sec
+Wa-512:		Thread took 1699ms, 11.50k ops / sec
+Wa-512:		Thread took 950ms, 20.56k ops / sec
+Wa-512:		Thread took 1458ms, 13.40k ops / sec
+Wa-512:		Thread took 818ms, 23.88k ops / sec
+Wa-512:		Thread took 1361ms, 14.35k ops / sec
+Wa-512:		Thread took 1868ms, 10.46k ops / sec
+Wa-512:		Thread took 1799ms, 10.86k ops / sec
+Wa-512:		Thread took 1470ms, 13.29k ops / sec
+Wa-512:		Thread took 990ms, 19.73k ops / sec
+Wa-512:		Thread took 1084ms, 18.02k ops / sec
+Wa-512:		Thread took 1080ms, 18.08k ops / sec
+Wa-512:		Thread took 1004ms, 19.45k ops / sec
+Wa-512:		Thread took 1614ms, 12.10k ops / sec
+Wa-512:		Thread took 1409ms, 13.86k ops / sec
+Wa-512:		Thread took 1723ms, 11.34k ops / sec
+Wa-512:		Thread took 1235ms, 15.81k ops / sec
+Wa-512:		Thread took 2091ms, 9.34k ops / sec
+Wa-512:		Thread took 1141ms, 17.12k ops / sec
+Wa-512:		Thread took 1226ms, 15.93k ops / sec
+Wa-512:		Thread took 2177ms, 8.97k ops / sec
+Wa-512:		Thread took 1721ms, 11.35k ops / sec
+Wa-512:		Thread took 432ms, 45.21k ops / sec
+Wa-512:		Thread took 1245ms, 15.69k ops / sec
+Wa-512:		Thread took 1414ms, 13.81k ops / sec
+Wa-512:		Thread took 1085ms, 18.00k ops / sec
+Wa-512:		Thread took 2390ms, 8.17k ops / sec
+Wa-512:		Thread took 1352ms, 14.45k ops / sec
+Wa-512:		Thread took 1589ms, 12.29k ops / sec
+Wa-512:		Thread took 1582ms, 12.35k ops / sec
+Wa-512:		Thread took 1397ms, 13.98k ops / sec
+Wa-512:		Thread took 888ms, 21.99k ops / sec
+Wa-512:		Thread took 923ms, 21.16k ops / sec
+Wa-512:		Thread took 628ms, 31.10k ops / sec
+Wa-512:		Thread took 959ms, 20.37k ops / sec
+Wa-512:		Thread took 1561ms, 12.51k ops / sec
+Wa-512:		Thread took 691ms, 28.26k ops / sec
+Wa-512:		Thread took 1009ms, 19.36k ops / sec
+Wa-512:		Thread took 1240ms, 15.75k ops / sec
+Wa-512:		Thread took 1599ms, 12.21k ops / sec
+Wa-512:		Thread took 853ms, 22.90k ops / sec
+Wa-512:		Thread took 2051ms, 9.52k ops / sec
+Wa-512:		Thread took 1135ms, 17.21k ops / sec
+Wa-512:		Thread took 1379ms, 14.16k ops / sec
+Wa-512:		Thread took 1441ms, 13.55k ops / sec
+Wa-512:		Thread took 1250ms, 15.62k ops / sec
+Wa-512:		Thread took 653ms, 29.91k ops / sec
+Wa-512:		Thread took 2067ms, 9.45k ops / sec
+Wa-512:		Thread took 1465ms, 13.33k ops / sec
+Wa-512:		Thread took 1479ms, 13.21k ops / sec
+Wa-512:		Thread took 1092ms, 17.89k ops / sec
+Wa-512:		Thread took 1041ms, 18.76k ops / sec
+Wa-512:		Thread took 680ms, 28.72k ops / sec
+Wa-512:		Thread took 428ms, 45.63k ops / sec
+Wa-512:		Thread took 1097ms, 17.80k ops / sec
+Wa-512:		Thread took 549ms, 35.58k ops / sec
+Wa-512:		Thread took 771ms, 25.33k ops / sec
+Wa-512:		Thread took 1428ms, 13.68k ops / sec
+Wa-512:		Thread took 1302ms, 15.00k ops / sec
+Wa-512:		Thread took 928ms, 21.05k ops / sec
+Wa-512:		Thread took 743ms, 26.29k ops / sec
+Wa-512:		Thread took 1110ms, 17.60k ops / sec
+Wa-512:		Thread took 1257ms, 15.54k ops / sec
+Wa-512:		Thread took 1371ms, 14.25k ops / sec
+Wa-512:		Thread took 895ms, 21.82k ops / sec
+Wa-512:		Thread took 1305ms, 14.97k ops / sec
+Wa-512:		Thread took 1229ms, 15.89k ops / sec
+Wa-512:		Thread took 1285ms, 15.20k ops / sec
+Wa-512:		Thread took 989ms, 19.75k ops / sec
+Wa-512:		Thread took 434ms, 45.00k ops / sec
+Wa-512:		Thread took 943ms, 20.71k ops / sec
+Wa-512:		Thread took 759ms, 25.73k ops / sec
+Wa-512:		Thread took 578ms, 33.79k ops / sec
+Wa-512:		Thread took 358ms, 54.56k ops / sec
+Wa-512:		Thread took 978ms, 19.97k ops / sec
+Wa-512:		Thread took 650ms, 30.05k ops / sec
+Wa-512:		Thread took 556ms, 35.13k ops / sec
+Wa-512:		Thread took 567ms, 34.45k ops / sec
+Wa-512:		Thread took 1224ms, 15.96k ops / sec
+Wa-512:		Thread took 1229ms, 15.89k ops / sec
+Wa-512:		Thread took 1229ms, 15.89k ops / sec
+Wa-512:		Thread took 861ms, 22.68k ops / sec
+Wa-512:		Thread took 666ms, 29.33k ops / sec
+Wa-512:		Thread took 1493ms, 13.08k ops / sec
+Wa-512:		Thread took 712ms, 27.43k ops / sec
+Wa-512:		Thread took 1143ms, 17.09k ops / sec
+Wa-512:		Thread took 457ms, 42.74k ops / sec
+Wa-512:		Thread took 693ms, 28.18k ops / sec
+Wa-512:	Aggregate throughput (512 threads): 785.66k ops / sec
+Finished exerciseScheduler (QuickSearchBenchmarksTest)
+Starting measureMemoryUseWithUnlimitedCache (QuickSearchBenchmarksTest)
+Inserting and querying took 36,398ms
+Measured instance size: 144,820,872 bytes
+{ "hits": 1708, "misses": 267, "uncacheable": 0, "evictions": 0, "size": 3188000, "keysCached": 267, "maxSize": 35791394, "disabled": false, "keyLimit": 10 }
+Finished measureMemoryUseWithUnlimitedCache (QuickSearchBenchmarksTest)
+Starting benchmarkWithSillyCache (QuickSearchBenchmarksTest)
+Warmup:	2.49k ops / sec
+Simple:	400.00k ops / sec
+Medium:	78.80k ops / sec
+Brutal:	0.85k ops / sec
+Finished benchmarkWithSillyCache (QuickSearchBenchmarksTest)
+Starting benchmarkWithUnlimitedCacheUnion (QuickSearchBenchmarksTest)
+Run 1
+Warmup:	21.39k ops / sec
+Simple:	429.18k ops / sec
+Medium:	154.80k ops / sec
+Brutal:	7.20k ops / sec
+Run 2
+Warmup:	21.68k ops / sec
+Simple:	452.49k ops / sec
+Medium:	162.60k ops / sec
+Brutal:	7.13k ops / sec
+Run 3
+Warmup:	21.03k ops / sec
+Simple:	421.94k ops / sec
+Medium:	160.77k ops / sec
+Brutal:	7.16k ops / sec
+Run 4
+Warmup:	21.59k ops / sec
+Simple:	431.03k ops / sec
+Medium:	158.48k ops / sec
+Brutal:	7.22k ops / sec
+Run 5
+Warmup:	21.95k ops / sec
+Simple:	436.68k ops / sec
+Medium:	164.47k ops / sec
+Brutal:	7.12k ops / sec
+Finished benchmarkWithUnlimitedCacheUnion (QuickSearchBenchmarksTest)
+Starting benchmarkWithUnlimitedCacheIntersection (QuickSearchBenchmarksTest)
+Run 1
+Warmup:	59.92k ops / sec
+Simple:	429.18k ops / sec
+Medium:	348.43k ops / sec
+Brutal:	34.67k ops / sec
+Run 2
+Warmup:	56.79k ops / sec
+Simple:	444.44k ops / sec
+Medium:	347.22k ops / sec
+Brutal:	34.90k ops / sec
+Run 3
+Warmup:	55.93k ops / sec
+Simple:	446.43k ops / sec
+Medium:	353.36k ops / sec
+Brutal:	35.09k ops / sec
+Run 4
+Warmup:	56.82k ops / sec
+Simple:	442.48k ops / sec
+Medium:	359.71k ops / sec
+Brutal:	34.73k ops / sec
+Run 5
+Warmup:	56.69k ops / sec
+Simple:	462.96k ops / sec
+Medium:	344.83k ops / sec
+Brutal:	34.44k ops / sec
+Finished benchmarkWithUnlimitedCacheIntersection (QuickSearchBenchmarksTest)
+Starting measureMemoryUseWithCache (QuickSearchBenchmarksTest)
+Inserting and querying took 35,574ms
+Measured instance size: 71,384,576 bytes
+{ "hits": 1704, "misses": 50, "uncacheable": 221, "evictions": 25, "size": 1322000, "keysCached": 25, "maxSize": 1398101, "disabled": false, "keyLimit": 1 }
+Finished measureMemoryUseWithCache (QuickSearchBenchmarksTest)
+Starting benchmarkWithoutCacheIntersection (QuickSearchBenchmarksTest)
+Run 1
+Warmup:	2.58k ops / sec
+Simple:	343.64k ops / sec
+Medium:	104.49k ops / sec
+Brutal:	0.89k ops / sec
+Run 2
+Warmup:	2.57k ops / sec
+Simple:	408.16k ops / sec
+Medium:	107.87k ops / sec
+Brutal:	0.88k ops / sec
+Run 3
+Warmup:	2.56k ops / sec
+Simple:	406.50k ops / sec
+Medium:	107.53k ops / sec
+Brutal:	0.90k ops / sec
+Run 4
+Warmup:	2.59k ops / sec
+Simple:	432.90k ops / sec
+Medium:	108.34k ops / sec
+Brutal:	0.90k ops / sec
+Run 5
+Warmup:	2.60k ops / sec
+Simple:	401.61k ops / sec
+Medium:	104.60k ops / sec
+Brutal:	0.90k ops / sec
+Finished benchmarkWithoutCacheIntersection (QuickSearchBenchmarksTest)
+Starting measureMemoryUse (QuickSearchBenchmarksTest)
+Inserting and querying took 44,523ms
+Measured instance size: 19,447,992 bytes
+
+Finished measureMemoryUse (QuickSearchBenchmarksTest)
+Starting benchmarkOperations (QuickSearchBenchmarksTest)
+Warmup:		Thread took 19639ms, 50.92k ops / sec
+Warmup:		Thread took 19828ms, 50.43k ops / sec
+Warmup:		Thread took 19838ms, 50.41k ops / sec
+Warmup:		Thread took 19841ms, 50.40k ops / sec
+Warmup:	Aggregate throughput: 201.59k ops / sec
+Warmed:		Thread took 19754ms, 50.62k ops / sec
+Warmed:		Thread took 19797ms, 50.51k ops / sec
+Warmed:		Thread took 19784ms, 50.55k ops / sec
+Warmed:		Thread took 19829ms, 50.43k ops / sec
+Warmed:	Aggregate throughput: 201.72k ops / sec
+Finished benchmarkOperations (QuickSearchBenchmarksTest)
+Starting measureMemoryUseWithCacheDisabledItself (QuickSearchBenchmarksTest)
+Inserting and querying took 42,238ms
+Measured instance size: 19,448,736 bytes
+{ "hits": 18, "misses": 22, "uncacheable": 1935, "evictions": 22, "size": 0, "keysCached": 0, "maxSize": 349525, "disabled": true, "keyLimit": 0 }
+Finished measureMemoryUseWithCacheDisabledItself (QuickSearchBenchmarksTest)
+Starting benchmarkSimpleReads (QuickSearchBenchmarksTest)
+Run 1
+Warmup:		Thread took 12051ms, 207.45k ops / sec
+Warmup:		Thread took 12058ms, 207.33k ops / sec
+Warmup:		Thread took 12069ms, 207.14k ops / sec
+Warmup:		Thread took 12076ms, 207.02k ops / sec
+Warmup:	Aggregate throughput (4 threads): 827.95k ops / sec
+Warm-1:		Thread took 22820ms, 438.21k ops / sec
+Warm-1:	Aggregate throughput (1 threads): 438.21k ops / sec
+Warm-2:		Thread took 16807ms, 297.50k ops / sec
+Warm-2:		Thread took 16798ms, 297.65k ops / sec
+Warm-2:	Aggregate throughput (2 threads): 594.92k ops / sec
+Warm-4:		Thread took 12380ms, 201.94k ops / sec
+Warm-4:		Thread took 12438ms, 201.00k ops / sec
+Warm-4:		Thread took 12447ms, 200.85k ops / sec
+Warm-4:		Thread took 12468ms, 200.51k ops / sec
+Warm-4:	Aggregate throughput (4 threads): 801.73k ops / sec
+Warm-8:		Thread took 11926ms, 104.81k ops / sec
+Warm-8:		Thread took 12108ms, 103.24k ops / sec
+Warm-8:		Thread took 12215ms, 102.33k ops / sec
+Warm-8:		Thread took 12448ms, 100.42k ops / sec
+Warm-8:		Thread took 12505ms, 99.96k ops / sec
+Warm-8:		Thread took 12502ms, 99.98k ops / sec
+Warm-8:		Thread took 12638ms, 98.91k ops / sec
+Warm-8:		Thread took 12723ms, 98.25k ops / sec
+Warm-8:	Aggregate throughput (8 threads): 785.24k ops / sec
+Run 2
+Warmup:		Thread took 12464ms, 200.58k ops / sec
+Warmup:		Thread took 12470ms, 200.48k ops / sec
+Warmup:		Thread took 12467ms, 200.53k ops / sec
+Warmup:		Thread took 12504ms, 199.94k ops / sec
+Warmup:	Aggregate throughput (4 threads): 799.74k ops / sec
+Warm-1:		Thread took 23356ms, 428.16k ops / sec
+Warm-1:	Aggregate throughput (1 threads): 428.16k ops / sec
+Warm-2:		Thread took 15794ms, 316.58k ops / sec
+Warm-2:		Thread took 15857ms, 315.32k ops / sec
+Warm-2:	Aggregate throughput (2 threads): 630.56k ops / sec
+Warm-4:		Thread took 12443ms, 200.92k ops / sec
+Warm-4:		Thread took 12450ms, 200.80k ops / sec
+Warm-4:		Thread took 12460ms, 200.64k ops / sec
+Warm-4:		Thread took 12469ms, 200.50k ops / sec
+Warm-4:	Aggregate throughput (4 threads): 801.99k ops / sec
+Warm-8:		Thread took 12009ms, 104.09k ops / sec
+Warm-8:		Thread took 12091ms, 103.38k ops / sec
+Warm-8:		Thread took 12179ms, 102.64k ops / sec
+Warm-8:		Thread took 12341ms, 101.29k ops / sec
+Warm-8:		Thread took 12354ms, 101.18k ops / sec
+Warm-8:		Thread took 12395ms, 100.85k ops / sec
+Warm-8:		Thread took 12372ms, 101.03k ops / sec
+Warm-8:		Thread took 12399ms, 100.81k ops / sec
+Warm-8:	Aggregate throughput (8 threads): 803.60k ops / sec
+Run 3
+Warmup:		Thread took 12193ms, 205.04k ops / sec
+Warmup:		Thread took 12215ms, 204.67k ops / sec
+Warmup:		Thread took 12249ms, 204.10k ops / sec
+Warmup:		Thread took 12249ms, 204.10k ops / sec
+Warmup:	Aggregate throughput (4 threads): 816.33k ops / sec
+Warm-1:		Thread took 22916ms, 436.38k ops / sec
+Warm-1:	Aggregate throughput (1 threads): 436.38k ops / sec
+Warm-2:		Thread took 15436ms, 323.92k ops / sec
+Warm-2:		Thread took 15473ms, 323.14k ops / sec
+Warm-2:	Aggregate throughput (2 threads): 646.25k ops / sec
+Warm-4:		Thread took 12261ms, 203.90k ops / sec
+Warm-4:		Thread took 12265ms, 203.83k ops / sec
+Warm-4:		Thread took 12303ms, 203.20k ops / sec
+Warm-4:		Thread took 12313ms, 203.04k ops / sec
+Warm-4:	Aggregate throughput (4 threads): 812.15k ops / sec
+Warm-8:		Thread took 11833ms, 105.64k ops / sec
+Warm-8:		Thread took 11865ms, 105.35k ops / sec
+Warm-8:		Thread took 11873ms, 105.28k ops / sec
+Warm-8:		Thread took 12108ms, 103.24k ops / sec
+Warm-8:		Thread took 12125ms, 103.09k ops / sec
+Warm-8:		Thread took 12167ms, 102.74k ops / sec
+Warm-8:		Thread took 12167ms, 102.74k ops / sec
+Warm-8:		Thread took 12316ms, 101.49k ops / sec
+Warm-8:	Aggregate throughput (8 threads): 811.89k ops / sec
+Run 4
+Warmup:		Thread took 12203ms, 204.87k ops / sec
+Warmup:		Thread took 12257ms, 203.97k ops / sec
+Warmup:		Thread took 12269ms, 203.77k ops / sec
+Warmup:		Thread took 12278ms, 203.62k ops / sec
+Warmup:	Aggregate throughput (4 threads): 814.46k ops / sec
+Warm-1:		Thread took 22945ms, 435.82k ops / sec
+Warm-1:	Aggregate throughput (1 threads): 435.82k ops / sec
+Warm-2:		Thread took 15335ms, 326.05k ops / sec
+Warm-2:		Thread took 15367ms, 325.37k ops / sec
+Warm-2:	Aggregate throughput (2 threads): 650.53k ops / sec
+Warm-4:		Thread took 12026ms, 207.88k ops / sec
+Warm-4:		Thread took 12044ms, 207.57k ops / sec
+Warm-4:		Thread took 12047ms, 207.52k ops / sec
+Warm-4:		Thread took 12059ms, 207.31k ops / sec
+Warm-4:	Aggregate throughput (4 threads): 828.57k ops / sec
+Warm-8:		Thread took 11556ms, 108.17k ops / sec
+Warm-8:		Thread took 11626ms, 107.52k ops / sec
+Warm-8:		Thread took 11762ms, 106.27k ops / sec
+Warm-8:		Thread took 11831ms, 105.65k ops / sec
+Warm-8:		Thread took 11883ms, 105.19k ops / sec
+Warm-8:		Thread took 11940ms, 104.69k ops / sec
+Warm-8:		Thread took 11990ms, 104.25k ops / sec
+Warm-8:		Thread took 12159ms, 102.80k ops / sec
+Warm-8:	Aggregate throughput (8 threads): 822.44k ops / sec
+Run 5
+Warmup:		Thread took 12038ms, 207.68k ops / sec
+Warmup:		Thread took 12038ms, 207.68k ops / sec
+Warmup:		Thread took 12044ms, 207.57k ops / sec
+Warmup:		Thread took 12058ms, 207.33k ops / sec
+Warmup:	Aggregate throughput (4 threads): 829.12k ops / sec
+Warm-1:		Thread took 23163ms, 431.72k ops / sec
+Warm-1:	Aggregate throughput (1 threads): 431.69k ops / sec
+Warm-2:		Thread took 17190ms, 290.87k ops / sec
+Warm-2:		Thread took 17218ms, 290.39k ops / sec
+Warm-2:	Aggregate throughput (2 threads): 580.79k ops / sec
+Warm-4:		Thread took 12667ms, 197.36k ops / sec
+Warm-4:		Thread took 12700ms, 196.85k ops / sec
+Warm-4:		Thread took 12717ms, 196.59k ops / sec
+Warm-4:		Thread took 12723ms, 196.49k ops / sec
+Warm-4:	Aggregate throughput (4 threads): 785.85k ops / sec
+Warm-8:		Thread took 11450ms, 109.17k ops / sec
+Warm-8:		Thread took 12235ms, 102.17k ops / sec
+Warm-8:		Thread took 12443ms, 100.46k ops / sec
+Warm-8:		Thread took 12477ms, 100.18k ops / sec
+Warm-8:		Thread took 12446ms, 100.43k ops / sec
+Warm-8:		Thread took 12575ms, 99.40k ops / sec
+Warm-8:		Thread took 12644ms, 98.86k ops / sec
+Warm-8:		Thread took 12704ms, 98.39k ops / sec
+Warm-8:	Aggregate throughput (8 threads): 786.53k ops / sec
+Finished benchmarkSimpleReads (QuickSearchBenchmarksTest)
+Starting benchmarkWithDefaultCache (QuickSearchBenchmarksTest)
+Warmup:	18.22k ops / sec
+Simple:	436.68k ops / sec
+Medium:	142.45k ops / sec
+Brutal:	7.06k ops / sec
+Finished benchmarkWithDefaultCache (QuickSearchBenchmarksTest)
+Tests run: 13, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2,501.604 sec
+Running com.zigurs.karlis.utils.search.ImmutableSetTest
+Tests run: 37, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.046 sec
+
+Results :
+
+Tests run: 133, Failures: 0, Errors: 0, Skipped: 0
+
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time: 41:48.019s
+[INFO] Finished at: Sun Oct 23 21:58:57 UTC 2016
+[INFO] Final Memory: 17M/200M
+[INFO] ------------------------------------------------------------------------
