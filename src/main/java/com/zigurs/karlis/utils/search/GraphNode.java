@@ -35,6 +35,10 @@ public final class GraphNode<V> {
     private Set<V> items;
     private Set<GraphNode<V>> parents;
 
+    private int itemsSizeHint;
+    private int nodesSizeHint;
+
+
     /**
      * Create a node with immutable identity string.
      *
@@ -118,5 +122,21 @@ public final class GraphNode<V> {
      */
     public void removeParent(@NotNull final GraphNode<V> parent) {
         parents = ImmutableSet.removeAndCreate(parents, parent);
+    }
+
+    public int getItemsSizeHint() {
+        return itemsSizeHint;
+    }
+
+    public void setItemsSizeHint(int sizeHint) {
+        this.itemsSizeHint = sizeHint;
+    }
+
+    public void setNodesSizeHint(int nodesSizeHint) {
+        this.nodesSizeHint = nodesSizeHint;
+    }
+
+    public int getNodesSizeHint() {
+        return nodesSizeHint;
     }
 }

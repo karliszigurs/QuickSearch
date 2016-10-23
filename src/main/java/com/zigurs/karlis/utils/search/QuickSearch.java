@@ -575,10 +575,20 @@ public class QuickSearch<T> {
             }
         }
 
+        Map<T, Double> result;
+        final Map<T, Double> accumulator = new LinkedHashMap<>(root.getItemsSizeHint() > 0 ? root.getItemsSizeHint() : 16);
+        final Set<String> visitsTracker = new HashSet<>(root.getNodesSizeHint() > 0 ? root.getNodesSizeHint() : 16);
+
         if (cache != null)
-            return cache.getFromCacheOrSupplier(root, rootNode -> walkAndScore(rootNode.getFragment(), rootNode, new HashMap<>(), new HashSet<>()));
+            result = cache.getFromCacheOrSupplier(root, rootNode -> walkAndScore(rootNode.getFragment(), rootNode, accumulator, visitsTracker));
         else
-            return walkAndScore(root.getFragment(), root, new HashMap<>(), new HashSet<>());
+            result = walkAndScore(root.getFragment(), root, accumulator, visitsTracker);
+
+        /* Store size hints to prevent rehash operations on repeat visits */
+        root.setItemsSizeHint(result.size());
+        root.setNodesSizeHint(visitsTracker.size());
+
+        return result;
     }
 
     private Map<T, Double> walkAndScore(@NotNull final String originalFragment,
@@ -589,8 +599,7 @@ public class QuickSearch<T> {
 
         if (!node.getItems().isEmpty()) {
             Double score = keywordMatchScorer.apply(originalFragment, node.getFragment());
-
-            node.getItems().forEach(item -> accumulated.merge(item, score, (d1, d2) -> d1 > d2 ? d1 : d2));
+            node.getItems().forEach(item -> accumulated.merge(item, score, (d1, d2) -> d1.compareTo(d2) > 0 ? d1 : d2));
         }
 
         node.getParents().forEach(parent -> {
