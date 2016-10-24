@@ -33,7 +33,6 @@ import static com.zigurs.karlis.utils.search.QuickSearch.ACCUMULATION_POLICY.INT
 import static com.zigurs.karlis.utils.search.QuickSearch.ACCUMULATION_POLICY.UNION;
 import static org.junit.Assert.*;
 
-@Ignore
 public class QuickSearchBenchmarksTest {
 
     private static final boolean RUN_FULL_BENCHMARKS = false;
