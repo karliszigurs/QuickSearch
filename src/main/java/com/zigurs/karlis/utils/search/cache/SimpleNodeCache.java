@@ -89,7 +89,7 @@ public class SimpleNodeCache<T> implements Cache<T> {
                 cached = supplier.apply(node);
                 long writeLock = mapLock.writeLock();
                 try {
-                    cache.put(node.getFragment(), new HashMap<>(cached));
+                    cache.put(node.getFragment(), Collections.unmodifiableMap(cached));
                     currentEntries.addAndGet(cached.size());
                     checkAndTrimToSize();
                 } finally {

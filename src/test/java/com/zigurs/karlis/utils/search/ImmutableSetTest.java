@@ -211,9 +211,9 @@ public class ImmutableSetTest {
 
         Iterator<String> iterator = set.iterator();
 
-        while(true) {
+        //noinspection InfiniteLoopStatement
+        while(true)
             iterator.next();
-        }
     }
 
     @Test

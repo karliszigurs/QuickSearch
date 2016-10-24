@@ -512,7 +512,7 @@ public class QuickSearch<T> {
                     .collect(Collectors.toList());
         } else {
             return matches.entrySet().stream()
-                    .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
+                    .sorted((o1, o2) -> o1.getValue().compareTo(o2.getValue()) < 0 ? 1 : -1)
                     .limit(maxItemsToList)
                     .map(e -> new ScoreWrapper<>(e.getKey(), e.getValue()))
                     .collect(Collectors.toList());
@@ -555,8 +555,22 @@ public class QuickSearch<T> {
                 accumulatedItems = fragmentItems;
                 firstFragment = false;
             } else {
-                accumulatedItems.keySet().retainAll(fragmentItems.keySet());
-                accumulatedItems.entrySet().forEach(e -> e.setValue(e.getValue() + fragmentItems.get(e.getKey())));
+                if (cache == null) {
+                    // Optimistic, safe to work on collection directly
+                    accumulatedItems.keySet().retainAll(fragmentItems.keySet());
+                    accumulatedItems.entrySet().forEach(e -> e.setValue(e.getValue() + fragmentItems.get(e.getKey())));
+                } else {
+                    // trickier, avoid touching the returned map as it may be cached
+                    Map<T, Double> destinationMap = new LinkedHashMap<>(accumulatedItems.size());
+
+                    accumulatedItems.entrySet().forEach(e -> {
+                        Double newValue = fragmentItems.get(e.getKey());
+                        if (newValue != null)
+                            destinationMap.put(e.getKey(), e.getValue() + newValue);
+                    });
+
+                    accumulatedItems = destinationMap;
+                }
             }
         }
 
@@ -575,10 +589,10 @@ public class QuickSearch<T> {
             }
         }
 
-        Map<T, Double> result;
         final Map<T, Double> accumulator = new LinkedHashMap<>(root.getItemsSizeHint() > 0 ? root.getItemsSizeHint() : 16);
         final Set<String> visitsTracker = new HashSet<>(root.getNodesSizeHint() > 0 ? root.getNodesSizeHint() : 16);
 
+        Map<T, Double> result;
         if (cache != null)
             result = cache.getFromCacheOrSupplier(root, rootNode -> walkAndScore(rootNode.getFragment(), rootNode, accumulator, visitsTracker));
         else
@@ -715,13 +729,18 @@ public class QuickSearch<T> {
         GraphNode<T> node = fragmentsItemsTree.get(identity);
 
         if (node == null) {
-            node = new GraphNode<>(identity);
-            fragmentsItemsTree.put(identity, node);
+            /*
+             * Required for visitors tracker set to work properly
+             */
+            final String internedIdentity = identity.intern();
+
+            node = new GraphNode<>(internedIdentity);
+            fragmentsItemsTree.put(internedIdentity, node);
 
             // And proceed to add child nodes
             if (node.getFragment().length() > 1) {
-                createAndRegisterNode(node, identity.substring(0, identity.length() - 1), null);
-                createAndRegisterNode(node, identity.substring(1), null);
+                createAndRegisterNode(node, internedIdentity.substring(0, identity.length() - 1), null);
+                createAndRegisterNode(node, internedIdentity.substring(1), null);
             }
         }
 

@@ -283,13 +283,9 @@ public class ImmutableSet<T> extends AbstractSet<T> {
     }
 
     private static <S> boolean itemsEqual(S one, S two) {
-        if (one == two)
-            return true;
-
-        if (one.hashCode() != two.hashCode())
-            return false;
-
-        return one.equals(two);
+        return one == two ||
+                (one.hashCode() == two.hashCode() &&
+                        one.equals(two));
     }
 
     @Override
@@ -377,10 +373,8 @@ public class ImmutableSet<T> extends AbstractSet<T> {
 
         Set<?> set = (Set<?>) o;
 
-        if (set.size() != size())
-            return false;
-
-        return containsAll(set);
+        return set.size() == size() &&
+                containsAll(set);
     }
 
     private static class ArrayIterator<I> implements Iterator<I> {
