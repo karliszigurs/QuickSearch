@@ -19,7 +19,6 @@ import com.zigurs.karlis.utils.search.GraphNode;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.StampedLock;
 import java.util.function.Function;
 
@@ -33,13 +32,14 @@ import java.util.function.Function;
 public class SimpleNodeCache<T> implements Cache<T> {
 
     /*
-     * LinkedHashMap to take advantage of the last accessed functionality.
-     * Might be replaced in the future, as it's fairly heavyweight code in there...
+     * Cache itself. As we are locking over it anyway, no benefit from
+     * any concurrent implementations. LinkedHashMap because it offers access order iteration.
      */
     private final Map<String, Map<T, Double>> cache = new LinkedHashMap<>(128, 0.75f, true);
 
     /*
-     * And a lock, as we are using a thread-unsafe map implementation.
+     * A lock, needed since we are trying to track the contents of the
+     * maps, not the count of items in the cache map itself.
      */
     private final StampedLock mapLock = new StampedLock();
 
@@ -47,13 +47,13 @@ public class SimpleNodeCache<T> implements Cache<T> {
      * Track and manage size
      */
     private final int MAX_ALLOWED_ENTRIES;
-    private final AtomicLong currentEntries = new AtomicLong(0);
+    private long currentEntries = 0L;
     private long keyLengthLimit = 10;
     private boolean cacheDisabled = false;
 
     /*
      * Statistics. Not thread safe, but I'm not
-     * too worried about any recording being missed.
+     * too worried about any recordings being missed.
      */
     private long hits = 0;
     private long misses = 0;
@@ -74,79 +74,35 @@ public class SimpleNodeCache<T> implements Cache<T> {
     @Override
     public Map<T, Double> getFromCacheOrSupplier(@NotNull final GraphNode<T> node,
                                                  @NotNull final Function<GraphNode<T>, Map<T, Double>> supplier) {
-        // this isn't quite proper thread safe yet...
-        if (!cacheDisabled && isCacheable(node.getFragment())) {
-            Map<T, Double> cached;
-            long readLock = mapLock.readLock();
-            try {
-                cached = cache.get(node.getFragment());
-            } finally {
-                mapLock.unlockRead(readLock);
-            }
+        long stamp = mapLock.readLock();
+        try {
+            if (!cacheDisabled && isCacheable(node.getFragment())) {
+                Map<T, Double> cached = cache.get(node.getFragment());
 
-            if (cached == null) {
-                misses++;
-                cached = supplier.apply(node);
-                long writeLock = mapLock.writeLock();
-                try {
-                    cache.put(node.getFragment(), Collections.unmodifiableMap(cached));
-                    currentEntries.addAndGet(cached.size());
-                    checkAndTrimToSize();
-                } finally {
-                    mapLock.unlockWrite(writeLock);
+                if (cached == null) {
+                    misses++;
+                    cached = Collections.unmodifiableMap(supplier.apply(node));
+
+                    stamp = mapLock.tryConvertToWriteLock(stamp);
+
+                    if (stamp == 0L)
+                        stamp = mapLock.writeLock();
+
+                    cache.put(node.getFragment(), cached);
+                    currentEntries += cached.size();
+                    if (currentEntries > MAX_ALLOWED_ENTRIES)
+                        trimCache();
+                } else {
+                    hits++;
                 }
+
+                return cached;
             } else {
-                hits++;
+                uncacheable++;
+                return supplier.apply(node);
             }
-
-            return cached;
-        } else {
-            uncacheable++;
-            return supplier.apply(node);
-        }
-    }
-
-    private void checkAndTrimToSize() {
-        if (currentEntries.get() > MAX_ALLOWED_ENTRIES) {
-            /*
-             * We have burst the limit with the current key length,
-             * scale back what we cache (or disable cache if already
-             * at the shortest keys).
-             */
-            boolean trimmedAllowedSize = false;
-
-            if (keyLengthLimit > 0) {
-                keyLengthLimit--;
-                cacheDisabled = keyLengthLimit < 1;
-                trimmedAllowedSize = true;
-            }
-
-            /*
-             * We just want to check things at the end of the queue,
-             * so that least accessed items could be trimmed.
-             */
-            Deque<Map.Entry<String, Map<T, Double>>> stack = new ArrayDeque<>(cache.size());
-            cache.entrySet().forEach(stack::push);
-
-            while (currentEntries.get() > MAX_ALLOWED_ENTRIES) {
-                Map.Entry<String, Map<T, Double>> entry = stack.pop();
-                cache.remove(entry.getKey());
-                currentEntries.addAndGet(-entry.getValue().size());
-                evictions++;
-            }
-
-            /*
-             * Also clear the cache of all elements that are
-             * now under the threshold of cacheable.
-             */
-            while (trimmedAllowedSize && !stack.isEmpty()) {
-                Map.Entry<String, Map<T, Double>> entry = stack.pop();
-                if (!isCacheable(entry.getKey())) {
-                    cache.remove(entry.getKey());
-                    currentEntries.addAndGet(-entry.getValue().size());
-                    evictions++;
-                }
-            }
+        } finally {
+            mapLock.unlock(stamp);
         }
     }
 
@@ -154,16 +110,68 @@ public class SimpleNodeCache<T> implements Cache<T> {
         return key.length() <= keyLengthLimit;
     }
 
+    // Called only after write lock has been acquired
+    private void trimCache() {
+        /*
+         * We have burst the limit with the current key length,
+         * scale back what we cache (or disable cache if already
+         * at the shortest keys).
+         */
+        if (keyLengthLimit > 0) {
+            keyLengthLimit--;
+            cacheDisabled = keyLengthLimit < 1;
+
+            if (cacheDisabled) {
+                // DO NOT call clear() here, lock may be non-re-entrant
+                cache.clear();
+                currentEntries = 0L;
+                return;
+            }
+        }
+
+        /*
+         * We just want to check things at the end of the queue,
+         * so that least accessed items could be trimmed.
+         */
+        Deque<Map.Entry<String, Map<T, Double>>> stack = new ArrayDeque<>(cache.size());
+        cache.entrySet().forEach(stack::push);
+
+        while (currentEntries > MAX_ALLOWED_ENTRIES) {
+            Map.Entry<String, Map<T, Double>> entry = stack.pop();
+            cache.remove(entry.getKey());
+            currentEntries -= entry.getValue().size();
+            evictions++;
+        }
+
+        /*
+         * Also clear the cache of all elements that are
+         * now over the threshold of cacheable.
+         */
+        while (!stack.isEmpty()) {
+            Map.Entry<String, Map<T, Double>> entry = stack.pop();
+            if (!isCacheable(entry.getKey())) {
+                cache.remove(entry.getKey());
+                currentEntries -= entry.getValue().size();
+                evictions++;
+            }
+        }
+    }
+
     @Override
     public void clear() {
-        long writeLock = mapLock.writeLock();
+        long stamp = mapLock.readLock();
         try {
-            if (!cache.isEmpty() || currentEntries.get() > 0) {
+            if (!cache.isEmpty()) {
+                stamp = mapLock.tryConvertToWriteLock(stamp);
+
+                if (stamp == 0L)
+                    stamp = mapLock.writeLock();
+
                 cache.clear();
-                currentEntries.set(0);
+                currentEntries = 0L;
             }
         } finally {
-            mapLock.unlockWrite(writeLock);
+            mapLock.unlock(stamp);
         }
     }
 
@@ -182,7 +190,7 @@ public class SimpleNodeCache<T> implements Cache<T> {
                 misses,
                 uncacheable,
                 evictions,
-                currentEntries.get(),
+                currentEntries,
                 cache.size(),
                 MAX_ALLOWED_ENTRIES,
                 keyLengthLimit < 1,

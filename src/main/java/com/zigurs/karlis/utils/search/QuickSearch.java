@@ -384,7 +384,6 @@ public class QuickSearch<T> {
         if (searchKeywords.isEmpty())
             return Optional.empty();
 
-
         long readLock = lock.readLock();
         try {
             List<ScoreWrapper<T>> results = findItemsImpl(searchKeywords, 1);
@@ -543,39 +542,36 @@ public class QuickSearch<T> {
     private Map<T, Double> findAndScoreIntersectionImpl(@NotNull final Set<String> suppliedFragments) {
         Map<T, Double> accumulatedItems = null;
 
-        boolean firstFragment = true;
-
         for (String suppliedFragment : suppliedFragments) {
             Map<T, Double> fragmentItems = walkAndScore(suppliedFragment);
 
             if (fragmentItems.isEmpty())
                 return fragmentItems; // Can fail early
 
-            if (firstFragment) {
+            if (accumulatedItems == null) { // first item
                 accumulatedItems = fragmentItems;
-                firstFragment = false;
-            } else {
-                if (cache == null) {
-                    // Optimistic, safe to work on collection directly
-                    accumulatedItems.keySet().retainAll(fragmentItems.keySet());
-                    accumulatedItems.entrySet().forEach(e -> e.setValue(e.getValue() + fragmentItems.get(e.getKey())));
-                } else {
-                    // trickier, avoid touching the returned map as it may be cached
-                    Map<T, Double> destinationMap = new LinkedHashMap<>(accumulatedItems.size());
 
-                    accumulatedItems.entrySet().forEach(e -> {
-                        Double newValue = fragmentItems.get(e.getKey());
-                        if (newValue != null)
-                            destinationMap.put(e.getKey(), e.getValue() + newValue);
-                    });
+            } else if (cache == null) { // safe to work on collection directly
+                accumulatedItems.keySet().retainAll(fragmentItems.keySet());
+                accumulatedItems.entrySet().forEach(e -> e.setValue(e.getValue() + fragmentItems.get(e.getKey())));
 
-                    accumulatedItems = destinationMap;
-                }
+            } else { // trickier, merge two (existing and newly supplied) maps into a new one
+                Map<T, Double> destinationMap = new LinkedHashMap<>(accumulatedItems.size());
+
+                accumulatedItems.entrySet().forEach(e -> {
+                    Double newValue = fragmentItems.get(e.getKey());
+                    if (newValue != null)
+                        destinationMap.put(e.getKey(), e.getValue() + newValue);
+                });
+
+                accumulatedItems = destinationMap;
             }
         }
 
-        //noinspection ConstantConditions
-        return accumulatedItems;
+        if (accumulatedItems == null)
+            return Collections.emptyMap();
+        else
+            return accumulatedItems;
     }
 
     private Map<T, Double> walkAndScore(@NotNull final String fragment) {
