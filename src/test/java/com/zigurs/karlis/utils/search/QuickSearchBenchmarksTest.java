@@ -138,13 +138,13 @@ public class QuickSearchBenchmarksTest {
         if (RUN_FULL_BENCHMARKS) {
             multiKeywordBenchmarkRun(searchInstance, 1.0, 30.0, 30.0, 0.1);
             assertEquals(
-                    "{ \"hits\": 0, \"misses\": 10, \"uncacheable\": 2499990, \"evictions\": 10, \"size\": 0, \"keysCached\": 0, \"maxSize\": 17, \"disabled\": true, \"keyLimit\": 0 }",
+                    "{ \"hits\": 0, \"misses\": 10, \"uncacheable\": 2499990, \"evictions\": 9, \"size\": 0, \"keysCached\": 0, \"maxSize\": 17, \"disabled\": true, \"keyLimit\": 0 }",
                     searchInstance.getCacheStats()
             );
         } else {
             multiKeywordBenchmarkRun(searchInstance, 0.1, 5.0, 5.0, 0.1);
             assertEquals(
-                    "{ \"hits\": 0, \"misses\": 10, \"uncacheable\": 24990, \"evictions\": 10, \"size\": 0, \"keysCached\": 0, \"maxSize\": 17, \"disabled\": true, \"keyLimit\": 0 }",
+                    "{ \"hits\": 0, \"misses\": 10, \"uncacheable\": 24990, \"evictions\": 9, \"size\": 0, \"keysCached\": 0, \"maxSize\": 17, \"disabled\": true, \"keyLimit\": 0 }",
                     searchInstance.getCacheStats()
             );
         }
