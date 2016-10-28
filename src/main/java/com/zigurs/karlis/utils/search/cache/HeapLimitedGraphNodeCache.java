@@ -18,22 +18,26 @@ package com.zigurs.karlis.utils.search.cache;
 import com.zigurs.karlis.utils.search.GraphNode;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.*;
+import java.util.Collections;
+import java.util.Deque;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.locks.StampedLock;
 import java.util.function.Function;
 
 /**
- * Simple, adaptive-ish cache that will scale back what it caches each time it hits the
- * limit it is allowed to cache.
+ * Simple, strong-referenced cache implementation that tries to limit its memory
+ * use (based on an educated guess of cost of references).
  * <p>
- * It will eventually disable itself if it finds itself unable to cache even the shortest keys
- * to avoid trashing the cache on every request.
+ * During use it will scale down what it caches every time it hits the set
+ * cache limit ultimately disabling (and purging) itself if it keeps hitting the limits.
  */
-public class SimpleNodeCache<T> implements Cache<T> {
+public class HeapLimitedGraphNodeCache<T> implements Cache<GraphNode<T>, Map<T, Double>> {
 
     /*
-     * Cache itself. As we are locking over it anyway, no benefit from
-     * any concurrent implementations. LinkedHashMap because it offers access order iteration.
+     * Cache map itself. As we are locking over it anyway, no benefit from using concurrent
+     * implementations. LinkedHashMap because it offers access order iteration.
      */
     private final Map<String, Map<T, Double>> cache = new LinkedHashMap<>(128, 0.75f, true);
 
@@ -53,14 +57,24 @@ public class SimpleNodeCache<T> implements Cache<T> {
 
     /*
      * Statistics. Not thread safe, but I'm not
-     * too worried about any recordings being missed.
+     * too worried about % of stats being missed.
      */
     private long hits = 0;
     private long misses = 0;
     private long uncacheable = 0;
     private long evictions = 0;
 
-    public SimpleNodeCache(final int cacheLimitInBytes) {
+    /**
+     * Create a cache instance with specified size limit in bytes.
+     * <p>
+     * Constructor will throw a fit if a size of less than 1 is specified.
+     *
+     * @param cacheLimitInBytes heap use limit hint
+     */
+    public HeapLimitedGraphNodeCache(final int cacheLimitInBytes) {
+        if (cacheLimitInBytes < 1)
+            throw new IllegalArgumentException("Illegal cache size specified");
+
         /*
          * Average of 60 bytes per entry as empirically measured, may
          * differ slightly in ether direction depending on the exact dataset.
@@ -71,16 +85,33 @@ public class SimpleNodeCache<T> implements Cache<T> {
         MAX_ALLOWED_ENTRIES = cacheLimitInBytes / 60;
     }
 
+    /**
+     * Look for a result ether from cache or from the supplied function.
+     * <p>
+     * Supplier of the function should consider that it may (and will) be read concurrently by multiple
+     * threads, repeatedly for the same value and there is no guarantee that a content returned to
+     * function invocation will be the same references that will be returned to the original caller.
+     *
+     * @param node     key node
+     * @param supplier function to invoke for result if no hits are found in cache
+     * @return result ether from cache or from the supplied function
+     */
     @Override
+    @NotNull
     public Map<T, Double> getFromCacheOrSupplier(@NotNull final GraphNode<T> node,
                                                  @NotNull final Function<GraphNode<T>, Map<T, Double>> supplier) {
         long stamp = mapLock.readLock();
         try {
-            if (!cacheDisabled && isCacheable(node.getFragment())) {
+            if (isCacheable(node.getFragment())) {
                 Map<T, Double> cached = cache.get(node.getFragment());
 
-                if (cached == null) {
+                if (cached != null) {
+                    hits++;
+
+                    return cached;
+                } else {
                     misses++;
+
                     cached = Collections.unmodifiableMap(supplier.apply(node));
 
                     stamp = mapLock.tryConvertToWriteLock(stamp);
@@ -89,14 +120,14 @@ public class SimpleNodeCache<T> implements Cache<T> {
                         stamp = mapLock.writeLock();
 
                     cache.put(node.getFragment(), cached);
+
                     currentEntries += cached.size();
+
                     if (currentEntries > MAX_ALLOWED_ENTRIES)
                         trimCache();
-                } else {
-                    hits++;
-                }
 
-                return cached;
+                    return cached;
+                }
             } else {
                 uncacheable++;
                 return supplier.apply(node);
@@ -107,7 +138,7 @@ public class SimpleNodeCache<T> implements Cache<T> {
     }
 
     private boolean isCacheable(@NotNull final String key) {
-        return key.length() <= keyLengthLimit;
+        return !cacheDisabled && key.length() <= keyLengthLimit;
     }
 
     // Called only after write lock has been acquired
@@ -122,8 +153,7 @@ public class SimpleNodeCache<T> implements Cache<T> {
             cacheDisabled = keyLengthLimit < 1;
 
             if (cacheDisabled) {
-                // DO NOT call clear() here, lock may be non-re-entrant
-                cache.clear();
+                cache.clear(); // DO NOT call clearCache() here, lock may be non-re-entrant
                 currentEntries = 0L;
                 return;
             }
@@ -133,7 +163,7 @@ public class SimpleNodeCache<T> implements Cache<T> {
          * We just want to check things at the end of the queue,
          * so that least accessed items could be trimmed.
          */
-        Deque<Map.Entry<String, Map<T, Double>>> stack = new ArrayDeque<>(cache.size());
+        Deque<Map.Entry<String, Map<T, Double>>> stack = new LinkedBlockingDeque<>(cache.size());
         cache.entrySet().forEach(stack::push);
 
         while (currentEntries > MAX_ALLOWED_ENTRIES) {
@@ -147,18 +177,17 @@ public class SimpleNodeCache<T> implements Cache<T> {
          * Also clear the cache of all elements that are
          * now over the threshold of cacheable.
          */
-        while (!stack.isEmpty()) {
-            Map.Entry<String, Map<T, Double>> entry = stack.pop();
+        stack.forEach(entry -> {
             if (!isCacheable(entry.getKey())) {
                 cache.remove(entry.getKey());
                 currentEntries -= entry.getValue().size();
                 evictions++;
             }
-        }
+        });
     }
 
     @Override
-    public void clear() {
+    public void clearCache() {
         long stamp = mapLock.readLock();
         try {
             if (!cache.isEmpty()) {
@@ -176,24 +205,37 @@ public class SimpleNodeCache<T> implements Cache<T> {
     }
 
     @Override
-    public String getCacheStats() {
-        return String.format("{ \"hits\": %d, " +
-                        "\"misses\": %d, " +
-                        "\"uncacheable\": %d, " +
-                        "\"evictions\": %d, " +
-                        "\"size\": %d, " +
-                        "\"keysCached\": %d, " +
-                        "\"maxSize\": %d, " +
-                        "\"disabled\": %b, " +
-                        "\"keyLimit\": %d }",
-                hits,
-                misses,
-                uncacheable,
-                evictions,
-                currentEntries,
-                cache.size(),
-                MAX_ALLOWED_ENTRIES,
-                keyLengthLimit < 1,
-                keyLengthLimit);
+    public CacheStatistics getStatistics() {
+        return new CacheStatistics() {
+            @Override
+            public long getHits() {
+                return hits;
+            }
+
+            @Override
+            public long getMisses() {
+                return misses;
+            }
+
+            @Override
+            public long getUncacheable() {
+                return uncacheable;
+            }
+
+            @Override
+            public long getEvictions() {
+                return evictions;
+            }
+
+            @Override
+            public boolean isEnabled() {
+                return !cacheDisabled;
+            }
+
+            @Override
+            public long getSize() {
+                return currentEntries;
+            }
+        };
     }
 }

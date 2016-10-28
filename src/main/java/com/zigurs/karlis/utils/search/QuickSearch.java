@@ -16,7 +16,8 @@
 package com.zigurs.karlis.utils.search;
 
 import com.zigurs.karlis.utils.search.cache.Cache;
-import com.zigurs.karlis.utils.search.cache.SimpleNodeCache;
+import com.zigurs.karlis.utils.search.cache.CacheStatistics;
+import com.zigurs.karlis.utils.search.cache.HeapLimitedGraphNodeCache;
 import com.zigurs.karlis.utils.search.model.Item;
 import com.zigurs.karlis.utils.search.model.Result;
 import com.zigurs.karlis.utils.search.model.Stats;
@@ -205,7 +206,7 @@ public class QuickSearch<T> {
     @NotNull
     private final StampedLock lock = new StampedLock();
     @Nullable
-    private final Cache<T> cache;
+    private final Cache<GraphNode<T>, Map<T, Double>> cache;
 
     /**
      * Private constructor, use builder instead.
@@ -242,7 +243,7 @@ public class QuickSearch<T> {
          */
 
         if (builder.cacheLimit > 0)
-            this.cache = new SimpleNodeCache<>(builder.cacheLimit);
+            this.cache = new HeapLimitedGraphNodeCache<>(builder.cacheLimit);
         else
             cache = null;
     }
@@ -483,8 +484,12 @@ public class QuickSearch<T> {
         return stats;
     }
 
-    public String getCacheStats() {
-        return cache != null ? cache.getCacheStats() : "";
+    @NotNull
+    public Optional<CacheStatistics> getCacheStats() {
+        if (cache != null)
+            return Optional.of(cache.getStatistics());
+        else
+            return Optional.empty();
     }
 
     /*
@@ -641,7 +646,7 @@ public class QuickSearch<T> {
 
     private void clearCache() {
         if (cache != null)
-            cache.clear();
+            cache.clearCache();
     }
 
     @NotNull

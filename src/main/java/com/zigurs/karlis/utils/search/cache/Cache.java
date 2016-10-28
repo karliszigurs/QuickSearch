@@ -15,17 +15,21 @@
  */
 package com.zigurs.karlis.utils.search.cache;
 
-import com.zigurs.karlis.utils.search.GraphNode;
-
-import java.util.Map;
 import java.util.function.Function;
 
-public interface Cache<T> {
+/**
+ * Simple cache interface. Supplies a map from GraphNode key or reads
+ * (and possibly caches it) from the specified supplier.
+ *
+ * @param <K> type of key used in this cache
+ * @param <V> corresponding payload returned by this cache
+ */
+public interface Cache<K, V> {
 
-    Map<T, Double> getFromCacheOrSupplier(GraphNode<T> rootNode, Function<GraphNode<T>, Map<T, Double>> supplier);
+    V getFromCacheOrSupplier(K rootNode, Function<K, V> supplier);
 
-    void clear();
+    void clearCache();
 
-    String getCacheStats();
+    CacheStatistics getStatistics();
 
 }
