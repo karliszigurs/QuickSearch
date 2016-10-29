@@ -192,6 +192,9 @@ public class ImmutableSet<T> extends AbstractSet<T> {
 
     private static <S> ImmutableSet<S> removeViaCompacting(@NotNull final ImmutableSet<S> set,
                                                            @NotNull final S surplusItem) {
+        if (set.isEmpty())
+            return set;
+
         S[] source = set.array;
         Object[] destination = new Object[source.length - 1];
 
