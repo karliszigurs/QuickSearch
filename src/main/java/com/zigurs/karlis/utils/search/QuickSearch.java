@@ -505,6 +505,12 @@ public class QuickSearch<T> {
                                                 final int maxItemsToList) {
         Map<T, Double> matches = findAndScoreImpl(searchKeywords);
 
+        /*
+         * Avoid sorting an empty map
+         */
+        if (matches.isEmpty())
+            return Collections.emptyList();
+
         if (matches.size() > maxItemsToList) {
             /*
              * Use custom sort if the candidates list is larger than number of items we
