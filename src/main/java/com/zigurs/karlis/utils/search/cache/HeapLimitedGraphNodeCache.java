@@ -100,40 +100,56 @@ public class HeapLimitedGraphNodeCache<T> implements Cache<GraphNode<T>, Map<T, 
     @NotNull
     public Map<T, Double> getFromCacheOrSupplier(@NotNull final GraphNode<T> node,
                                                  @NotNull final Function<GraphNode<T>, Map<T, Double>> supplier) {
-        long stamp = mapLock.readLock();
+        boolean cacheable;
+
+        /*
+         * Optimistic case, try to read from cache and return immediately
+         */
+        long readStamp = mapLock.readLock();
         try {
-            if (isCacheable(node.getFragment())) {
+            cacheable = isCacheable(node.getFragment());
+            if (cacheable) {
                 Map<T, Double> cached = cache.get(node.getFragment());
 
                 if (cached != null) {
                     hits++;
-
-                    return cached;
-                } else {
-                    misses++;
-
-                    cached = Collections.unmodifiableMap(supplier.apply(node));
-
-                    stamp = mapLock.tryConvertToWriteLock(stamp);
-
-                    if (stamp == 0L)
-                        stamp = mapLock.writeLock();
-
-                    cache.put(node.getFragment(), cached);
-
-                    currentEntries += cached.size();
-
-                    if (currentEntries > MAX_ALLOWED_ENTRIES)
-                        trimCache();
-
                     return cached;
                 }
-            } else {
-                uncacheable++;
-                return supplier.apply(node);
             }
         } finally {
-            mapLock.unlock(stamp);
+            mapLock.unlockRead(readStamp);
+        }
+
+        /*
+         * If we reach here there was ether a cache miss or
+         * the keyword is too long to be cached.
+         *
+         * First - see if we should just pass the call through...
+         */
+        if (!cacheable) {
+            uncacheable++;
+            return supplier.apply(node);
+        }
+
+        /*
+         * That wasn't it. We need to try to write into the cache...
+         */
+
+        long writeStamp = mapLock.writeLock();
+        try {
+            misses++;
+            Map<T, Double> newResult = Collections.unmodifiableMap(supplier.apply(node));
+
+            cache.put(node.getFragment(), newResult);
+
+            currentEntries += newResult.size();
+
+            if (currentEntries > MAX_ALLOWED_ENTRIES)
+                trimCache();
+
+            return newResult;
+        } finally {
+            mapLock.unlockWrite(writeStamp);
         }
     }
 
