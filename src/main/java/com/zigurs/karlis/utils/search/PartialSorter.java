@@ -29,6 +29,10 @@ import java.util.*;
  */
 public class PartialSorter {
 
+    /*
+     * TODO - performance scaling investigation
+     */
+
     /**
      * Sort function
      *
@@ -47,23 +51,23 @@ public class PartialSorter {
         if (limitResultsTo < 1)
             return Collections.emptyList();
 
-        LinkedList<X> result = new LinkedList<>();
+        List<X> result = new ArrayList<>(limitResultsTo + 1);
 
         for (X entry : input) {
             if (result.size() < limitResultsTo) {
                 insertInListInOrderedPos(result, entry, comparator);
-            } else if (comparator.compare(entry, result.getLast()) < 0) {
+            } else if (comparator.compare(entry, result.get(result.size() - 1)) < 0) {
                 insertInListInOrderedPos(result, entry, comparator);
-                result.removeLast();
+                result.remove(result.size() - 1);
             }
         }
 
         return result;
     }
 
-    private static <X> void insertInListInOrderedPos(@NotNull List<X> result,
-                                                     @NotNull X entry,
-                                                     @NotNull Comparator<X> comparator) {
+    private static <X> void insertInListInOrderedPos(List<X> result,
+                                                     X entry,
+                                                     Comparator<X> comparator) {
         for (int pos = 0; pos < result.size(); pos++) {
             if (comparator.compare(entry, result.get(pos)) < 0) {
                 result.add(pos, entry);
