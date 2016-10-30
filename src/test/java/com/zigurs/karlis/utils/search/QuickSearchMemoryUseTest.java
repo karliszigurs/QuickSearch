@@ -117,7 +117,7 @@ public class QuickSearchMemoryUseTest {
 
         final long endTime = System.currentTimeMillis() - startTime;
 
-        System.out.println(String.format("Inserting and querying took %,dms", endTime));
+        System.out.println(String.format("Inserting and warming caches took %,dms", endTime));
 
 
         MemoryMeter meter = new MemoryMeter().withGuessing(MemoryMeter.Guess.ALWAYS_UNSAFE);

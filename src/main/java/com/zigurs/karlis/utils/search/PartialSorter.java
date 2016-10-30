@@ -29,12 +29,10 @@ import java.util.*;
  */
 public class PartialSorter {
 
-    /*
-     * TODO - performance scaling investigation
-     */
-
     /**
-     * Sort function
+     * Sort function which delegates the sorting to likely more efficient
+     * internal sorting implementation for the given input size and desired
+     * results set size
      *
      * @param input          collection to select elements from
      * @param limitResultsTo maximum size of generated ordered list, negative or 0 will return empty list
@@ -51,6 +49,50 @@ public class PartialSorter {
         if (limitResultsTo < 1)
             return Collections.emptyList();
 
+        if (limitResultsTo < 11)
+            return sortAndLimitWithArrayList(input, limitResultsTo, comparator);
+        else
+            return sortAndLimitWithTreeSet(input, limitResultsTo, comparator);
+    }
+
+    /**
+     * Sort function accumulating top results in a tree set
+     *
+     * @param input          collection to select elements from
+     * @param limitResultsTo maximum size of generated ordered list, negative or 0 will return empty list
+     * @param comparator     comparator to use (or use Comparator.naturalOrder())
+     * @param <X>            type of objects to sort
+     * @return sorted list consisting of first (up to limitResultsTo) elements in specified comparator order
+     */
+    public static <X> List<X> sortAndLimitWithTreeSet(@NotNull final Collection<? extends X> input,
+                                                      final int limitResultsTo,
+                                                      @NotNull final Comparator<X> comparator) {
+        TreeSet<X> results = new TreeSet<>(comparator);
+
+        for (X entry : input) {
+            if (results.size() < limitResultsTo) {
+                results.add(entry);
+            } else if (comparator.compare(entry, results.last()) < 0) {
+                results.add(entry);
+                results.remove(results.last());
+            }
+        }
+
+        return new ArrayList<>(results);
+    }
+
+    /**
+     * Sort function accumulating results in an array list
+     *
+     * @param input          collection to select elements from
+     * @param limitResultsTo maximum size of generated ordered list, negative or 0 will return empty list
+     * @param comparator     comparator to use (or use Comparator.naturalOrder())
+     * @param <X>            type of objects to sort
+     * @return sorted list consisting of first (up to limitResultsTo) elements in specified comparator order
+     */
+    public static <X> List<X> sortAndLimitWithArrayList(@NotNull final Collection<? extends X> input,
+                                                        final int limitResultsTo,
+                                                        @NotNull final Comparator<X> comparator) {
         List<X> result = new ArrayList<>(limitResultsTo + 1);
 
         for (X entry : input) {

@@ -511,26 +511,23 @@ public class QuickSearch<T> {
         if (matches.isEmpty())
             return Collections.emptyList();
 
-        if (matches.size() > maxItemsToList) {
-            /*
-             * Use custom sort if the candidates list is larger than number of items we
-             * need to report back. On large sets of results this can bring notable
-             * improvements in speed when compared to built-in sorting methods.
-             */
-            return PartialSorter.sortAndLimit(matches.entrySet(), maxItemsToList, (o1, o2) -> o1.getValue().compareTo(o2.getValue()) < 0 ? 1 : -1).stream()
-                    .map(e -> new ScoreWrapper<>(e.getKey(), e.getValue()))
-                    .collect(Collectors.toList());
-        } else {
-            return matches.entrySet().stream()
-                    .sorted((o1, o2) -> o1.getValue().compareTo(o2.getValue()) < 0 ? 1 : -1)
-                    .limit(maxItemsToList)
-                    .map(e -> new ScoreWrapper<>(e.getKey(), e.getValue()))
-                    .collect(Collectors.toList());
-        }
+        return PartialSorter.sortAndLimit(matches.entrySet(), maxItemsToList, (o1, o2) -> o1.getValue().compareTo(o2.getValue()) < 0 ? 1 : -1)
+                .stream()
+                .map(e -> new ScoreWrapper<>(e.getKey(), e.getValue()))
+                .collect(Collectors.toList());
     }
 
     @NotNull
     private Map<T, Double> findAndScoreImpl(@NotNull final Set<String> suppliedFragments) {
+        if (suppliedFragments.isEmpty())
+            return Collections.emptyMap();
+
+        /*
+         * Avoid calling into merges if we are looking for only one keyword
+         */
+        if (suppliedFragments.size() == 1)
+            return walkAndScore(suppliedFragments.iterator().next());
+
         if (accumulationPolicy == UNION)
             return findAndScoreUnionImpl(suppliedFragments);
         else // implied (withAccumulationPolicy == INTERSECTION)
@@ -557,7 +554,7 @@ public class QuickSearch<T> {
             Map<T, Double> fragmentItems = walkAndScore(suppliedFragment);
 
             if (fragmentItems.isEmpty())
-                return fragmentItems; // Can fail early
+                return fragmentItems; // Can fail early, no results will be found
 
             if (accumulatedItems == null) { // first item
                 accumulatedItems = fragmentItems;
@@ -566,7 +563,7 @@ public class QuickSearch<T> {
                 accumulatedItems.keySet().retainAll(fragmentItems.keySet());
                 accumulatedItems.entrySet().forEach(e -> e.setValue(e.getValue() + fragmentItems.get(e.getKey())));
 
-            } else { // trickier, merge two (existing and newly supplied) maps into a new one
+            } else { // cache is active, merge two (existing and newly supplied) maps into a new one
                 Map<T, Double> destinationMap = new LinkedHashMap<>(accumulatedItems.size());
 
                 accumulatedItems.entrySet().forEach(e -> {
