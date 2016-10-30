@@ -21,7 +21,7 @@ in single digit microsecond range. Less than 50MB of heap required for 100'000 u
 
 ## Demo
 
-Live demo available at http://zigurs.com/quicksearch.html (instance of https://github.com/karliszigurs/QuickSearchServer).
+Live demo available at http://zigurs.com/qs/ (instance of https://github.com/karliszigurs/QuickSearchServer).
 
 ## Include it in your project
 
