@@ -30,6 +30,7 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import static com.zigurs.karlis.utils.search.PartialSorter.sortAndLimit;
 import static com.zigurs.karlis.utils.search.QuickSearch.ACCUMULATION_POLICY.UNION;
 import static com.zigurs.karlis.utils.search.QuickSearch.UNMATCHED_POLICY.BACKTRACKING;
 
@@ -511,7 +512,7 @@ public class QuickSearch<T> {
         if (matches.isEmpty())
             return Collections.emptyList();
 
-        return PartialSorter.sortAndLimit(matches.entrySet(), maxItemsToList, (o1, o2) -> o1.getValue().compareTo(o2.getValue()) < 0 ? 1 : -1)
+        return sortAndLimit(matches.entrySet(), maxItemsToList, (o1, o2) -> -o1.getValue().compareTo(o2.getValue()))
                 .stream()
                 .map(e -> new ScoreWrapper<>(e.getKey(), e.getValue()))
                 .collect(Collectors.toList());
