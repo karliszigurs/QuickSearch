@@ -29,6 +29,13 @@ import java.util.*;
  */
 public class PartialSorter {
 
+    /*
+     * Magical number where we switch from using array to using TreeSet.
+     *
+     * Determined after profiling / benchmarking scaling curves and consulting with pixies.
+     */
+    private static final int ARRAY_SORT_LIMIT = 101;
+
     /**
      * Sort function which delegates the sorting to likely more efficient
      * internal sorting implementation for the given input size and desired
@@ -46,77 +53,66 @@ public class PartialSorter {
         Objects.requireNonNull(input);
         Objects.requireNonNull(comparator);
 
-        if (limitResultsTo < 1)
+        if (limitResultsTo < 1 || input.isEmpty())
             return Collections.emptyList();
 
-        if (limitResultsTo < 11)
-            return sortAndLimitWithArrayList(input, limitResultsTo, comparator);
+        if (limitResultsTo < ARRAY_SORT_LIMIT)
+            return sortAndLimitWithArray(input, limitResultsTo, comparator);
         else
             return sortAndLimitWithTreeSet(input, limitResultsTo, comparator);
     }
 
-    /**
-     * Sort function accumulating top results in a tree set
-     *
-     * @param input          collection to select elements from
-     * @param limitResultsTo maximum size of generated ordered list, negative or 0 will return empty list
-     * @param comparator     comparator to use (or use Comparator.naturalOrder())
-     * @param <X>            type of objects to sort
-     * @return sorted list consisting of first (up to limitResultsTo) elements in specified comparator order
-     */
-    public static <X> List<X> sortAndLimitWithTreeSet(@NotNull final Collection<? extends X> input,
+    private static <X> List<X> sortAndLimitWithTreeSet(@NotNull final Collection<? extends X> input,
                                                       final int limitResultsTo,
                                                       @NotNull final Comparator<X> comparator) {
         TreeSet<X> results = new TreeSet<>(comparator);
 
+        X lastEntry = null;
+
         for (X entry : input) {
             if (results.size() < limitResultsTo) {
                 results.add(entry);
-            } else if (comparator.compare(entry, results.last()) < 0) {
+                lastEntry = results.last();
+            } else if (comparator.compare(entry, lastEntry) < 0) {
                 results.add(entry);
                 results.remove(results.last());
+                lastEntry = results.last();
             }
         }
 
         return new ArrayList<>(results);
     }
 
-    /**
-     * Sort function accumulating results in an array list
-     *
-     * @param input          collection to select elements from
-     * @param limitResultsTo maximum size of generated ordered list, negative or 0 will return empty list
-     * @param comparator     comparator to use (or use Comparator.naturalOrder())
-     * @param <X>            type of objects to sort
-     * @return sorted list consisting of first (up to limitResultsTo) elements in specified comparator order
-     */
-    public static <X> List<X> sortAndLimitWithArrayList(@NotNull final Collection<? extends X> input,
-                                                        final int limitResultsTo,
-                                                        @NotNull final Comparator<X> comparator) {
-        List<X> result = new ArrayList<>(limitResultsTo + 1);
+    private static <X> List<X> sortAndLimitWithArray(@NotNull final Collection<? extends X> input,
+                                                    final int limitResultsTo,
+                                                    @NotNull final Comparator<X> comparator) {
+        //noinspection unchecked
+        X[] array = (X[]) new Object[Math.min(input.size(), limitResultsTo)];
+
+        X lastEntry = null;
 
         for (X entry : input) {
-            if (result.size() < limitResultsTo) {
-                insertInListInOrderedPos(result, entry, comparator);
-            } else if (comparator.compare(entry, result.get(result.size() - 1)) < 0) {
-                insertInListInOrderedPos(result, entry, comparator);
-                result.remove(result.size() - 1);
+            if (lastEntry == null) { //handle initial population
+                for (int pos = 0; pos < array.length; pos++) {
+                    if (array[pos] == null || comparator.compare(entry, array[pos]) < 0) {
+                        System.arraycopy(array, pos, array, pos + 1, array.length - (pos + 1));
+                        array[pos] = entry;
+                        break;
+                    }
+                }
+                lastEntry = array[array.length - 1];
+            } else if (comparator.compare(entry, lastEntry) < 0) {
+                for (int pos = 0; pos < array.length; pos++) {
+                    if (comparator.compare(entry, array[pos]) < 0) {
+                        System.arraycopy(array, pos, array, pos + 1, array.length - (pos + 1));
+                        array[pos] = entry;
+                        break;
+                    }
+                }
+                lastEntry = array[array.length - 1];
             }
         }
 
-        return result;
-    }
-
-    private static <X> void insertInListInOrderedPos(List<X> result,
-                                                     X entry,
-                                                     Comparator<X> comparator) {
-        for (int pos = 0; pos < result.size(); pos++) {
-            if (comparator.compare(entry, result.get(pos)) < 0) {
-                result.add(pos, entry);
-                return;
-            }
-        }
-        // If not added already (and returned there), append to end of the list
-        result.add(entry);
+        return Arrays.asList(array);
     }
 }
