@@ -139,15 +139,6 @@ public class HeapLimitedGraphNodeCache<T> implements Cache<GraphNode<T>, Map<T, 
         long writeStamp = mapLock.writeLock();
         try {
             misses++;
-            Map<T, Double> cached = cache.get(node.getFragment());
-
-            /*
-             * Another thread already populated it, we can return
-             */
-            if (cached != null) {
-                hits++;
-                return cached;
-            }
 
             /*
              * Continue to populate...
