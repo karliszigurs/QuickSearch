@@ -1,12 +1,13 @@
 [![Build Status](https://travis-ci.org/karliszigurs/QuickSearch.svg?branch=master)](https://travis-ci.org/karliszigurs/QuickSearch) [![SonarQube Coverage](https://img.shields.io/sonar/http/sonarqube.com/com.zigurs.karlis.utils.search:quicksearch/coverage.svg)](https://sonarqube.com/dashboard/index?id=com.zigurs.karlis.utils.search%3Aquicksearch) [![SonarQube Tech Debt](https://img.shields.io/sonar/http/sonarqube.com/com.zigurs.karlis.utils.search:quicksearch/tech_debt.svg)](https://sonarqube.com/dashboard/index?id=com.zigurs.karlis.utils.search%3Aquicksearch) [![Coverty Scan](https://scan.coverity.com/projects/10587/badge.svg)](https://scan.coverity.com/projects/karliszigurs-quicksearch) [![Codacy grade](https://img.shields.io/codacy/grade/c0340f5e099740d4b27c830c282d073e.svg)](https://www.codacy.com/app/homolupus/QuickSearch/dashboard)
 # QuickSearch
+
 Simple and lightweight in-memory search library for Java 8 web and desktop applications. Single 20KB jar. 100% test coverage.
 
 QuickSearch provides pretty instant incremental search over arbitrary items and their keywords.
 This is achieved by adding items and pre-calculating corresponding matching keywords and their
 fragments that are then matched against users input during search.
 
-It is well suited for small to medium datasets (e.g. up to a few tens of thousands items) that can fit into memory, e.g.
+It is well suited for small to medium data sets (e.g. up to a few tens of thousands items) that can fit into memory, e.g.
 
   * Contacts lookup (keywords of department, position, location, etc)
   * Online shop stock (keywords of category, raw description, brand names, reviews)
