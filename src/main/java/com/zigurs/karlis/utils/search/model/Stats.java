@@ -1,5 +1,7 @@
 /*
- * Copyright 2016 Karlis Zigurs
+ *                                     //
+ * Copyright 2016 Karlis Zigurs (http://zigurs.com)
+ *                                   //
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.

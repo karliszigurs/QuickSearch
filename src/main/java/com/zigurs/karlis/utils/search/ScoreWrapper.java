@@ -1,5 +1,7 @@
 /*
- * Copyright 2016 Karlis Zigurs
+ *                                     //
+ * Copyright 2016 Karlis Zigurs (http://zigurs.com)
+ *                                   //
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,8 +17,6 @@
  */
 package com.zigurs.karlis.utils.search;
 
-import org.jetbrains.annotations.NotNull;
-
 /**
  * Internal utility class. Package access for testing purposes.
  * <p>
@@ -24,16 +24,15 @@ import org.jetbrains.annotations.NotNull;
  */
 public class ScoreWrapper<T> {
 
-    @NotNull
     private final T item;
     private final double score;
 
-    public ScoreWrapper(@NotNull final T item, final double score) {
+    public ScoreWrapper(final T item, final double score) {
         this.item = item;
         this.score = score;
     }
 
-    @NotNull
+
     public T unwrap() {
         return item;
     }

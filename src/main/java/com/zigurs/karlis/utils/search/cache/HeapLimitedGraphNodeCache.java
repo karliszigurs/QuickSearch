@@ -1,5 +1,7 @@
 /*
- * Copyright 2016 Karlis Zigurs
+ *                                     //
+ * Copyright 2016 Karlis Zigurs (http://zigurs.com)
+ *                                   //
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +18,6 @@
 package com.zigurs.karlis.utils.search.cache;
 
 import com.zigurs.karlis.utils.search.GraphNode;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.Collections;
 import java.util.Deque;
@@ -97,9 +98,9 @@ public class HeapLimitedGraphNodeCache<T> implements Cache<GraphNode<T>, Map<T, 
      * @return result ether from cache or from the supplied function
      */
     @Override
-    @NotNull
-    public Map<T, Double> getFromCacheOrSupplier(@NotNull final GraphNode<T> node,
-                                                 @NotNull final Function<GraphNode<T>, Map<T, Double>> supplier) {
+
+    public Map<T, Double> getFromCacheOrSupplier(final GraphNode<T> node,
+                                                 final Function<GraphNode<T>, Map<T, Double>> supplier) {
         boolean cacheable;
 
         /*
@@ -166,7 +167,7 @@ public class HeapLimitedGraphNodeCache<T> implements Cache<GraphNode<T>, Map<T, 
         }
     }
 
-    private boolean isCacheable(@NotNull final String key) {
+    private boolean isCacheable(final String key) {
         return !cacheDisabled && key.length() <= keyLengthLimit;
     }
 
@@ -177,15 +178,13 @@ public class HeapLimitedGraphNodeCache<T> implements Cache<GraphNode<T>, Map<T, 
          * scale back what we cache (or disable cache if already
          * at the shortest keys).
          */
-        if (keyLengthLimit > 0) {
-            keyLengthLimit--;
-            cacheDisabled = keyLengthLimit < 1;
+        keyLengthLimit--;
+        cacheDisabled = keyLengthLimit < 1;
 
-            if (cacheDisabled) {
-                cache.clear(); // DO NOT call clearCache() here, lock may be non-re-entrant
-                currentEntries = 0L;
-                return;
-            }
+        if (cacheDisabled) {
+            cache.clear(); // DO NOT call clearCache() here, lock may be non-re-entrant
+            currentEntries = 0L;
+            return;
         }
 
         /*

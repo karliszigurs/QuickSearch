@@ -1,5 +1,7 @@
 /*
- * Copyright 2016 Karlis Zigurs
+ *                                     //
+ * Copyright 2016 Karlis Zigurs (http://zigurs.com)
+ *                                   //
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +16,6 @@
  * limitations under the License.
  */
 package com.zigurs.karlis.utils.search;
-
-import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 import java.util.function.Consumer;
@@ -60,42 +60,27 @@ public class ImmutableSet<T> extends AbstractSet<T> {
      */
     private static final ImmutableSet EMPTY_SET = new ImmutableSet(new Object[0]) {
         @Override
-        public int size() {
-            return 0;
-        }
-
-        @Override
-        public boolean contains(Object o) {
-            return false;
-        }
-
-        @NotNull
-        @Override
         public Iterator iterator() {
             return NULL_ITERATOR;
         }
 
         @Override
-        public void forEach(Consumer action) {
-            /* No operation */
-        }
-
-        @NotNull
-        @Override
         public ImmutableSet safeCopy() {
             return EMPTY_SET;
         }
     };
+
     /**
      * Array with elements in this set.
      */
     private final T[] array;
+
     /**
      * Cached hashcode
      */
     private int hashCode = 0;
 
-    private ImmutableSet(@NotNull final T[] array) {
+    private ImmutableSet(final T[] array) {
         this.array = array;
     }
 
@@ -105,7 +90,6 @@ public class ImmutableSet<T> extends AbstractSet<T> {
      * @param <S> type
      * @return empty set
      */
-    @NotNull
     public static <S> ImmutableSet<S> empty() {
         return (ImmutableSet<S>) EMPTY_SET;
     }
@@ -117,8 +101,7 @@ public class ImmutableSet<T> extends AbstractSet<T> {
      * @param <S>  type
      * @return set of type with specified member
      */
-    @NotNull
-    public static <S> ImmutableSet<S> fromSingle(@NotNull final S item) {
+    public static <S> ImmutableSet<S> fromSingle(final S item) {
         Objects.requireNonNull(item);
 
         return new ImmutableSet<>((S[]) new Object[]{item});
@@ -135,9 +118,8 @@ public class ImmutableSet<T> extends AbstractSet<T> {
      * @param <S>    type
      * @return set of items
      */
-    @NotNull
-    public static <S> ImmutableSet<S> addAndCreate(@NotNull final Collection<? extends S> source,
-                                                   @NotNull final S item) {
+    public static <S> ImmutableSet<S> addAndCreate(final Collection<? extends S> source,
+                                                   final S item) {
         Objects.requireNonNull(source);
         Objects.requireNonNull(item);
 
@@ -173,9 +155,8 @@ public class ImmutableSet<T> extends AbstractSet<T> {
      * @param <S>         type
      * @return set of original collection items minus specified item
      */
-    @NotNull
-    public static <S> ImmutableSet<S> removeAndCreate(@NotNull final Collection<? extends S> source,
-                                                      @NotNull final S surplusItem) {
+    public static <S> ImmutableSet<S> removeAndCreate(final Collection<? extends S> source,
+                                                      final S surplusItem) {
         Objects.requireNonNull(source);
         Objects.requireNonNull(surplusItem);
 
@@ -190,8 +171,8 @@ public class ImmutableSet<T> extends AbstractSet<T> {
         }
     }
 
-    private static <S> ImmutableSet<S> removeViaCompacting(@NotNull final ImmutableSet<S> set,
-                                                           @NotNull final S surplusItem) {
+    private static <S> ImmutableSet<S> removeViaCompacting(final ImmutableSet<S> set,
+                                                           final S surplusItem) {
         if (set.isEmpty())
             return set;
 
@@ -220,8 +201,7 @@ public class ImmutableSet<T> extends AbstractSet<T> {
      * @param <S>    type
      * @return read only set
      */
-    @NotNull
-    public static <S> ImmutableSet<S> fromCollection(@NotNull final Collection<? extends S> source) {
+    public static <S> ImmutableSet<S> fromCollection(final Collection<? extends S> source) {
         Objects.requireNonNull(source);
 
         if (source.isEmpty())
@@ -249,9 +229,8 @@ public class ImmutableSet<T> extends AbstractSet<T> {
      * @param <S>     type
      * @return set of unique items across both collections
      */
-    @NotNull
-    public static <S> ImmutableSet<S> fromCollections(@NotNull final Collection<? extends S> source,
-                                                      @NotNull final Collection<? extends S> source2) {
+    public static <S> ImmutableSet<S> fromCollections(final Collection<? extends S> source,
+                                                      final Collection<? extends S> source2) {
         Objects.requireNonNull(source);
         Objects.requireNonNull(source2);
 
@@ -311,7 +290,6 @@ public class ImmutableSet<T> extends AbstractSet<T> {
         return false;
     }
 
-    @NotNull
     @Override
     public Iterator<T> iterator() {
         return new ArrayIterator(array);
@@ -327,7 +305,6 @@ public class ImmutableSet<T> extends AbstractSet<T> {
         }
     }
 
-    @NotNull
     public ImmutableSet<T> safeCopy() {
         return new ImmutableSet<>(Arrays.copyOf(array, array.length));
     }
@@ -339,7 +316,6 @@ public class ImmutableSet<T> extends AbstractSet<T> {
      *
      * @return calculated hashcode
      */
-    @SuppressWarnings("ForLoopReplaceableByForEach")
     @Override
     public int hashCode() {
         if (hashCode != 0)
@@ -352,6 +328,7 @@ public class ImmutableSet<T> extends AbstractSet<T> {
          */
 
         int h = 0;
+        //noinspection ForLoopReplaceableByForEach
         for (int i = 0; i < array.length; i++)
             h += array[i].hashCode();
 

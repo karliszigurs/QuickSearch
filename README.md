@@ -75,6 +75,11 @@ All internal data structures are pre-calculated and reside in memory. Following 
   * [X] web service and quick search API (https://github.com/karliszigurs/QuickSearchServer)
   * [ ] fuzzy text matching
 
-## Credits
+### Credits
 
-Karlis Zigurs, 2016
+```
+                              //
+(C) 2016 Karlis Zigurs (http://zigurs.com)
+                            //
+```
+

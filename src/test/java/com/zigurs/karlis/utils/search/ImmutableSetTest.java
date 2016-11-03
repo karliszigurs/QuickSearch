@@ -1,5 +1,7 @@
 /*
- * Copyright 2016 Karlis Zigurs
+ *                                     //
+ * Copyright 2016 Karlis Zigurs (http://zigurs.com)
+ *                                   //
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -126,6 +128,14 @@ public class ImmutableSetTest {
     }
 
     @Test
+    public void removeAndCreate5() throws Exception {
+        Collection<String> single = ImmutableSet.empty();
+        Set<String> set = ImmutableSet.removeAndCreate(single, "Ea");
+        assertTrue(set.isEmpty());
+        assertEquals(0, set.size());
+    }
+
+    @Test
     public void fromCollection() throws Exception {
         Set<String> set = ImmutableSet.fromCollection(Arrays.asList("cat", "dog"));
         assertFalse(set.isEmpty());
@@ -202,7 +212,7 @@ public class ImmutableSetTest {
         set.forEach(Assert::assertNotNull);
     }
 
-    @Test(expected=NoSuchElementException.class)
+    @Test(expected = NoSuchElementException.class)
     public void iterator1() throws Exception {
         Set<String> set = ImmutableSet.empty();
         for (int i = 0; i < 10; i++) {
@@ -212,7 +222,7 @@ public class ImmutableSetTest {
         Iterator<String> iterator = set.iterator();
 
         //noinspection InfiniteLoopStatement
-        while(true)
+        while (true)
             iterator.next();
     }
 
@@ -348,6 +358,4 @@ public class ImmutableSetTest {
         assertTrue(set.equals(ImmutableSet.empty()));
         assertTrue(set.equals(Collections.emptySet()));
     }
-
-
 }

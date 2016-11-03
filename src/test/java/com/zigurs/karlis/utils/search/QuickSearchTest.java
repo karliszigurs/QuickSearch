@@ -680,9 +680,21 @@ public class QuickSearchTest {
     }
 
     @Test
+    public void largeUnionWorks() throws Exception {
+        for (int i = 0; i < 1000; i++)
+            addItem("Item" + i, "one two three");
+
+        Result<String> res = searchInstance.findItemsWithDetail("two three", 10);
+
+        assertEquals("Unexpected result size", 10, res.getResponseItems().size());
+        assertEquals("Unexpected score", 4.0, res.getResponseItems().get(0).getScore(), 0.0);
+    }
+
+    @Test
     public void intersectionWorks() throws Exception {
         searchInstance = QuickSearch.builder()
                 .withAccumulationPolicy(INTERSECTION)
+                .withCache()
                 .build();
 
         addItem("test1", "one two");
@@ -756,6 +768,50 @@ public class QuickSearchTest {
         assertEquals("Unexpected result size", 2, res.getResponseItems().size());
         assertEquals("Unexpected score", 4.0, res.getResponseItems().get(0).getScore(), 0.0);
         assertEquals("Unexpected score", 4.0, res.getResponseItems().get(1).getScore(), 0.0);
+    }
+
+    @Test
+    public void checkCacheReports() throws Exception {
+        searchInstance = QuickSearch.builder()
+                .withAccumulationPolicy(INTERSECTION)
+                .withCache()
+                .build();
+
+        addItem("test1", "one two");
+        addItem("test2", "two three");
+        addItem("test3", "three four");
+        addItem("test4", "three five");
+        addItem("test5", "three six");
+        addItem("test6", "three seven");
+        addItem("test7", "zebra cat");
+
+        assertEquals("Unexpected result size", 1, searchInstance.findItems("two three", 10).size());
+        assertEquals("Unexpected result size", 2, searchInstance.findItems("two", 10).size());
+        assertEquals("Unexpected result size", 1, searchInstance.findItems("three two", 10).size());
+        assertEquals("Unexpected result size", 0, searchInstance.findItems("three cat two zebra", 10).size());
+        assertEquals("Unexpected result size", 0, searchInstance.findItems("cat three two", 10).size());
+
+        assertTrue(searchInstance.getCacheStats().isPresent());
+
+        assertEquals(8, searchInstance.getCacheStats().get().getHits());
+        assertEquals(0, searchInstance.getCacheStats().get().getEvictions());
+        assertEquals(4, searchInstance.getCacheStats().get().getMisses());
+        assertEquals(9, searchInstance.getCacheStats().get().getSize());
+        assertEquals(0, searchInstance.getCacheStats().get().getUncacheable());
+    }
+
+
+    @Test
+    public void checkCacheMissing() throws Exception {
+        searchInstance = QuickSearch.builder()
+                .withAccumulationPolicy(UNION)
+                .build();
+
+        addItem("test1", "one two");
+
+        assertEquals("Unexpected result size", 1, searchInstance.findItems("two three", 10).size());
+
+        assertFalse(searchInstance.getCacheStats().isPresent());
     }
 
     @Test
