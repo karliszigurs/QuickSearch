@@ -28,14 +28,14 @@ import static org.junit.Assert.*;
 public class ImmutableSetTest {
 
     @Test
-    public void empty() throws Exception {
+    public void empty() {
         Set<String> set = ImmutableSet.empty();
         assertTrue(set.isEmpty());
         assertEquals(0, set.size());
     }
 
     @Test
-    public void fromSingle() throws Exception {
+    public void fromSingle() {
         String cat = "cat";
         Set<String> set = ImmutableSet.fromSingle(cat);
         assertFalse(set.isEmpty());
@@ -44,7 +44,7 @@ public class ImmutableSetTest {
     }
 
     @Test
-    public void addAndCreate() throws Exception {
+    public void addAndCreate() {
         String cat = "cat";
         String dog = "dog";
 
@@ -56,7 +56,7 @@ public class ImmutableSetTest {
     }
 
     @Test
-    public void addAndCreate1() throws Exception {
+    public void addAndCreate1() {
         String cat = "cat";
         String dog = "dog";
 
@@ -69,7 +69,7 @@ public class ImmutableSetTest {
     }
 
     @Test
-    public void addAndCreate2() throws Exception {
+    public void addAndCreate2() {
         Collection<String> single = Collections.singleton("cat");
         Set<String> set = ImmutableSet.addAndCreate(single, "dog");
         assertFalse(set.isEmpty());
@@ -78,7 +78,7 @@ public class ImmutableSetTest {
     }
 
     @Test
-    public void removeAndCreate() throws Exception {
+    public void removeAndCreate() {
         String cat = "cat";
         String dog = "dog";
 
@@ -91,7 +91,7 @@ public class ImmutableSetTest {
     }
 
     @Test
-    public void removeAndCreate1() throws Exception {
+    public void removeAndCreate1() {
         Set<String> single = ImmutableSet.fromSingle("cat");
         Set<String> set = ImmutableSet.removeAndCreate(single, "cat");
         assertTrue(set.isEmpty());
@@ -99,7 +99,7 @@ public class ImmutableSetTest {
     }
 
     @Test
-    public void removeAndCreate2() throws Exception {
+    public void removeAndCreate2() {
         Set<String> single = ImmutableSet.fromSingle("cat");
         Set<String> set = ImmutableSet.removeAndCreate(single, "dog");
         assertFalse(set.isEmpty());
@@ -108,7 +108,7 @@ public class ImmutableSetTest {
     }
 
     @Test
-    public void removeAndCreate3() throws Exception {
+    public void removeAndCreate3() {
         Collection<String> single = Collections.singleton("cat");
         Set<String> set = ImmutableSet.removeAndCreate(single, "dog");
         assertFalse(set.isEmpty());
@@ -117,7 +117,7 @@ public class ImmutableSetTest {
     }
 
     @Test
-    public void removeAndCreate4() throws Exception {
+    public void removeAndCreate4() {
         assertEquals("FB".hashCode(), "Ea".hashCode());
 
         Collection<String> single = ImmutableSet.fromCollection(Arrays.asList("FB", "one"));
@@ -128,7 +128,7 @@ public class ImmutableSetTest {
     }
 
     @Test
-    public void removeAndCreate5() throws Exception {
+    public void removeAndCreate5() {
         Collection<String> single = ImmutableSet.empty();
         Set<String> set = ImmutableSet.removeAndCreate(single, "Ea");
         assertTrue(set.isEmpty());
@@ -136,7 +136,7 @@ public class ImmutableSetTest {
     }
 
     @Test
-    public void fromCollection() throws Exception {
+    public void fromCollection() {
         Set<String> set = ImmutableSet.fromCollection(Arrays.asList("cat", "dog"));
         assertFalse(set.isEmpty());
         assertEquals(2, set.size());
@@ -144,7 +144,7 @@ public class ImmutableSetTest {
     }
 
     @Test
-    public void fromCollection1() throws Exception {
+    public void fromCollection1() {
         Set<String> set = ImmutableSet.fromCollection(Collections.emptySet());
         assertTrue(set.isEmpty());
         assertEquals(0, set.size());
@@ -152,7 +152,7 @@ public class ImmutableSetTest {
     }
 
     @Test
-    public void fromCollections() throws Exception {
+    public void fromCollections() {
         Set<String> set = ImmutableSet.fromCollections(Arrays.asList("cat", "dog"), Arrays.asList("red", "blue"));
         assertFalse(set.isEmpty());
         assertEquals(4, set.size());
@@ -160,7 +160,7 @@ public class ImmutableSetTest {
     }
 
     @Test
-    public void fromCollections1() throws Exception {
+    public void fromCollections1() {
         Set<String> set = ImmutableSet.fromCollections(Collections.emptySet(), Arrays.asList("red", "blue"));
         assertFalse(set.isEmpty());
         assertEquals(2, set.size());
@@ -168,7 +168,7 @@ public class ImmutableSetTest {
     }
 
     @Test
-    public void fromCollections2() throws Exception {
+    public void fromCollections2() {
         Set<String> set = ImmutableSet.fromCollections(Arrays.asList("red", "blue"), Collections.emptySet());
         assertFalse(set.isEmpty());
         assertEquals(2, set.size());
@@ -176,7 +176,7 @@ public class ImmutableSetTest {
     }
 
     @Test
-    public void fromCollections3() throws Exception {
+    public void fromCollections3() {
         Set<String> set = ImmutableSet.fromCollections(Collections.emptySet(), Collections.emptySet());
         assertTrue(set.isEmpty());
         assertEquals(0, set.size());
@@ -184,7 +184,7 @@ public class ImmutableSetTest {
     }
 
     @Test
-    public void contains() throws Exception {
+    public void contains() {
         Set<String> set = ImmutableSet.empty();
         for (int i = 0; i < 1000; i++) {
             set = ImmutableSet.addAndCreate(set, "Item" + i);
@@ -196,14 +196,14 @@ public class ImmutableSetTest {
     }
 
     @Test
-    public void contains1() throws Exception {
+    public void contains1() {
         assertEquals("FB".hashCode(), "Ea".hashCode());
         Set<String> set = ImmutableSet.fromSingle("FB");
         assertFalse(set.contains("Ea"));
     }
 
     @Test
-    public void iterator() throws Exception {
+    public void iterator() {
         Set<String> set = ImmutableSet.empty();
         for (int i = 0; i < 1000; i++) {
             set = ImmutableSet.addAndCreate(set, "Item" + i);
@@ -213,7 +213,7 @@ public class ImmutableSetTest {
     }
 
     @Test(expected = NoSuchElementException.class)
-    public void iterator1() throws Exception {
+    public void iterator1() {
         Set<String> set = ImmutableSet.empty();
         for (int i = 0; i < 10; i++) {
             set = ImmutableSet.addAndCreate(set, "Item" + i);
@@ -227,7 +227,7 @@ public class ImmutableSetTest {
     }
 
     @Test
-    public void forEach() throws Exception {
+    public void forEach() {
         Set<String> set = ImmutableSet.empty();
         for (int i = 0; i < 1000; i++) {
             set = ImmutableSet.addAndCreate(set, "Item" + i);
@@ -240,7 +240,7 @@ public class ImmutableSetTest {
     }
 
     @Test
-    public void safeCopy() throws Exception {
+    public void safeCopy() {
         ImmutableSet<String> set = ImmutableSet.empty();
         for (int i = 0; i < 1000; i++) {
             set = ImmutableSet.addAndCreate(set, "Item" + i);

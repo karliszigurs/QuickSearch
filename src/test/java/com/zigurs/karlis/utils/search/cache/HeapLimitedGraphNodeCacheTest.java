@@ -43,7 +43,7 @@ public class HeapLimitedGraphNodeCacheTest {
     };
 
     @Before
-    public void setUp() throws Exception {
+    public void setUp() {
         cache = new HeapLimitedGraphNodeCache<>(1024 * 1024);
     }
 

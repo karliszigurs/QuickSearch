@@ -87,12 +87,12 @@ public class QuickSearchTest {
     private QuickSearch<String> searchInstance;
 
     @Before
-    public void setUp() throws Exception {
+    public void setUp() {
         searchInstance = QuickSearch.builder().build();
     }
 
     @After
-    public void tearDown() throws Exception {
+    public void tearDown() {
         searchInstance = null;
     }
 
@@ -231,35 +231,35 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void itemAdded() throws Exception {
+    public void itemAdded() {
         addItem("item", "one two three");
         checkStats(1, 23);
         assertEquals(1, searchInstance.getStats().getItems());
     }
 
     @Test
-    public void missingKeywords() throws Exception {
+    public void missingKeywords() {
         assertFalse("Add a new search item with no keywords?", searchInstance.addItem("item", ""));
     }
 
     @Test
-    public void missingKeywords2() throws Exception {
+    public void missingKeywords2() {
         assertFalse("Add a new search item with no keywords?", searchInstance.addItem("item", "    "));
     }
 
     @Test
-    public void emptyItemAdded2() throws Exception {
+    public void emptyItemAdded2() {
         addItem("", "one two three");
         assertEquals(1, searchInstance.getStats().getItems());
     }
 
     @Test
-    public void nullItemAdded() throws Exception {
+    public void nullItemAdded() {
         assertFalse("Failed to add a new search item.", searchInstance.addItem(null, "one two three"));
     }
 
     @Test
-    public void nullItemAdded2() throws Exception {
+    public void nullItemAdded2() {
         assertFalse("Failed to add a new search item.", searchInstance.addItem("item", null));
     }
 
@@ -275,14 +275,14 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void itemRemoved() throws Exception {
+    public void itemRemoved() {
         addItem("toBeRemoved", "one two three");
         searchInstance.removeItem("toBeRemoved");
         assertEquals(0, searchInstance.getStats().getFragments());
     }
 
     @Test
-    public void itemRemoved1() throws Exception {
+    public void itemRemoved1() {
         addItem("test1", "onex two three");
         addItem("test2", "onexx two three");
         addItem("test3", "one two three");
@@ -299,14 +299,14 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void itemRemoved2() throws Exception {
+    public void itemRemoved2() {
         addItem("toBeRemoved", "one two three");
         searchInstance.removeItem(null);
         assertEquals(23, searchInstance.getStats().getFragments());
     }
 
     @Test
-    public void itemRemoved3() throws Exception {
+    public void itemRemoved3() {
         searchInstance = QuickSearch.builder().withCache().build();
 
         addItem("toBeRemoved", "one two three");
@@ -317,7 +317,7 @@ public class QuickSearchTest {
 
 
     @Test
-    public void removeTwice() throws Exception {
+    public void removeTwice() {
         addItem("test1", "onex two three");
         addItem("test2", "onexx two three");
         addItem("test3", "one two three");
@@ -336,85 +336,85 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void itemFound() throws Exception {
+    public void itemFound() {
         addItem("test", "one two three");
         assertNotNull("Search item not found", searchInstance.findItem("one"));
     }
 
     @Test
-    public void itemNotFound() throws Exception {
+    public void itemNotFound() {
         addItem("test", "one two three");
         assertFalse("Search item not found", searchInstance.findItem("").isPresent());
     }
 
     @Test
-    public void itemNotFound8() throws Exception {
+    public void itemNotFound8() {
         addItem("test", "one two three");
         assertFalse("Search item not found", searchInstance.findItem("   ").isPresent());
     }
 
     @Test
-    public void itemNotFound1() throws Exception {
+    public void itemNotFound1() {
         addItem("test", "one two three");
         assertTrue("Search item not found", searchInstance.findItems("", 1).isEmpty());
     }
 
     @Test
-    public void itemNotFound2() throws Exception {
+    public void itemNotFound2() {
         addItem("test", "one two three");
         assertFalse("Search item not found", searchInstance.findItemWithDetail("").isPresent());
     }
 
     @Test
-    public void itemNotFound10() throws Exception {
+    public void itemNotFound10() {
         addItem("test", "one two three");
         assertFalse("Search item not found", searchInstance.findItemWithDetail("    ").isPresent());
     }
 
     @Test
-    public void itemNotFound9() throws Exception {
+    public void itemNotFound9() {
         addItem("test", "one two three");
         assertTrue("Search item not found", searchInstance.findItemsWithDetail("    ", 1).getResponseItems().isEmpty());
     }
 
     @Test
-    public void itemNotFound3() throws Exception {
+    public void itemNotFound3() {
         addItem("test", "one two three");
         assertTrue("Search item not found", searchInstance.findItemsWithDetail("", 1).getResponseItems().isEmpty());
     }
 
     @Test
-    public void itemNotFound4() throws Exception {
+    public void itemNotFound4() {
         addItem("test", "one two three");
         assertTrue("Search item not found", searchInstance.findItemsWithDetail("", 0).getResponseItems().isEmpty());
     }
 
     @Test
-    public void itemNotFound5() throws Exception {
+    public void itemNotFound5() {
         addItem("test", "one two three");
         assertTrue("Search item not found", searchInstance.findItemsWithDetail(null, 1).getResponseItems().isEmpty());
     }
 
     @Test
-    public void itemNotFound6() throws Exception {
+    public void itemNotFound6() {
         addItem("test", "one two three");
         assertFalse("Search item not found", searchInstance.findItemWithDetail("London").isPresent());
     }
 
     @Test
-    public void itemNotFound7() throws Exception {
+    public void itemNotFound7() {
         addItem("test", "one two three");
         assertTrue("Search item not found", searchInstance.findItemsWithDetail("four five", 1).getResponseItems().isEmpty());
     }
 
     @Test
-    public void nullItemNotFound() throws Exception {
+    public void nullItemNotFound() {
         addItem("test", "one two three");
         assertFalse("Search item found", searchInstance.findItem(null).isPresent());
     }
 
     @Test
-    public void augumentedItemFound() throws Exception {
+    public void augumentedItemFound() {
         addItem("test", "one two three");
 
         Optional<Item<String>> result = searchInstance.findItemWithDetail("one");
@@ -423,26 +423,26 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void augumentedItemFoundWithNull() throws Exception {
+    public void augumentedItemFoundWithNull() {
         addItem("test", "one two three");
         assertFalse(searchInstance.findItemWithDetail(null).isPresent());
     }
 
     @Test
-    public void findEmptyResult() throws Exception {
+    public void findEmptyResult() {
         addItem("test", "one two three test");
         assertTrue(searchInstance.findItemsWithDetail("test", 0).getResponseItems().isEmpty());
     }
 
     @Test
-    public void findCompletelyUnrelated() throws Exception {
+    public void findCompletelyUnrelated() {
         addItem("test", "one two three");
         assertTrue(searchInstance.findItemsWithDetail("search engine", 0).getResponseItems().isEmpty());
         assertEquals("search engine", searchInstance.findItemsWithDetail("search engine", 0).getSearchString());
     }
 
     @Test
-    public void itemsFound() throws Exception {
+    public void itemsFound() {
         addItem("test1", "one two three");
         addItem("test2", "one two three");
         addItem("test3", "one two three");
@@ -451,7 +451,7 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void itemsFoundInOrder() throws Exception {
+    public void itemsFoundInOrder() {
         addItem("test1", "onex two three");
         addItem("test2", "one two three");
         addItem("test3", "onexx two three");
@@ -481,7 +481,7 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void findAugumentedItems() throws Exception {
+    public void findAugumentedItems() {
         addItem("test1", "one two three");
         addItem("test2", "one two three");
         addItem("test3", "one two three");
@@ -494,7 +494,7 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void findNoItems() throws Exception {
+    public void findNoItems() {
         addItem("test1", "one two three");
         addItem("test2", "one two three");
         addItem("test3", "one two three");
@@ -502,7 +502,7 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void findWithNullItems() throws Exception {
+    public void findWithNullItems() {
         addItem("test1", "one two three");
         addItem("test2", "one two three");
         addItem("test3", "one two three");
@@ -510,7 +510,7 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void findNoAugumentedItems() throws Exception {
+    public void findNoAugumentedItems() {
         addItem("test1", "one two three");
         addItem("test2", "one two three");
         addItem("test3", "one two three");
@@ -518,7 +518,7 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void exerciseMultiStepMapping() throws Exception {
+    public void exerciseMultiStepMapping() {
         String exerciseString = "aquickbrownfoxjumpsoverthelazydog";
 
         for (int i = 2; i < exerciseString.length(); i++) {
@@ -533,13 +533,13 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void statsAreEmpty() throws Exception {
+    public void statsAreEmpty() {
         checkStats(0, 0);
         assertEquals(0, searchInstance.getStats().getItems());
     }
 
     @Test
-    public void statsAreFull() throws Exception {
+    public void statsAreFull() {
         String exerciseString = "aquickbrownfoxjumpsoverthelazydog";
 
         for (int i = 2; i < exerciseString.length(); i++) {
@@ -556,13 +556,13 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void singleItem() throws Exception {
+    public void singleItem() {
         addItem("test", "abra");
         assertEquals(1, searchInstance.getStats().getItems());
     }
 
     @Test
-    public void alternativeScorerFunction() throws Exception {
+    public void alternativeScorerFunction() {
         QuickSearch<String> alternativeConfig = QuickSearch.builder()
                 .withKeywordMatchScorer((s1, s2) -> (double) (s1.length() * s1.length()))
                 .build();
@@ -582,7 +582,7 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void expandKeywords() throws Exception {
+    public void expandKeywords() {
         String exerciseString = "aquickbrownfoxjumpsoverthelazydog";
 
         for (int i = 2; i < exerciseString.length(); i++) {
@@ -611,7 +611,7 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void findItemsLimit() throws Exception {
+    public void findItemsLimit() {
         addItem("test1", "one two three");
         addItem("test2", "one two three");
         addItem("test3", "one two three");
@@ -623,7 +623,7 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void itemsRanking() throws Exception {
+    public void itemsRanking() {
         addItem("test1", "onex two three");
         addItem("test2", "onexx two three");
         addItem("test3", "one two three");
@@ -638,7 +638,7 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void directMatching() throws Exception {
+    public void directMatching() {
         addItem("test1", "keyword");
         addItem("test2", "keyboard");
 
@@ -649,7 +649,7 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void unionWorks() throws Exception {
+    public void unionWorks() {
         addItem("test1", "one two");
         addItem("test2", "two three");
         addItem("test3", "three four");
@@ -665,7 +665,7 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void unionWorks1() throws Exception {
+    public void unionWorks1() {
         addItem("test1", "one two");
         addItem("test2", "two three");
         addItem("test3", "three four");
@@ -680,7 +680,7 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void largeUnionWorks() throws Exception {
+    public void largeUnionWorks() {
         for (int i = 0; i < 1000; i++)
             addItem("Item" + i, "one two three");
 
@@ -691,7 +691,7 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void intersectionWorks() throws Exception {
+    public void intersectionWorks() {
         searchInstance = QuickSearch.builder()
                 .withAccumulationPolicy(INTERSECTION)
                 .withCache()
@@ -713,7 +713,7 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void intersectionWorks1() throws Exception {
+    public void intersectionWorks1() {
         searchInstance = QuickSearch.builder()
                 .withAccumulationPolicy(INTERSECTION)
                 .build();
@@ -728,7 +728,7 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void intersectionWorks2() throws Exception {
+    public void intersectionWorks2() {
         searchInstance = QuickSearch.builder()
                 .withAccumulationPolicy(INTERSECTION)
                 .build();
@@ -741,7 +741,7 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void intersectionWorks3() throws Exception {
+    public void intersectionWorks3() {
         searchInstance = QuickSearch.builder()
                 .withAccumulationPolicy(INTERSECTION)
                 .build();
@@ -754,7 +754,7 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void intersectionWorks4() throws Exception {
+    public void intersectionWorks4() {
         searchInstance = QuickSearch.builder()
                 .withAccumulationPolicy(INTERSECTION)
                 .build();
@@ -771,7 +771,7 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void checkCacheReports() throws Exception {
+    public void checkCacheReports() {
         searchInstance = QuickSearch.builder()
                 .withAccumulationPolicy(INTERSECTION)
                 .withCache()
@@ -802,7 +802,7 @@ public class QuickSearchTest {
 
 
     @Test
-    public void checkCacheMissing() throws Exception {
+    public void checkCacheMissing() {
         searchInstance = QuickSearch.builder()
                 .withAccumulationPolicy(UNION)
                 .build();
@@ -815,7 +815,7 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void backtrackMatchingStops() throws Exception {
+    public void backtrackMatchingStops() {
         addItem("keyword", "keyword");
         addItem("keyboard", "keyboard");
 
@@ -826,7 +826,7 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void backtrackMatchingContinues() throws Exception {
+    public void backtrackMatchingContinues() {
         addItem("keyword", "keyword one");
         addItem("keyboard", "keyboard");
 
@@ -838,7 +838,7 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void exactMatching() throws Exception {
+    public void exactMatching() {
         searchInstance = QuickSearch.builder()
                 .withAccumulationPolicy(UNION)
                 .withUnmatchedPolicy(EXACT)
@@ -853,7 +853,7 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void clear() throws Exception {
+    public void clear() {
         addItem("test1", "onex two three");
         addItem("test2", "onexx two three");
         addItem("test3", "one two three");
@@ -925,20 +925,20 @@ public class QuickSearchTest {
      * Tests boilerplate
      */
 
-    protected void addItem(String item, String keywords) throws AssertionError {
+    protected void addItem(String item, String keywords) {
         addItem(searchInstance, item, keywords);
     }
 
-    protected void addItem(QuickSearch<String> instance, String item, String keywords) throws AssertionError {
+    protected void addItem(QuickSearch<String> instance, String item, String keywords) {
         assertTrue("Failed to add item", instance.addItem(item, keywords));
     }
 
-    protected void checkStats(int items, int fragments) throws AssertionError {
+    protected void checkStats(int items, int fragments) {
         checkStats(searchInstance.getStats(), items, fragments);
         assertNotNull(searchInstance.getStats());
     }
 
-    protected void checkStats(Stats stats, int items, int fragments) throws AssertionError {
+    protected void checkStats(Stats stats, int items, int fragments) {
         assertEquals(items, stats.getItems());
         assertEquals(fragments, stats.getFragments());
     }

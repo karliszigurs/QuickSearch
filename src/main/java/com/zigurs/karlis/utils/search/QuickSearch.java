@@ -584,12 +584,17 @@ public class QuickSearch<T> {
             } else {
                 return Collections.emptyMap();
             }
+        } else {
+            return walkAndScore(root);
         }
+    }
 
+    private Map<T, Double> walkAndScore(GraphNode<T> root) {
         final Map<T, Double> accumulator = new LinkedHashMap<>(root.getItemsSizeHint() > 0 ? root.getItemsSizeHint() : 16);
         final Set<String> visitsTracker = new HashSet<>(root.getNodesSizeHint() > 0 ? root.getNodesSizeHint() : 16);
 
         Map<T, Double> result;
+
         if (cache != null)
             result = cache.getFromCacheOrSupplier(root, rootNode -> walkAndScore(rootNode.getFragment(), rootNode, accumulator, visitsTracker));
         else

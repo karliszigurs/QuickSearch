@@ -18,10 +18,7 @@
 package com.zigurs.karlis.utils.search;
 
 import org.github.jamm.MemoryMeter;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.TestWatcher;
-import org.junit.runner.Description;
 
 import static org.junit.Assert.assertTrue;
 
@@ -30,25 +27,6 @@ public class QuickSearchMemoryUseTest {
     private static final boolean MEASURE_LARGE_COLLECTIONS = false;
 
     private static final String[][] USA_STATES = QuickSearchTest.USA_STATES;
-
-    @Rule
-    public TestWatcher testWatcher = new TestWatcher() {
-        @Override
-        protected void starting(final Description description) {
-            String methodName = description.getMethodName();
-            String className = description.getClassName();
-            className = className.substring(className.lastIndexOf('.') + 1);
-            System.out.println(String.format("Starting %s (%s)", methodName, className));
-        }
-
-        @Override
-        protected void finished(Description description) {
-            String methodName = description.getMethodName();
-            String className = description.getClassName();
-            className = className.substring(className.lastIndexOf('.') + 1);
-            System.out.println(String.format("Finished %s (%s)", methodName, className));
-        }
-    };
 
     @Test
     public void measureMemoryUse() {
@@ -96,8 +74,6 @@ public class QuickSearchMemoryUseTest {
 
         final int itemsCount = MEASURE_LARGE_COLLECTIONS ? 100_000 : 1_000;
 
-        final long startTime = System.currentTimeMillis();
-
         for (int i = 0; i < itemsCount; i++) {
             String[] items = USA_STATES[i % USA_STATES.length];
             searchInstance.addItem(items[0] + "-" + i, String.format("%s %s %s %s", items[0], items[1], items[2], items[3]));
@@ -117,14 +93,7 @@ public class QuickSearchMemoryUseTest {
             searchInstance.findItem(String.valueOf(character));
         }
 
-        final long endTime = System.currentTimeMillis() - startTime;
-
-        System.out.println(String.format("Inserting and warming caches took %,dms", endTime));
-
-
         MemoryMeter meter = new MemoryMeter().withGuessing(MemoryMeter.Guess.ALWAYS_UNSAFE);
-        final long measured = meter.measureDeep(searchInstance);
-        System.out.println(String.format("Measured instance size: %,d bytes", measured));
-        return measured;
+        return meter.measureDeep(searchInstance);
     }
 }
