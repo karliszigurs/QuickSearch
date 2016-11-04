@@ -362,7 +362,7 @@ public class ImmutableSet<T> extends AbstractSet<T> {
         private final I[] innerArray;
         private int index = 0;
 
-        public ArrayIterator(I[] array) {
+        private ArrayIterator(I[] array) {
             innerArray = array;
         }
 

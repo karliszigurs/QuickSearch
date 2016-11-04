@@ -255,7 +255,7 @@ public class HeapLimitedGraphNodeCache<T> implements Cache<GraphNode<T>, Map<T, 
         private final long size;
         private final boolean isEnabled;
 
-        public HeapLimitedGraphNodeCacheStatistics(final long hits,
+        private HeapLimitedGraphNodeCacheStatistics(final long hits,
                                                    final long misses,
                                                    final long evictions,
                                                    final long uncacheable,
