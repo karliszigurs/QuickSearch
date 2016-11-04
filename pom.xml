@@ -22,7 +22,7 @@
         <dependency>
             <groupId>com.zigurs.karlis.utils</groupId>
             <artifactId>magicsort</artifactId>
-            <version>0.2-SNAPSHOT</version>
+            <version>0.2</version>
         </dependency>
 
         <dependency>

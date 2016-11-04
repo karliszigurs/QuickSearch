@@ -51,10 +51,10 @@ public class HeapLimitedGraphNodeCache<T> implements Cache<GraphNode<T>, Map<T, 
     /*
      * Track and manage size
      */
-    private final int MAX_ALLOWED_ENTRIES;
+    private final int maxAllowedEntries;
     private long currentEntries = 0L;
     private long keyLengthLimit = 10;
-    private boolean cacheDisabled = false;
+    private boolean isDisabled = false;
 
     /*
      * Statistics. Not thread safe, but I'm not
@@ -83,7 +83,7 @@ public class HeapLimitedGraphNodeCache<T> implements Cache<GraphNode<T>, Map<T, 
          * Shouldn't depend on the cached object size as we are only
          * adding a reference to it in the original graph tree.
          */
-        MAX_ALLOWED_ENTRIES = cacheLimitInBytes / 60;
+        maxAllowedEntries = cacheLimitInBytes / 60;
     }
 
     /**
@@ -141,7 +141,10 @@ public class HeapLimitedGraphNodeCache<T> implements Cache<GraphNode<T>, Map<T, 
             misses++;
 
             /*
-             * Continue to populate...
+             * Retrieve and store.
+             *
+             * Wrap it in unmodifiable to make sure nobody modifies it
+             * and it remains the same for the future hits in cache.
              */
             Map<T, Double> newResult = Collections.unmodifiableMap(supplier.apply(node));
 
@@ -149,7 +152,7 @@ public class HeapLimitedGraphNodeCache<T> implements Cache<GraphNode<T>, Map<T, 
 
             currentEntries += newResult.size();
 
-            if (currentEntries > MAX_ALLOWED_ENTRIES)
+            if (currentEntries > maxAllowedEntries)
                 trimCache();
 
             return newResult;
@@ -159,10 +162,18 @@ public class HeapLimitedGraphNodeCache<T> implements Cache<GraphNode<T>, Map<T, 
     }
 
     private boolean isCacheable(final String key) {
-        return !cacheDisabled && key.length() <= keyLengthLimit;
+        return !isDisabled && key.length() <= keyLengthLimit;
     }
 
-    // Called only after write lock has been acquired
+    /*
+     * (should be ever) Called only from getFromCacheOrSupplier
+     * after write lock has been acquired.
+     *
+     * (I would love if Java had a notation to restrict/specify/limit the
+     * calling site in defining methods, e.g. @OnlyFrom("getFromCacheOrSupplier(...)")...
+     *
+     * Maybe one day.
+     */
     private void trimCache() {
         /*
          * We have burst the limit with the current key length,
@@ -170,9 +181,9 @@ public class HeapLimitedGraphNodeCache<T> implements Cache<GraphNode<T>, Map<T, 
          * at the shortest keys).
          */
         keyLengthLimit--;
-        cacheDisabled = keyLengthLimit < 1;
+        isDisabled = keyLengthLimit < 1;
 
-        if (cacheDisabled) {
+        if (isDisabled) {
             cache.clear(); // DO NOT call clearCache() here, lock may be non-re-entrant
             currentEntries = 0L;
             return;
@@ -185,7 +196,7 @@ public class HeapLimitedGraphNodeCache<T> implements Cache<GraphNode<T>, Map<T, 
         Deque<Map.Entry<String, Map<T, Double>>> stack = new LinkedBlockingDeque<>(cache.size());
         cache.entrySet().forEach(stack::push);
 
-        while (currentEntries > MAX_ALLOWED_ENTRIES) {
+        while (currentEntries > maxAllowedEntries) {
             Map.Entry<String, Map<T, Double>> entry = stack.pop();
             cache.remove(entry.getKey());
             currentEntries -= entry.getValue().size();
@@ -225,36 +236,67 @@ public class HeapLimitedGraphNodeCache<T> implements Cache<GraphNode<T>, Map<T, 
 
     @Override
     public CacheStatistics getStatistics() {
-        return new CacheStatistics() {
-            @Override
-            public long getHits() {
-                return hits;
-            }
+        return new HeapLimitedGraphNodeCacheStatistics(
+                hits,
+                misses,
+                evictions,
+                uncacheable,
+                currentEntries,
+                !isDisabled
+        );
+    }
 
-            @Override
-            public long getMisses() {
-                return misses;
-            }
+    private static class HeapLimitedGraphNodeCacheStatistics implements CacheStatistics {
 
-            @Override
-            public long getUncacheable() {
-                return uncacheable;
-            }
+        private final long hits;
+        private final long misses;
+        private final long evictions;
+        private final long uncacheable;
+        private final long size;
+        private final boolean isEnabled;
 
-            @Override
-            public long getEvictions() {
-                return evictions;
-            }
+        public HeapLimitedGraphNodeCacheStatistics(final long hits,
+                                                   final long misses,
+                                                   final long evictions,
+                                                   final long uncacheable,
+                                                   final long size,
+                                                   final boolean isEnabled) {
+            this.hits = hits;
+            this.misses = misses;
+            this.evictions = evictions;
+            this.uncacheable = uncacheable;
+            this.size = size;
+            this.isEnabled = isEnabled;
+        }
 
-            @Override
-            public boolean isEnabled() {
-                return !cacheDisabled;
-            }
+        @Override
+        public long getHits() {
+            return hits;
+        }
 
-            @Override
-            public long getSize() {
-                return currentEntries;
-            }
-        };
+        @Override
+        public long getMisses() {
+            return misses;
+        }
+
+        @Override
+        public long getEvictions() {
+            return evictions;
+        }
+
+        @Override
+        public long getUncacheable() {
+            return uncacheable;
+        }
+
+        @Override
+        public long getSize() {
+            return size;
+        }
+
+        @Override
+        public boolean isEnabled() {
+            return isEnabled;
+        }
     }
 }

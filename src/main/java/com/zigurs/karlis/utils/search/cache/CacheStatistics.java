@@ -17,18 +17,21 @@
  */
 package com.zigurs.karlis.utils.search.cache;
 
+/**
+ * Interface declaring basic cache statistics.
+ */
 public interface CacheStatistics {
 
     long getHits();
 
     long getMisses();
 
-    long getUncacheable();
-
     long getEvictions();
 
-    boolean isEnabled();
+    long getUncacheable();
 
     long getSize();
+
+    boolean isEnabled();
 
 }

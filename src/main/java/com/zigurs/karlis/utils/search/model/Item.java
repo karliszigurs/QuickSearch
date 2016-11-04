@@ -27,11 +27,8 @@ import java.util.Set;
  */
 public class Item<T> {
 
-
     private final T result;
-
     private final Set<String> itemKeywords;
-
     private final double score;
 
     /**
@@ -52,7 +49,6 @@ public class Item<T> {
      *
      * @return wrapped result
      */
-
     public T getResult() {
         return result;
     }
@@ -62,7 +58,6 @@ public class Item<T> {
      *
      * @return result keywords, if supplied
      */
-
     public Set<String> getItemKeywords() {
         return itemKeywords;
     }

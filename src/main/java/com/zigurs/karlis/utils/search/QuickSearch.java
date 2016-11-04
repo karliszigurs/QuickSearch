@@ -23,7 +23,6 @@ import com.zigurs.karlis.utils.search.cache.HeapLimitedGraphNodeCache;
 import com.zigurs.karlis.utils.search.model.Item;
 import com.zigurs.karlis.utils.search.model.Result;
 import com.zigurs.karlis.utils.search.model.Stats;
-import com.zigurs.karlis.utils.sort.MagicSort;
 
 import java.util.*;
 import java.util.concurrent.locks.StampedLock;
@@ -33,6 +32,7 @@ import java.util.stream.Collectors;
 
 import static com.zigurs.karlis.utils.search.QuickSearch.ACCUMULATION_POLICY.UNION;
 import static com.zigurs.karlis.utils.search.QuickSearch.UNMATCHED_POLICY.BACKTRACKING;
+import static com.zigurs.karlis.utils.sort.MagicSort.sortAndLimit;
 
 /**
  * Simple and lightweight in-memory quick search provider.
@@ -514,7 +514,7 @@ public class QuickSearch<T> {
         if (matches.isEmpty())
             return Collections.emptyList();
 
-        return MagicSort.sortAndLimit(matches.entrySet(), maxItemsToList, (e1, e2) -> -e1.getValue().compareTo(e2.getValue()))
+        return sortAndLimit(matches.entrySet(), maxItemsToList, (e1, e2) -> -e1.getValue().compareTo(e2.getValue()))
                 .stream()
                 .map(e -> new ScoreWrapper<>(e.getKey(), e.getValue()))
                 .collect(Collectors.toList());

@@ -27,13 +27,12 @@ import java.util.function.Function;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
 
 public class HeapLimitedGraphNodeCacheTest {
 
     private Cache<GraphNode<String>, Map<String, Double>> cache;
 
-    private Function<GraphNode<String>, Map<String, Double>> supplierFunction = (keyword) -> {
+    private final Function<GraphNode<String>, Map<String, Double>> supplierFunction = (keyword) -> {
         Map<String, Double> map = new HashMap<>();
 
         for (int i = 0; i < 10_000; i++) {
@@ -42,7 +41,6 @@ public class HeapLimitedGraphNodeCacheTest {
 
         return map;
     };
-
 
     @Before
     public void setUp() throws Exception {
@@ -70,7 +68,7 @@ public class HeapLimitedGraphNodeCacheTest {
     }
 
     @Test
-    public void forceTrim() {
+    public void forceTrimAndDisable() {
         for (int i = 0; i < 27; i++) {
             cache.getFromCacheOrSupplier(new GraphNode<>(String.valueOf('a' + (i % 24))), supplierFunction);
             cache.getFromCacheOrSupplier(new GraphNode<>("a"), supplierFunction);
