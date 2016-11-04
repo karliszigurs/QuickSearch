@@ -30,7 +30,7 @@ Live demo available at http://zigurs.com/qs/ (instance of https://github.com/kar
 <dependency>
     <groupId>com.zigurs.karlis.utils.search</groupId>
     <artifactId>quicksearch</artifactId>
-    <version>LATEST</version>
+    <version>1.6</version>
 </dependency>
 ```
 
