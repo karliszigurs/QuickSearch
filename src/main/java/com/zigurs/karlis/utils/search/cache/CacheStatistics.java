@@ -15,29 +15,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.zigurs.karlis.utils.search;
+package com.zigurs.karlis.utils.search.cache;
 
 /**
- * Internal utility class. Package access for testing purposes.
- * <p>
- * Track item score during result set generation.
+ * Interface declaring basic cache statistics.
  */
-public class ScoreWrapper<T> {
+public interface CacheStatistics {
 
-    private final T item;
-    private final double score;
+    long getHits();
 
-    public ScoreWrapper(final T item, final double score) {
-        this.item = item;
-        this.score = score;
-    }
+    long getMisses();
 
+    long getEvictions();
 
-    public T unwrap() {
-        return item;
-    }
+    long getUncacheable();
 
-    public double getScore() {
-        return score;
-    }
+    long getSize();
+
+    boolean isEnabled();
+
 }

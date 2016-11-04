@@ -1,5 +1,7 @@
 /*
- * Copyright 2016 Karlis Zigurs
+ *                                     //
+ * Copyright 2016 Karlis Zigurs (http://zigurs.com)
+ *                                   //
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,8 +17,6 @@
  */
 package com.zigurs.karlis.utils.search.model;
 
-import org.jetbrains.annotations.NotNull;
-
 import java.util.List;
 
 /**
@@ -26,9 +26,7 @@ import java.util.List;
  */
 public class Result<T> {
 
-    @NotNull
     private final String searchString;
-    @NotNull
     private final List<Item<T>> responseItems;
 
     /**
@@ -37,7 +35,7 @@ public class Result<T> {
      * @param searchString  search string that generated this result set
      * @param responseItems found items
      */
-    public Result(@NotNull final String searchString, @NotNull final List<Item<T>> responseItems) {
+    public Result(final String searchString, final List<Item<T>> responseItems) {
         this.searchString = searchString;
         this.responseItems = responseItems;
     }
@@ -47,7 +45,6 @@ public class Result<T> {
      *
      * @return original search string
      */
-    @NotNull
     public String getSearchString() {
         return searchString;
     }
@@ -57,7 +54,6 @@ public class Result<T> {
      *
      * @return list of 0 to n top scoring search items
      */
-    @NotNull
     public List<Item<T>> getResponseItems() {
         return responseItems;
     }

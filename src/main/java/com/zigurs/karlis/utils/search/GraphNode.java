@@ -1,5 +1,7 @@
 /*
- * Copyright 2016 Karlis Zigurs
+ *                                     //
+ * Copyright 2016 Karlis Zigurs (http://zigurs.com)
+ *                                   //
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,8 +17,6 @@
  */
 package com.zigurs.karlis.utils.search;
 
-import org.jetbrains.annotations.NotNull;
-
 import java.util.Objects;
 import java.util.Set;
 
@@ -31,20 +31,23 @@ import java.util.Set;
  */
 public final class GraphNode<V> {
 
-    private final String key;
+    private final String fragment;
     private Set<V> items;
     private Set<GraphNode<V>> parents;
+
+    private int itemsSizeHint;
+    private int nodesSizeHint;
 
     /**
      * Create a node with immutable identity string.
      *
-     * @param identifier any string you like
+     * @param fragment any string you like
      */
-    public GraphNode(@NotNull final String identifier) {
-        Objects.requireNonNull(identifier);
-        this.key = identifier;
-        this.items = ReadOnlySet.empty();
-        this.parents = ReadOnlySet.empty();
+    public GraphNode(final String fragment) {
+        Objects.requireNonNull(fragment);
+        this.fragment = fragment;
+        this.items = ImmutableSet.empty();
+        this.parents = ImmutableSet.empty();
     }
 
     /**
@@ -52,9 +55,8 @@ public final class GraphNode<V> {
      *
      * @return selected identifier
      */
-    @NotNull
-    public String getKey() {
-        return key;
+    public String getFragment() {
+        return fragment;
     }
 
     /**
@@ -72,11 +74,11 @@ public final class GraphNode<V> {
      *
      * @param item item to add.
      */
-    public void addItem(@NotNull final V item) {
+    public void addItem(final V item) {
         if (items.isEmpty())
-            items = ReadOnlySet.fromSingle(item);
+            items = ImmutableSet.fromSingle(item);
         else
-            items = ReadOnlySet.addAndCreate(items, item);
+            items = ImmutableSet.addAndCreate(items, item);
     }
 
     /**
@@ -84,8 +86,8 @@ public final class GraphNode<V> {
      *
      * @param item item to remove.
      */
-    public void removeItem(@NotNull final V item) {
-        items = ReadOnlySet.removeAndCreate(items, item);
+    public void removeItem(final V item) {
+        items = ImmutableSet.removeAndCreate(items, item);
     }
 
     /**
@@ -104,11 +106,11 @@ public final class GraphNode<V> {
      *
      * @param parent parent to add.
      */
-    public void addParent(@NotNull final GraphNode<V> parent) {
+    public void addParent(final GraphNode<V> parent) {
         if (parents.isEmpty())
-            parents = ReadOnlySet.fromSingle(parent);
+            parents = ImmutableSet.fromSingle(parent);
         else
-            parents = ReadOnlySet.addAndCreate(parents, parent);
+            parents = ImmutableSet.addAndCreate(parents, parent);
     }
 
     /**
@@ -116,7 +118,47 @@ public final class GraphNode<V> {
      *
      * @param parent parent to remove.
      */
-    public void removeParent(@NotNull final GraphNode<V> parent) {
-        parents = ReadOnlySet.removeAndCreate(parents, parent);
+    public void removeParent(final GraphNode<V> parent) {
+        parents = ImmutableSet.removeAndCreate(parents, parent);
+    }
+
+    /**
+     * Internal helper to aid in pre-setting the
+     * size of collections for results traversal.
+     *
+     * @return previously set hint
+     */
+    int getItemsSizeHint() {
+        return itemsSizeHint;
+    }
+
+    /**
+     * Internal helper to aid in pre-setting the
+     * size of collections for results traversal.
+     *
+     * @param sizeHint hint
+     */
+    void setItemsSizeHint(int sizeHint) {
+        this.itemsSizeHint = sizeHint;
+    }
+
+    /**
+     * Internal helper to aid in pre-setting the
+     * size of collections for results traversal.
+     *
+     * @return previously set hint
+     */
+    int getNodesSizeHint() {
+        return nodesSizeHint;
+    }
+
+    /**
+     * Internal helper to aid in pre-setting the
+     * size of collections for results traversal.
+     *
+     * @param nodesSizeHint hint
+     */
+    void setNodesSizeHint(int nodesSizeHint) {
+        this.nodesSizeHint = nodesSizeHint;
     }
 }

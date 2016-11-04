@@ -15,29 +15,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.zigurs.karlis.utils.search;
+package com.zigurs.karlis.utils.search.cache;
+
+import java.util.function.Function;
 
 /**
- * Internal utility class. Package access for testing purposes.
- * <p>
- * Track item score during result set generation.
+ * Simple cache interface. Supplies a map from GraphNode key or reads
+ * (and possibly caches it) from the specified supplier.
+ *
+ * @param <K> type of key used in this cache
+ * @param <V> corresponding payload returned by this cache
  */
-public class ScoreWrapper<T> {
+public interface Cache<K, V> {
 
-    private final T item;
-    private final double score;
+    V getFromCacheOrSupplier(K rootNode, Function<K, V> supplier);
 
-    public ScoreWrapper(final T item, final double score) {
-        this.item = item;
-        this.score = score;
-    }
+    void clearCache();
 
+    CacheStatistics getStatistics();
 
-    public T unwrap() {
-        return item;
-    }
-
-    public double getScore() {
-        return score;
-    }
 }

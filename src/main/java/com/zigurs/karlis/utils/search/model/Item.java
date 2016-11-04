@@ -1,5 +1,7 @@
 /*
- * Copyright 2016 Karlis Zigurs
+ *                                     //
+ * Copyright 2016 Karlis Zigurs (http://zigurs.com)
+ *                                   //
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,8 +17,6 @@
  */
 package com.zigurs.karlis.utils.search.model;
 
-import org.jetbrains.annotations.NotNull;
-
 import java.util.Set;
 
 /**
@@ -27,11 +27,8 @@ import java.util.Set;
  */
 public class Item<T> {
 
-    @NotNull
     private final T result;
-    @NotNull
     private final Set<String> itemKeywords;
-
     private final double score;
 
     /**
@@ -41,7 +38,7 @@ public class Item<T> {
      * @param itemKeywords set of non-null keywords associated with result
      * @param score        search result score for the result
      */
-    public Item(@NotNull final T result, @NotNull final Set<String> itemKeywords, final double score) {
+    public Item(final T result, final Set<String> itemKeywords, final double score) {
         this.result = result;
         this.itemKeywords = itemKeywords;
         this.score = score;
@@ -52,7 +49,6 @@ public class Item<T> {
      *
      * @return wrapped result
      */
-    @NotNull
     public T getResult() {
         return result;
     }
@@ -62,7 +58,6 @@ public class Item<T> {
      *
      * @return result keywords, if supplied
      */
-    @NotNull
     public Set<String> getItemKeywords() {
         return itemKeywords;
     }
