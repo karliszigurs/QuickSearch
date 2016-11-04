@@ -160,7 +160,7 @@ public class QuickSearchTest {
                 .withKeywordExtractor(s -> new HashSet<>(Arrays.asList("", "one", "blue", "yellow", null)))
                 .build();
         addItem("test", "onetwo three");
-        searchInstance.findItem("one");
+        assertEquals("test", searchInstance.findItem("yellow").get());
     }
 
     @Test

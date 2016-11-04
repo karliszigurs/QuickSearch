@@ -210,6 +210,7 @@ public class ImmutableSetTest {
         }
 
         set.forEach(Assert::assertNotNull);
+        assertFalse(set.isEmpty());
     }
 
     @Test(expected = NoSuchElementException.class)
