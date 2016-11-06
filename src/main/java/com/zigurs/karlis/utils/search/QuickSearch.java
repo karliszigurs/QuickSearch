@@ -25,8 +25,12 @@ import com.zigurs.karlis.utils.search.model.Result;
 import com.zigurs.karlis.utils.search.model.Stats;
 
 import java.util.*;
+import java.util.concurrent.ForkJoinTask;
+import java.util.concurrent.RecursiveTask;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.StampedLock;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -204,6 +208,8 @@ public class QuickSearch<T> {
 
     private final Cache<GraphNode<T>, Map<T, Double>> cache;
 
+    private final boolean enableForkJoin;
+
     /**
      * Private constructor, use builder instead.
      *
@@ -242,6 +248,8 @@ public class QuickSearch<T> {
             this.cache = new HeapLimitedGraphNodeCache<>(builder.cacheLimit);
         else
             cache = null;
+
+        enableForkJoin = builder.enableForkJoin;
     }
 
     /**
@@ -533,46 +541,145 @@ public class QuickSearch<T> {
     }
 
     private Map<T, Double> findAndScoreUnionImpl(final Set<String> searchFragments) {
-        Map<T, Double> accumulatedItems = new LinkedHashMap<>();
+        Map<T, Double> accumulatedItems = new LinkedHashMap<>(); // TODO - benchmark linked vs plain
 
-        searchFragments.forEach(fragment ->
-                walkAndScore(fragment).forEach((k, v) ->
-                        accumulatedItems.merge(k, v, (d1, d2) -> d1 + d2))
-        );
+        if (enableForkJoin) {
+            ArrayList<RecursiveTask<Map<T, Double>>> tasks = new ArrayList<>(searchFragments.size());
+
+            // Leaking new instances like a bat in hell, ah well. TODO refactor later.
+            searchFragments.forEach(fragment -> {
+                final RecursiveTask<Map<T, Double>> fragmentTask = new RecursiveTask<Map<T, Double>>() {
+                    @Override
+                    protected Map<T, Double> compute() {
+                        return walkAndScore(fragment);
+                    }
+                };
+                tasks.add(fragmentTask);
+            });
+
+            invokeAll(tasks, map ->
+                    map.forEach((k, v) ->
+                            accumulatedItems.merge(k, v, (d1, d2) -> d1 + d2)));
+
+        } else {
+            searchFragments.forEach(fragment ->
+                    walkAndScore(fragment).forEach((k, v) ->
+                            accumulatedItems.merge(k, v, (d1, d2) -> d1 + d2))
+            );
+        }
 
         return accumulatedItems;
     }
 
     private Map<T, Double> findAndScoreIntersectionImpl(final Set<String> suppliedFragments) {
+        if (!enableForkJoin)
+            return findAndScoreIntersectionImplInThread(suppliedFragments);
+
+        /* Minor improvements, but not really worth the effort :/ */
+        /*
+         * FJ try. I could use a collector instead, but this allows me to cancel whole work
+         * on the first empty result instead.
+         */
+
+        AtomicReference<Map<T, Double>> results = new AtomicReference<>(null);
+        ArrayList<RecursiveTask<Map<T, Double>>> tasks = new ArrayList<>(suppliedFragments.size());
+
+        suppliedFragments.forEach(fragment -> {
+            final RecursiveTask<Map<T, Double>> fragmentTask = new RecursiveTask<Map<T, Double>>() {
+                @Override
+                protected Map<T, Double> compute() {
+                    return walkAndScore(fragment);
+                }
+            };
+            tasks.add(fragmentTask);
+        });
+
+        invokeAll(tasks, map -> {
+            /*
+             * Empty result in intersection, we know the outcome is empty.
+             * Cancel all the things still being processed.
+             */
+            if (map.isEmpty()) {
+                results.set(Collections.emptyMap());
+                tasks.forEach(task -> task.cancel(true));
+                return;
+            }
+
+            /*
+             * Try to replace a null result. If we succeed this was the first results callback.
+             */
+            if (results.compareAndSet(null, map))
+                return;
+
+            /*
+             * Guaranteed to be not null as per above.
+             */
+            Map<T, Double> existing = results.get();
+
+            /*
+             * Might be empty signifying that this task is
+             * calling back after we know it should be cancelled
+             */
+            if (existing.isEmpty())
+                return;
+
+            /*
+             * Fine. Merging is inevitable.
+             */
+            results.set(intersectMaps(map, existing));
+
+            /* repeat check for cancellation */
+            if (results.get().isEmpty())
+                tasks.forEach(task -> task.cancel(true));
+        });
+
+        return results.get();
+    }
+
+    private Map<T, Double> findAndScoreIntersectionImplInThread(final Set<String> suppliedFragments) {
         Map<T, Double> accumulatedItems = null;
 
         for (String suppliedFragment : suppliedFragments) {
             Map<T, Double> fragmentItems = walkAndScore(suppliedFragment);
 
-            if (fragmentItems.isEmpty())
-                return fragmentItems; // Can fail early, no results will be found
+            if (fragmentItems.isEmpty()) // results will be empty too, return early
+                return fragmentItems;
 
-            if (accumulatedItems == null) { // first item
+            if (accumulatedItems == null) {
                 accumulatedItems = fragmentItems;
+            } else {
+                accumulatedItems = intersectMaps(fragmentItems, accumulatedItems);
 
-            } else if (cache == null) { // safe to work on collection directly
-                accumulatedItems.keySet().retainAll(fragmentItems.keySet());
-                accumulatedItems.entrySet().forEach(e -> e.setValue(e.getValue() + fragmentItems.get(e.getKey())));
-
-            } else { // cache is active, merge two (existing and newly supplied) maps into a new one
-                Map<T, Double> destinationMap = new LinkedHashMap<>(accumulatedItems.size());
-
-                accumulatedItems.entrySet().forEach(e -> {
-                    Double newValue = fragmentItems.get(e.getKey());
-                    if (newValue != null)
-                        destinationMap.put(e.getKey(), e.getValue() + newValue);
-                });
-
-                accumulatedItems = destinationMap;
+                if (accumulatedItems.isEmpty())
+                    return accumulatedItems;
             }
+
         }
 
         return accumulatedItems;
+    }
+
+    private Map<T, Double> intersectMaps(Map<T, Double> left, Map<T, Double> right) {
+        Map<T, Double> smaller = left.size() < right.size() ? left : right;
+        Map<T, Double> bigger = smaller == left ? right : left;
+
+        /* Cache disabled, we can reuse the suppied maps directly */
+        // TODO - replace cache check with direct check if map is mutable.
+        if (cache == null) {
+            smaller.keySet().retainAll(bigger.keySet());
+            smaller.entrySet().forEach(e -> e.setValue(e.getValue() + bigger.get(e.getKey())));
+            return smaller;
+        } else { /* Cache present, new map needed. Expensive, but safe */
+            Map<T, Double> mergedMap = new LinkedHashMap<>(smaller.size());
+
+            smaller.entrySet().forEach(e -> {
+                Double newValue = bigger.get(e.getKey());
+                if (newValue != null)
+                    mergedMap.put(e.getKey(), e.getValue() + newValue);
+            });
+
+            return mergedMap;
+        }
     }
 
     private Map<T, Double> walkAndScore(final String fragment) {
@@ -785,6 +892,52 @@ public class QuickSearch<T> {
     }
 
     /*
+     * Fork & join helpers
+     */
+
+    /**
+     * Spin over tasks looking for the first tasks that are finished with their
+     * work. The idea here is process the tasks in the order of their completion.
+     * Not because the order of completion matters, but because the faster we can
+     * start processing _some_ results, the better.
+     * <p>
+     * All naive (e.g. ForkJoinTask.invokeAll()) implementations suffer from
+     * head-of line blocking (e.g. waiting for the result from a task that takes
+     * longer, but is earlier in the queue, while the task further down in the queue
+     * has already finished and can confirm that any further processing is not
+     * necessary.
+     * <p>
+     * This method will call supplied consumer with the outcome for each task that
+     * returns indicating it executed normally. Cancelled or exceptional outcomes
+     * will be quietly ignored.
+     *
+     * @param tasks            List of tasks to track their execution of
+     * @param outcomesConsumer callback for normally processed FJ task results
+     */
+    private static <X> void invokeAll(final List<RecursiveTask<X>> tasks,
+                                      final Consumer<X> outcomesConsumer) {
+        Objects.requireNonNull(tasks);
+        Objects.requireNonNull(outcomesConsumer);
+
+        /* kick-off */
+        tasks.forEach(ForkJoinTask::fork);
+
+        /* start spinning for results */
+        while (!tasks.isEmpty()) {
+            for (int i = 0; i < tasks.size(); i++) {
+                RecursiveTask<X> task = tasks.get(i);
+                if (task.isDone()) {
+                    tasks.remove(i);
+                    if (task.isCompletedNormally())
+                        outcomesConsumer.accept(task.join());
+                }
+            }
+            /* Be nice to host system, give it a bit of breathing space */
+            Thread.yield();
+        }
+    }
+
+    /*
      * Configuration and builder
      */
 
@@ -797,6 +950,7 @@ public class QuickSearch<T> {
         private Function<String, Set<String>> keywordsExtractor = DEFAULT_KEYWORDS_EXTRACTOR;
         private UNMATCHED_POLICY unmatchedPolicy = BACKTRACKING;
         private ACCUMULATION_POLICY accumulationPolicy = UNION;
+        private boolean enableForkJoin = false;
         private int cacheLimit = 0;
 
         public QuickSearchBuilder withKeywordMatchScorer(BiFunction<String, String, Double> scorer) {
@@ -821,6 +975,11 @@ public class QuickSearch<T> {
 
         public QuickSearchBuilder withAccumulationPolicy(ACCUMULATION_POLICY policy) {
             accumulationPolicy = policy;
+            return this;
+        }
+
+        public QuickSearchBuilder withForkJoinProcessing() {
+            enableForkJoin = true;
             return this;
         }
 
