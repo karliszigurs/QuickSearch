@@ -136,6 +136,69 @@ public class ImmutableSetTest {
     }
 
     @Test
+    public void getFirst() {
+        ImmutableSet<String> one = ImmutableSet.fromSingle("one");
+        assertEquals("one", one.getSingleElement());
+    }
+
+    @Test(expected = IndexOutOfBoundsException.class)
+    public void getFirstFromEmpty() {
+        ImmutableSet<String> empty = ImmutableSet.empty();
+        assertEquals("one", empty.getSingleElement());
+    }
+
+    @Test
+    public void getFirstFromMultiple() {
+        ImmutableSet<String> multiple = ImmutableSet.fromCollection(Arrays.asList("one", "two", "three"));
+        assertEquals("one", multiple.getSingleElement());
+    }
+
+    @Test(expected = IndexOutOfBoundsException.class)
+    public void getFirstFromNulls() {
+        ImmutableSet<String> multiple = ImmutableSet.fromCollection(Arrays.asList(null, null, null));
+        assertEquals("one", multiple.getSingleElement());
+    }
+
+    @Test
+    public void getFirstFromNullsAndItems() {
+        ImmutableSet<String> multiple = ImmutableSet.fromCollection(Arrays.asList(null, null, null, "one"));
+        assertEquals("one", multiple.getSingleElement());
+    }
+
+    @Test
+    public void getSplitEmpty() {
+        ImmutableSet<String> empty = ImmutableSet.empty();
+        assertEquals(0, empty.split().length);
+    }
+
+    @Test
+    public void getSplitSingle() {
+        ImmutableSet<String> single = ImmutableSet.fromSingle("one");
+        assertEquals(1, single.split().length);
+        assertEquals("one", (single.split()[0].getSingleElement()));
+    }
+
+    @Test
+    public void getSplitTwo() {
+        ImmutableSet<String> two = ImmutableSet.fromCollection(Arrays.asList("one", "two"));
+        assertEquals(2, two.split().length);
+        assertEquals("one", two.split()[0].getSingleElement());
+        assertEquals(1, two.split()[0].size());
+        assertEquals("two", two.split()[1].getSingleElement());
+        assertEquals(1, two.split()[1].size());
+    }
+
+    @Test
+    public void getSplitThree() {
+        ImmutableSet<String> two = ImmutableSet.fromCollection(Arrays.asList("one", "two", "three"));
+        assertEquals(2, two.split().length);
+        assertEquals("one", (two.split()[0].getSingleElement()));
+        assertEquals(1, (two.split()[0].size()));
+        assertEquals("two", (two.split()[1].getSingleElement()));
+        assertEquals(2, (two.split()[1].size()));
+    }
+
+    @Test
     public void fromCollection() {
         Set<String> set = ImmutableSet.fromCollection(Arrays.asList("cat", "dog"));
         assertFalse(set.isEmpty());

@@ -290,6 +290,42 @@ public class ImmutableSet<T> extends AbstractSet<T> {
         return false;
     }
 
+    /**
+     * Convenience call to retrieve a single item in the set and
+     * avoid creating iterator just for single access.
+     *
+     * @return single item from the set
+     */
+    public T getSingleElement() {
+        if (isEmpty())
+            throw new IndexOutOfBoundsException();
+
+        return array[0];
+    }
+
+    /**
+     * Convenience call to split the set in two, if possible. Helper for more
+     * efficient FJ code.
+     *
+     * @return Array of ether 0 (empty), 1 (size 1) or 2 (size > 1) elements splitting this set in half
+     */
+    public ImmutableSet<T>[] split() {
+        int size = size();
+
+        if (size == 0)
+            return new ImmutableSet[0];
+
+        if (size == 1)
+            return new ImmutableSet[]{this};
+
+        int firstHalf = size / 2;
+
+        ImmutableSet<T> first = new ImmutableSet<>(Arrays.copyOfRange(array, 0, firstHalf));
+        ImmutableSet<T> second = new ImmutableSet<>(Arrays.copyOfRange(array, firstHalf, size));
+
+        return new ImmutableSet[]{first, second};
+    }
+
     @Override
     public Iterator<T> iterator() {
         return new ArrayIterator(array);

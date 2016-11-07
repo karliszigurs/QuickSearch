@@ -25,12 +25,10 @@ import com.zigurs.karlis.utils.search.model.Result;
 import com.zigurs.karlis.utils.search.model.Stats;
 
 import java.util.*;
-import java.util.concurrent.ForkJoinTask;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.RecursiveTask;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.StampedLock;
 import java.util.function.BiFunction;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -190,12 +188,12 @@ public class QuickSearch<T> {
         return matchScore;
     };
 
-    private final UNMATCHED_POLICY unmatchedPolicy;
-    private final QuickSearch.ACCUMULATION_POLICY accumulationPolicy;
-
     /*
      * Instance properties
      */
+
+    private final QuickSearch.ACCUMULATION_POLICY accumulationPolicy;
+    private final UNMATCHED_POLICY unmatchedPolicy;
 
     private final BiFunction<String, String, Double> keywordMatchScorer;
     private final Function<String, String> keywordNormalizer;
@@ -280,7 +278,7 @@ public class QuickSearch<T> {
         if (item == null || keywords == null || keywords.isEmpty())
             return false;
 
-        Set<String> keywordsSet = prepareKeywords(keywords, true);
+        ImmutableSet<String> keywordsSet = prepareKeywords(keywords, true);
 
         if (keywordsSet.isEmpty())
             return false;
@@ -324,7 +322,7 @@ public class QuickSearch<T> {
         if (isInvalidRequest(searchString, 1))
             return Optional.empty();
 
-        Set<String> searchKeywords = prepareKeywords(searchString, false);
+        ImmutableSet<String> searchKeywords = prepareKeywords(searchString, false);
 
         if (searchKeywords.isEmpty())
             return Optional.empty();
@@ -333,7 +331,7 @@ public class QuickSearch<T> {
 
         long readLock = lock.readLock();
         try {
-            results = findItemsImpl(searchKeywords, 1);
+            results = doSearch(searchKeywords, 1);
         } finally {
             lock.unlockRead(readLock);
         }
@@ -356,7 +354,7 @@ public class QuickSearch<T> {
         if (isInvalidRequest(searchString, numberOfTopItems))
             return Collections.emptyList();
 
-        Set<String> searchKeywords = prepareKeywords(searchString, false);
+        ImmutableSet<String> searchKeywords = prepareKeywords(searchString, false);
 
         if (searchKeywords.isEmpty())
             return Collections.emptyList();
@@ -365,7 +363,7 @@ public class QuickSearch<T> {
 
         long readLock = lock.readLock();
         try {
-            results = findItemsImpl(searchKeywords, numberOfTopItems);
+            results = doSearch(searchKeywords, numberOfTopItems);
         } finally {
             lock.unlockRead(readLock);
         }
@@ -390,14 +388,14 @@ public class QuickSearch<T> {
         if (isInvalidRequest(searchString, 1))
             return Optional.empty();
 
-        Set<String> searchKeywords = prepareKeywords(searchString, false);
+        ImmutableSet<String> searchKeywords = prepareKeywords(searchString, false);
 
         if (searchKeywords.isEmpty())
             return Optional.empty();
 
         long readLock = lock.readLock();
         try {
-            List<ScoreWrapper<T>> results = findItemsImpl(searchKeywords, 1);
+            List<ScoreWrapper<T>> results = doSearch(searchKeywords, 1);
 
             if (results.isEmpty()) {
                 return Optional.empty();
@@ -428,14 +426,14 @@ public class QuickSearch<T> {
         if (isInvalidRequest(searchString, numberOfTopItems))
             return new Result<>(searchString != null ? searchString : "", Collections.emptyList());
 
-        Set<String> searchKeywords = prepareKeywords(searchString, false);
+        ImmutableSet<String> searchKeywords = prepareKeywords(searchString, false);
 
         if (searchKeywords.isEmpty())
             return new Result<>(searchString, Collections.emptyList());
 
         long readLock = lock.readLock();
         try {
-            List<ScoreWrapper<T>> results = findItemsImpl(searchKeywords, numberOfTopItems);
+            List<ScoreWrapper<T>> results = doSearch(searchKeywords, numberOfTopItems);
 
             if (results.isEmpty()) {
                 return new Result<>(searchString, Collections.emptyList());
@@ -512,164 +510,85 @@ public class QuickSearch<T> {
         return searchString == null || searchString.isEmpty() || numItems < 1;
     }
 
-    private List<ScoreWrapper<T>> findItemsImpl(final Set<String> searchKeywords,
-                                                final int maxItemsToList) {
-        Map<T, Double> matches = findAndScoreImpl(searchKeywords);
-
-        /*
-         * Avoid sorting an empty map
-         */
-        if (matches.isEmpty())
-            return Collections.emptyList();
-
-        return sortAndLimit(matches.entrySet(), maxItemsToList, (e1, e2) -> -e1.getValue().compareTo(e2.getValue()))
-                .stream()
+    private List<ScoreWrapper<T>> doSearch(final ImmutableSet<String> searchKeywords,
+                                           final int maxItemsToList) {
+        return sortAndLimit(
+                findAndScore(searchKeywords).entrySet(),
+                maxItemsToList,
+                (e1, e2) -> e2.getValue().compareTo(e1.getValue())
+        ).stream()
                 .map(e -> new ScoreWrapper<>(e.getKey(), e.getValue()))
                 .collect(Collectors.toList());
     }
 
-    private Map<T, Double> findAndScoreImpl(final Set<String> suppliedFragments) {
+    private Map<T, Double> findAndScore(final ImmutableSet<String> suppliedFragments) {
         /* Avoid calling into merges if we are looking for only one keyword */
-        if (suppliedFragments.size() < 2)
-            return walkAndScore(suppliedFragments.iterator().next());
+        if (suppliedFragments.size() == 1)
+            return walkAndScore(suppliedFragments.getSingleElement());
 
         /* Merges will be inevitable */
         if (accumulationPolicy == UNION)
-            return findAndScoreUnionImpl(suppliedFragments);
+            return findAndScoreUnion(suppliedFragments);
         else // implied (withAccumulationPolicy == INTERSECTION)
-            return findAndScoreIntersectionImpl(suppliedFragments);
+            return findAndScoreIntersection(suppliedFragments);
     }
 
-    private Map<T, Double> findAndScoreUnionImpl(final Set<String> searchFragments) {
-        Map<T, Double> accumulatedItems = new LinkedHashMap<>(); // TODO - benchmark linked vs plain
-
+    private Map<T, Double> findAndScoreUnion(final ImmutableSet<String> suppliedFragments) {
         if (enableForkJoin) {
-            ArrayList<RecursiveTask<Map<T, Double>>> tasks = new ArrayList<>(searchFragments.size());
-
-            // Leaking new instances like a bat in hell, ah well. TODO refactor later.
-            searchFragments.forEach(fragment -> {
-                final RecursiveTask<Map<T, Double>> fragmentTask = new RecursiveTask<Map<T, Double>>() {
-                    @Override
-                    protected Map<T, Double> compute() {
-                        return walkAndScore(fragment);
-                    }
-                };
-                tasks.add(fragmentTask);
-            });
-
-            invokeAll(tasks, map ->
-                    map.forEach((k, v) ->
-                            accumulatedItems.merge(k, v, (d1, d2) -> d1 + d2)));
+            return new FJUnionTask(suppliedFragments).fork().join();
 
         } else {
-            searchFragments.forEach(fragment ->
+            final Map<T, Double> accumulatedItems = new HashMap<>();
+
+            suppliedFragments.forEach(fragment ->
                     walkAndScore(fragment).forEach((k, v) ->
                             accumulatedItems.merge(k, v, (d1, d2) -> d1 + d2))
             );
-        }
 
-        return accumulatedItems;
+            return accumulatedItems;
+        }
     }
 
-    private Map<T, Double> findAndScoreIntersectionImpl(final Set<String> suppliedFragments) {
-        if (!enableForkJoin)
-            return findAndScoreIntersectionImplInThread(suppliedFragments);
+    private Map<T, Double> findAndScoreIntersection(final ImmutableSet<String> suppliedFragments) {
+        if (enableForkJoin) {
+            return new FJIntersectionTask(suppliedFragments).fork().join();
 
-        /* Minor improvements, but not really worth the effort :/ */
-        /*
-         * FJ try. I could use a collector instead, but this allows me to cancel whole work
-         * on the first empty result instead.
-         */
+        } else {
+            Map<T, Double> accumulatedItems = null;
 
-        AtomicReference<Map<T, Double>> results = new AtomicReference<>(null);
-        ArrayList<RecursiveTask<Map<T, Double>>> tasks = new ArrayList<>(suppliedFragments.size());
+            for (String suppliedFragment : suppliedFragments) {
+                Map<T, Double> fragmentItems = walkAndScore(suppliedFragment);
 
-        suppliedFragments.forEach(fragment -> {
-            final RecursiveTask<Map<T, Double>> fragmentTask = new RecursiveTask<Map<T, Double>>() {
-                @Override
-                protected Map<T, Double> compute() {
-                    return walkAndScore(fragment);
+                if (fragmentItems.isEmpty()) // results will be empty too, return early
+                    return fragmentItems;
+
+                if (accumulatedItems == null) {
+                    accumulatedItems = fragmentItems;
+                } else {
+                    accumulatedItems = intersectMaps(fragmentItems, accumulatedItems);
+
+                    if (accumulatedItems.isEmpty())
+                        return accumulatedItems;
                 }
-            };
-            tasks.add(fragmentTask);
-        });
-
-        invokeAll(tasks, map -> {
-            /*
-             * Empty result in intersection, we know the outcome is empty.
-             * Cancel all the things still being processed.
-             */
-            if (map.isEmpty()) {
-                results.set(Collections.emptyMap());
-                tasks.forEach(task -> task.cancel(true));
-                return;
             }
 
-            /*
-             * Try to replace a null result. If we succeed this was the first results callback.
-             */
-            if (results.compareAndSet(null, map))
-                return;
-
-            /*
-             * Guaranteed to be not null as per above.
-             */
-            Map<T, Double> existing = results.get();
-
-            /*
-             * Might be empty signifying that this task is
-             * calling back after we know it should be cancelled
-             */
-            if (existing.isEmpty())
-                return;
-
-            /*
-             * Fine. Merging is inevitable.
-             */
-            results.set(intersectMaps(map, existing));
-
-            /* repeat check for cancellation */
-            if (results.get().isEmpty())
-                tasks.forEach(task -> task.cancel(true));
-        });
-
-        return results.get();
-    }
-
-    private Map<T, Double> findAndScoreIntersectionImplInThread(final Set<String> suppliedFragments) {
-        Map<T, Double> accumulatedItems = null;
-
-        for (String suppliedFragment : suppliedFragments) {
-            Map<T, Double> fragmentItems = walkAndScore(suppliedFragment);
-
-            if (fragmentItems.isEmpty()) // results will be empty too, return early
-                return fragmentItems;
-
-            if (accumulatedItems == null) {
-                accumulatedItems = fragmentItems;
-            } else {
-                accumulatedItems = intersectMaps(fragmentItems, accumulatedItems);
-
-                if (accumulatedItems.isEmpty())
-                    return accumulatedItems;
-            }
-
+            return accumulatedItems;
         }
-
-        return accumulatedItems;
     }
 
-    private Map<T, Double> intersectMaps(Map<T, Double> left, Map<T, Double> right) {
+    private Map<T, Double> intersectMaps(final Map<T, Double> left,
+                                         final Map<T, Double> right) {
         Map<T, Double> smaller = left.size() < right.size() ? left : right;
         Map<T, Double> bigger = smaller == left ? right : left;
 
-        /* Cache disabled, we can reuse the suppied maps directly */
+        /* Cache disabled, we can reuse the supplied maps directly */
         // TODO - replace cache check with direct check if map is mutable.
         if (cache == null) {
             smaller.keySet().retainAll(bigger.keySet());
             smaller.entrySet().forEach(e -> e.setValue(e.getValue() + bigger.get(e.getKey())));
             return smaller;
-        } else { /* Cache present, new map needed. Expensive, but safe */
+        } else {
+            /* Cache present, new map needed. Expensive, but safe */
             Map<T, Double> mergedMap = new LinkedHashMap<>(smaller.size());
 
             smaller.entrySet().forEach(e -> {
@@ -757,7 +676,8 @@ public class QuickSearch<T> {
             cache.clearCache();
     }
 
-    private Set<String> prepareKeywords(final String keywordsString, boolean internKeywords) {
+    private ImmutableSet<String> prepareKeywords(final String keywordsString,
+                                                 final boolean internKeywords) {
         return ImmutableSet.fromCollection(
                 keywordsExtractor.apply(keywordsString).stream()
                         .filter(s -> s != null)
@@ -892,48 +812,82 @@ public class QuickSearch<T> {
     }
 
     /*
-     * Fork & join helpers
+     * Fork & join tasks
      */
 
-    /**
-     * Spin over tasks looking for the first tasks that are finished with their
-     * work. The idea here is process the tasks in the order of their completion.
-     * Not because the order of completion matters, but because the faster we can
-     * start processing _some_ results, the better.
-     * <p>
-     * All naive (e.g. ForkJoinTask.invokeAll()) implementations suffer from
-     * head-of line blocking (e.g. waiting for the result from a task that takes
-     * longer, but is earlier in the queue, while the task further down in the queue
-     * has already finished and can confirm that any further processing is not
-     * necessary.
-     * <p>
-     * This method will call supplied consumer with the outcome for each task that
-     * returns indicating it executed normally. Cancelled or exceptional outcomes
-     * will be quietly ignored.
-     *
-     * @param tasks            List of tasks to track their execution of
-     * @param outcomesConsumer callback for normally processed FJ task results
-     */
-    private static <X> void invokeAll(final List<RecursiveTask<X>> tasks,
-                                      final Consumer<X> outcomesConsumer) {
-        Objects.requireNonNull(tasks);
-        Objects.requireNonNull(outcomesConsumer);
+    private class FJIntersectionTask extends RecursiveTask<Map<T, Double>> {
 
-        /* kick-off */
-        tasks.forEach(ForkJoinTask::fork);
+        private final ImmutableSet<String> keywords;
 
-        /* start spinning for results */
-        while (!tasks.isEmpty()) {
-            for (int i = 0; i < tasks.size(); i++) {
-                RecursiveTask<X> task = tasks.get(i);
-                if (task.isDone()) {
-                    tasks.remove(i);
-                    if (task.isCompletedNormally())
-                        outcomesConsumer.accept(task.join());
-                }
+        private FJIntersectionTask(final ImmutableSet<String> keywords) {
+            this.keywords = keywords;
+        }
+
+        @Override
+        protected Map<T, Double> compute() {
+            if (keywords.size() == 1)
+                return walkAndScore(keywords.getSingleElement());
+
+            ImmutableSet<String>[] splits = keywords.split();
+
+            FJIntersectionTask left = new FJIntersectionTask(splits[0]);
+            left.fork();
+
+            FJIntersectionTask right = new FJIntersectionTask(splits[1]);
+            right.fork();
+
+            Map<T, Double> leftMap = left.join();
+
+            if (leftMap.isEmpty()) {
+                right.cancel(true); // Worth a try...
+                return leftMap;
             }
-            /* Be nice to host system, give it a bit of breathing space */
-            Thread.yield();
+
+            Map<T, Double> rightMap = right.join();
+
+            if (rightMap.isEmpty())
+                return rightMap;
+
+            return intersectMaps(leftMap, rightMap);
+        }
+    }
+
+    private class FJUnionTask extends RecursiveTask<Map<T, Double>> {
+
+        private final ImmutableSet<String> keywords;
+        private final ConcurrentHashMap<T, Double> accumulator;
+
+        private FJUnionTask(final ImmutableSet<String> keywords) {
+            this.keywords = keywords;
+            this.accumulator = new ConcurrentHashMap<>();
+        }
+
+        private FJUnionTask(final ImmutableSet<String> keywords,
+                            final ConcurrentHashMap<T, Double> accumulator) {
+            this.keywords = keywords;
+            this.accumulator = accumulator;
+        }
+
+        @Override
+        protected Map<T, Double> compute() {
+            if (keywords.size() == 1) {
+                walkAndScore(keywords.getSingleElement()).forEach((k, v) ->
+                        accumulator.merge(k, v, (d1, d2) -> d1 + d2)
+                );
+                return accumulator;
+            }
+
+            ImmutableSet<String>[] splits = keywords.split();
+
+            FJUnionTask left = new FJUnionTask(splits[0], accumulator);
+            left.fork();
+            FJUnionTask right = new FJUnionTask(splits[1], accumulator);
+            right.fork();
+
+            left.join();
+            right.join();
+
+            return accumulator;
         }
     }
 

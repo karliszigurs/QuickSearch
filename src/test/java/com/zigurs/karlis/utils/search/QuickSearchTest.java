@@ -719,27 +719,6 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void intersectionLotsOfItems() {
-        searchInstance = QuickSearch.builder()
-                .withAccumulationPolicy(INTERSECTION)
-//                .withCache()
-                .withUnmatchedPolicy(EXACT)
-                .withForkJoinProcessing()
-                .build();
-
-        for (int i = 0; i < QuickSearchMemoryUseTest.USA_STATES.length * 1_000; i++) {
-            String[] arr = QuickSearchMemoryUseTest.USA_STATES[i % QuickSearchMemoryUseTest.USA_STATES.length];
-            searchInstance.addItem(arr[0] + i, String.format("%s %s %s", arr[1], arr[2], arr[3]));
-        }
-        long t = System.currentTimeMillis();
-        int totalResults = 0;
-        for (int i = 0; i < 300; i++)
-//            totalResults += searchInstance.findItems("notinmylifetime b c d e f ", 10).size();
-            totalResults += searchInstance.findItems("q notinmylifetime b c d e f g h i j notinmylifetime k l m n o p q r s notinmylifetime t y z", 10).size();
-        System.out.println(System.currentTimeMillis() - t);
-    }
-
-    @Test
     public void checkCacheReports() {
         searchInstance = QuickSearch.builder()
                 .withAccumulationPolicy(INTERSECTION)
@@ -762,7 +741,7 @@ public class QuickSearchTest {
 
         assertTrue(searchInstance.getCacheStats().isPresent());
 
-        assertEquals(8, searchInstance.getCacheStats().get().getHits());
+        assertEquals(6, searchInstance.getCacheStats().get().getHits());
         assertEquals(0, searchInstance.getCacheStats().get().getEvictions());
         assertEquals(4, searchInstance.getCacheStats().get().getMisses());
         assertEquals(9, searchInstance.getCacheStats().get().getSize());
