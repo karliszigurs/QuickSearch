@@ -904,7 +904,7 @@ public class QuickSearch<T> {
         private Function<String, Set<String>> keywordsExtractor = DEFAULT_KEYWORDS_EXTRACTOR;
         private UNMATCHED_POLICY unmatchedPolicy = BACKTRACKING;
         private ACCUMULATION_POLICY accumulationPolicy = UNION;
-        private boolean enableForkJoin = false;
+        private boolean enableForkJoin = true;
         private int cacheLimit = 0;
 
         public QuickSearchBuilder withKeywordMatchScorer(BiFunction<String, String, Double> scorer) {
