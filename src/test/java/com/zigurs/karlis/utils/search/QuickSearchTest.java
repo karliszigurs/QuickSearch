@@ -741,7 +741,7 @@ public class QuickSearchTest {
 
         assertTrue(searchInstance.getCacheStats().isPresent());
 
-        assertEquals(6, searchInstance.getCacheStats().get().getHits());
+        assertEquals(8, searchInstance.getCacheStats().get().getHits());
         assertEquals(0, searchInstance.getCacheStats().get().getEvictions());
         assertEquals(4, searchInstance.getCacheStats().get().getMisses());
         assertEquals(9, searchInstance.getCacheStats().get().getSize());
