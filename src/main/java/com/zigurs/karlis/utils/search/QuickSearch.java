@@ -17,9 +17,7 @@
  */
 package com.zigurs.karlis.utils.search;
 
-import com.zigurs.karlis.utils.search.cache.Cache;
 import com.zigurs.karlis.utils.search.cache.CacheStatistics;
-import com.zigurs.karlis.utils.search.cache.HeapLimitedGraphNodeCache;
 import com.zigurs.karlis.utils.search.model.Item;
 import com.zigurs.karlis.utils.search.model.Result;
 import com.zigurs.karlis.utils.search.model.Stats;
@@ -27,13 +25,13 @@ import com.zigurs.karlis.utils.search.model.Stats;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.RecursiveTask;
-import java.util.concurrent.locks.StampedLock;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static com.zigurs.karlis.utils.search.QuickSearch.ACCUMULATION_POLICY.UNION;
 import static com.zigurs.karlis.utils.search.QuickSearch.UNMATCHED_POLICY.BACKTRACKING;
+import static com.zigurs.karlis.utils.search.helpers.QuickSearchConfigurationFunctionHelpers.*;
 import static com.zigurs.karlis.utils.sort.MagicSort.sortAndLimit;
 
 /**
@@ -199,12 +197,7 @@ public class QuickSearch<T> {
     private final Function<String, String> keywordNormalizer;
     private final Function<String, Set<String>> keywordsExtractor;
 
-    private final Map<String, GraphNode<T>> fragmentsItemsTree = new HashMap<>();
-    private final Map<T, ImmutableSet<String>> itemKeywordsMap = new HashMap<>();
-
-    private final StampedLock lock = new StampedLock();
-
-    private final Cache<GraphNode<T>, Map<T, Double>> cache;
+    private final QSGraph<T> graph;
 
     private final boolean enableForkJoin;
 
@@ -242,12 +235,9 @@ public class QuickSearch<T> {
          * provide internal supplier and null clearer.
          */
 
-        if (builder.cacheLimit > 0)
-            this.cache = new HeapLimitedGraphNodeCache<>(builder.cacheLimit);
-        else
-            cache = null;
-
         enableForkJoin = builder.enableForkJoin;
+
+        graph = new QSGraph<>(builder.cacheLimit);
     }
 
     /**
@@ -278,17 +268,13 @@ public class QuickSearch<T> {
         if (item == null || keywords == null || keywords.isEmpty())
             return false;
 
-        ImmutableSet<String> keywordsSet = prepareKeywords(keywords, true);
+        ImmutableSet<String> keywordsSet = prepareKeywords(keywords, keywordsExtractor, keywordNormalizer, true);
 
         if (keywordsSet.isEmpty())
             return false;
 
-        long writeLock = lock.writeLock();
-        try {
-            addItemImpl(item, keywordsSet);
-        } finally {
-            lock.unlockWrite(writeLock);
-        }
+        addItemImpl(item, keywordsSet);
+
         return true;
     }
 
@@ -304,12 +290,7 @@ public class QuickSearch<T> {
         if (item == null)
             return;
 
-        long writeLock = lock.writeLock();
-        try {
-            removeItemImpl(item);
-        } finally {
-            lock.unlockWrite(writeLock);
-        }
+        removeItemImpl(item);
     }
 
     /**
@@ -322,19 +303,12 @@ public class QuickSearch<T> {
         if (isInvalidRequest(searchString, 1))
             return Optional.empty();
 
-        ImmutableSet<String> searchKeywords = prepareKeywords(searchString, false);
+        ImmutableSet<String> searchKeywords = prepareKeywords(searchString, keywordsExtractor, keywordNormalizer, false);
 
         if (searchKeywords.isEmpty())
             return Optional.empty();
 
-        List<ScoreWrapper<T>> results;
-
-        long readLock = lock.readLock();
-        try {
-            results = doSearch(searchKeywords, 1);
-        } finally {
-            lock.unlockRead(readLock);
-        }
+        List<ScoreWrapper<T>> results = doSearch(searchKeywords, 1);
 
         if (results.isEmpty())
             return Optional.empty();
@@ -354,19 +328,12 @@ public class QuickSearch<T> {
         if (isInvalidRequest(searchString, numberOfTopItems))
             return Collections.emptyList();
 
-        ImmutableSet<String> searchKeywords = prepareKeywords(searchString, false);
+        ImmutableSet<String> searchKeywords = prepareKeywords(searchString, keywordsExtractor, keywordNormalizer, false);
 
         if (searchKeywords.isEmpty())
             return Collections.emptyList();
 
-        List<ScoreWrapper<T>> results;
-
-        long readLock = lock.readLock();
-        try {
-            results = doSearch(searchKeywords, numberOfTopItems);
-        } finally {
-            lock.unlockRead(readLock);
-        }
+        List<ScoreWrapper<T>> results = doSearch(searchKeywords, numberOfTopItems);
 
         if (results.isEmpty()) {
             return Collections.emptyList();
@@ -388,29 +355,24 @@ public class QuickSearch<T> {
         if (isInvalidRequest(searchString, 1))
             return Optional.empty();
 
-        ImmutableSet<String> searchKeywords = prepareKeywords(searchString, false);
+        ImmutableSet<String> searchKeywords = prepareKeywords(searchString, keywordsExtractor, keywordNormalizer, false);
 
         if (searchKeywords.isEmpty())
             return Optional.empty();
 
-        long readLock = lock.readLock();
-        try {
-            List<ScoreWrapper<T>> results = doSearch(searchKeywords, 1);
+        List<ScoreWrapper<T>> results = doSearch(searchKeywords, 1);
 
-            if (results.isEmpty()) {
-                return Optional.empty();
-            } else {
-                ScoreWrapper<T> w = results.get(0);
-                return Optional.of(
-                        new Item<>(
-                                w.unwrap(),
-                                itemKeywordsMap.get(w.unwrap()).safeCopy(),
-                                w.getScore()
-                        )
-                );
-            }
-        } finally {
-            lock.unlockRead(readLock);
+        if (results.isEmpty()) {
+            return Optional.empty();
+        } else {
+            ScoreWrapper<T> w = results.get(0);
+            return Optional.of(
+                    new Item<>(
+                            w.unwrap(),
+                            graph.getItemKeywords(w.unwrap()),
+                            w.getScore()
+                    )
+            );
         }
     }
 
@@ -426,32 +388,26 @@ public class QuickSearch<T> {
         if (isInvalidRequest(searchString, numberOfTopItems))
             return new Result<>(searchString != null ? searchString : "", Collections.emptyList());
 
-        ImmutableSet<String> searchKeywords = prepareKeywords(searchString, false);
+        ImmutableSet<String> searchKeywords = prepareKeywords(searchString, keywordsExtractor, keywordNormalizer, false);
 
         if (searchKeywords.isEmpty())
             return new Result<>(searchString, Collections.emptyList());
 
-        long readLock = lock.readLock();
-        try {
-            List<ScoreWrapper<T>> results = doSearch(searchKeywords, numberOfTopItems);
+        List<ScoreWrapper<T>> results = doSearch(searchKeywords, numberOfTopItems);
 
-            if (results.isEmpty()) {
-                return new Result<>(searchString, Collections.emptyList());
-            } else {
-                // Could be moved out of locked block if it wasn't for the keywords lookup...
-                return new Result<>(
-                        searchString,
-                        results.stream()
-                                .map(i -> new Item<>(
-                                        i.unwrap(),
-                                        itemKeywordsMap.get(i.unwrap()).safeCopy(),
-                                        i.getScore())
-                                )
-                                .collect(Collectors.toList())
-                );
-            }
-        } finally {
-            lock.unlockRead(readLock);
+        if (results.isEmpty()) {
+            return new Result<>(searchString, Collections.emptyList());
+        } else {
+            return new Result<>(
+                    searchString,
+                    results.stream()
+                            .map(i -> new Item<>(
+                                    i.unwrap(),
+                                    graph.getItemKeywords(i.unwrap()),
+                                    i.getScore())
+                            )
+                            .collect(Collectors.toList())
+            );
         }
     }
 
@@ -459,14 +415,7 @@ public class QuickSearch<T> {
      * Clear the search database.
      */
     public void clear() {
-        long writeLock = lock.writeLock();
-        try {
-            fragmentsItemsTree.clear();
-            itemKeywordsMap.clear();
-            clearCache();
-        } finally {
-            lock.unlockWrite(writeLock);
-        }
+        graph.clear();
     }
 
     /**
@@ -475,19 +424,7 @@ public class QuickSearch<T> {
      * @return stats listing number of items, keywords and fragments known
      */
     public Stats getStats() {
-        Stats stats;
-
-        long readLock = lock.readLock();
-        try {
-            stats = new Stats(
-                    itemKeywordsMap.size(),
-                    fragmentsItemsTree.size()
-            );
-        } finally {
-            lock.unlockRead(readLock);
-        }
-
-        return stats;
+        return graph.getStats();
     }
 
     /**
@@ -496,10 +433,7 @@ public class QuickSearch<T> {
      * @return Optional containing cache statistics if cache is enabled, empty otherwise
      */
     public Optional<CacheStatistics> getCacheStats() {
-        if (cache != null)
-            return Optional.of(cache.getStatistics());
-        else
-            return Optional.empty();
+        return graph.getCacheStats();
     }
 
     /*
@@ -524,7 +458,7 @@ public class QuickSearch<T> {
     private Map<T, Double> findAndScore(final ImmutableSet<String> suppliedFragments) {
         /* Avoid calling into merges if we are looking for only one keyword */
         if (suppliedFragments.size() == 1)
-            return walkAndScore(suppliedFragments.getSingleElement());
+            return walkGraphAndScore(suppliedFragments.getSingleElement());
 
         /* Merges will be inevitable */
         if (accumulationPolicy == UNION)
@@ -541,7 +475,7 @@ public class QuickSearch<T> {
             final Map<T, Double> accumulatedItems = new HashMap<>();
 
             suppliedFragments.forEach(fragment ->
-                    walkAndScore(fragment).forEach((k, v) ->
+                    walkGraphAndScore(fragment).forEach((k, v) ->
                             accumulatedItems.merge(k, v, (d1, d2) -> d1 + d2))
             );
 
@@ -557,7 +491,7 @@ public class QuickSearch<T> {
             Map<T, Double> accumulatedItems = null;
 
             for (String suppliedFragment : suppliedFragments) {
-                Map<T, Double> fragmentItems = walkAndScore(suppliedFragment);
+                Map<T, Double> fragmentItems = walkGraphAndScore(suppliedFragment);
 
                 if (fragmentItems.isEmpty()) // results will be empty too, return early
                     return fragmentItems;
@@ -583,7 +517,7 @@ public class QuickSearch<T> {
 
         /* Cache disabled, we can reuse the supplied maps directly */
         // TODO - replace cache check with direct check if map is mutable.
-        if (cache == null) {
+        if (!graph.isCacheEnabled()) {
             smaller.keySet().retainAll(bigger.keySet());
             smaller.entrySet().forEach(e -> e.setValue(e.getValue() + bigger.get(e.getKey())));
             return smaller;
@@ -601,214 +535,42 @@ public class QuickSearch<T> {
         }
     }
 
-    private Map<T, Double> walkAndScore(final String fragment) {
-        GraphNode<T> root = fragmentsItemsTree.get(fragment);
+    /*
+     * Interfacing with the graph
+     */
 
-        if (root == null) {
-            if (unmatchedPolicy == BACKTRACKING && fragment.length() > 1) {
-                return walkAndScore(fragment.substring(0, fragment.length() - 1));
-            } else {
-                return Collections.emptyMap();
-            }
-        } else {
-            return walkAndScore(root);
-        }
+    private void addItemImpl(final T item, final Set<String> suppliedKeywords) {
+        graph.registerItem(item, suppliedKeywords);
     }
 
-    private Map<T, Double> walkAndScore(GraphNode<T> root) {
-        final Map<T, Double> accumulator = new LinkedHashMap<>(root.getItemsSizeHint() > 0 ? root.getItemsSizeHint() : 16);
-        final Set<String> visitsTracker = new HashSet<>(root.getNodesSizeHint() > 0 ? root.getNodesSizeHint() : 16);
+    private void removeItemImpl(final T item) {
+        graph.unregisterItem(item);
+    }
 
-        Map<T, Double> result;
+    private Map<T, Double> walkGraphAndScore(final String keyword) {
+        Map<T, Double> result = graph.walkAndScore(keyword, keywordMatchScorer);
 
-        if (cache != null)
-            result = cache.getFromCacheOrSupplier(root, rootNode -> walkAndScore(rootNode.getFragment(), rootNode, accumulator, visitsTracker));
-        else
-            result = walkAndScore(root.getFragment(), root, accumulator, visitsTracker);
-
-        /* Store size hints to prevent rehash operations on repeat visits */
-        root.setItemsSizeHint(result.size());
-        root.setNodesSizeHint(visitsTracker.size());
+        /* Check if we need to back off */
+        if (unmatchedPolicy == BACKTRACKING
+                && result.isEmpty()
+                && keyword.length() > 1)
+            return walkGraphAndScore(keyword.substring(0, keyword.length() - 1));
 
         return result;
     }
 
-    private Map<T, Double> walkAndScore(final String originalFragment,
-                                        final GraphNode<T> node,
-                                        final Map<T, Double> accumulated,
-                                        final Set<String> visited) {
-        visited.add(node.getFragment());
-
-        if (!node.getItems().isEmpty()) {
-            Double score = keywordMatchScorer.apply(originalFragment, node.getFragment());
-            node.getItems().forEach(item -> accumulated.merge(item, score, (d1, d2) -> d1.compareTo(d2) > 0 ? d1 : d2));
-        }
-
-        node.getParents().forEach(parent -> {
-            if (!visited.contains(parent.getFragment())) {
-                walkAndScore(originalFragment, parent, accumulated, visited);
-            }
-        });
-
-        return accumulated;
-    }
-
-    private void addItemImpl(final T item,
-                             final Set<String> suppliedKeywords) {
-        registerItem(item, suppliedKeywords);
-
-        if (itemKeywordsMap.containsKey(item))
-            itemKeywordsMap.put(item, ImmutableSet.fromCollections(itemKeywordsMap.get(item), suppliedKeywords));
-        else
-            itemKeywordsMap.put(item, ImmutableSet.fromCollection(suppliedKeywords));
-
-        clearCache();
-    }
-
-    private void removeItemImpl(final T item) {
-        unregisterItem(item);
-        itemKeywordsMap.remove(item);
-        clearCache();
-    }
-
-    private void clearCache() {
-        if (cache != null)
-            cache.clearCache();
-    }
-
-    private ImmutableSet<String> prepareKeywords(final String keywordsString,
-                                                 final boolean internKeywords) {
+    private static ImmutableSet<String> prepareKeywords(final String keywordsString,
+                                                              final Function<String, Set<String>> extractorFunction,
+                                                              final Function<String, String> normalizerFunction,
+                                                              final boolean internKeywords) {
         return ImmutableSet.fromCollection(
-                keywordsExtractor.apply(keywordsString).stream()
+                extractorFunction.apply(keywordsString).stream()
                         .filter(s -> s != null)
-                        .map(keywordNormalizer)
+                        .map(normalizerFunction)
                         .filter(s -> !s.isEmpty())
                         .map(s -> internKeywords ? s.intern() : s)
                         .collect(Collectors.toSet()) // implies distinct
         );
-    }
-
-    /*
-     * Constructor parameter function tests.
-     */
-
-    /**
-     * Test keyword extractor function for valid set (can be empty)
-     * returned for empty and present string inputs.
-     *
-     * @param function Extractor function under test
-     * @throws IllegalArgumentException Thrown if there was a null output or an exception while processing test inputs
-     */
-    private void testKeywordsExtractorFunction(final Function<String, Set<String>> function) {
-        try {
-            if (function.apply("") == null || function.apply("testinput") == null)
-                throw new IllegalArgumentException("Keywords extractor function failed non-null result test");
-        } catch (IllegalArgumentException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new IllegalArgumentException("Exception while testing keywords extractor function", e);
-        }
-    }
-
-    /**
-     * Test keyword normalizer function for non-null string output (can be empty)
-     * returned for empty and present string inputs.
-     *
-     * @param function Normalizer function under test
-     * @throws IllegalArgumentException Thrown if there was a null output or exception during test invocations
-     */
-    private void testKeywordNormalizerFunction(final Function<String, String> function) {
-        try {
-            if (function.apply("") == null || function.apply("testinput") == null)
-                throw new IllegalArgumentException("Keyword normalizer function failed non-null output test");
-        } catch (IllegalArgumentException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new IllegalArgumentException("Exception while testing keyword normalizer function", e);
-        }
-    }
-
-    /**
-     * Test supplied scoring function for exceptions during scoring call.
-     *
-     * @param function Function under test
-     * @throws IllegalArgumentException Thrown if there was an exception trying to score example inputs
-     */
-    private void testKeywordMatchScorerFunction(final BiFunction<String, String, Double> function) {
-        try {
-            function.apply("testinput", "testinput");
-        } catch (Exception e) {
-            throw new IllegalArgumentException("Exception while testing keyword match scorer function", e);
-        }
-    }
-
-    /*
-     * Tree/graph of keyword fragments
-     */
-
-    private void registerItem(final T item,
-                              final Set<String> keywords) {
-        keywords.forEach(keyword -> createAndRegisterNode(null, keyword, item));
-    }
-
-    private void createAndRegisterNode(final GraphNode<T> parent,
-                                       final String identity,
-                                       final T item) {
-        GraphNode<T> node = fragmentsItemsTree.get(identity);
-
-        if (node == null) {
-            /*
-             * Required for visitors tracker set to work properly
-             */
-            final String internedIdentity = identity.intern();
-
-            node = new GraphNode<>(internedIdentity);
-            fragmentsItemsTree.put(internedIdentity, node);
-
-            // And proceed to add child nodes
-            if (node.getFragment().length() > 1) {
-                createAndRegisterNode(node, internedIdentity.substring(0, identity.length() - 1), null);
-                createAndRegisterNode(node, internedIdentity.substring(1), null);
-            }
-        }
-
-        if (item != null)
-            node.addItem(item);
-
-        if (parent != null)
-            node.addParent(parent);
-    }
-
-    private void unregisterItem(final T item) {
-        if (itemKeywordsMap.containsKey(item)) {
-            for (String keyword : itemKeywordsMap.get(item)) {
-                GraphNode<T> keywordNode = fragmentsItemsTree.get(keyword);
-
-                keywordNode.removeItem(item);
-
-                if (keywordNode.getItems().isEmpty())
-                    collapseEdge(keywordNode, null);
-            }
-        }
-    }
-
-    private void collapseEdge(final GraphNode<T> node,
-                              final GraphNode<T> parent) {
-        if (node == null) //already removed
-            return;
-
-        if (parent != null)
-            node.removeParent(parent);
-
-        // No getParents or getItems means that there's nothing here to find, proceed onwards
-        if (node.getParents().isEmpty() && node.getItems().isEmpty()) {
-            fragmentsItemsTree.remove(node.getFragment());
-
-            if (node.getFragment().length() > 1) {
-                collapseEdge(fragmentsItemsTree.get(node.getFragment().substring(0, node.getFragment().length() - 1)), node);
-                collapseEdge(fragmentsItemsTree.get(node.getFragment().substring(1)), node);
-            }
-        }
     }
 
     /*
@@ -826,7 +588,7 @@ public class QuickSearch<T> {
         @Override
         protected Map<T, Double> compute() {
             if (keywords.size() == 1)
-                return walkAndScore(keywords.getSingleElement());
+                return walkGraphAndScore(keywords.getSingleElement());
 
             ImmutableSet<String>[] splits = keywords.split();
 
@@ -871,7 +633,7 @@ public class QuickSearch<T> {
         @Override
         protected Map<T, Double> compute() {
             if (keywords.size() == 1) {
-                walkAndScore(keywords.getSingleElement()).forEach((k, v) ->
+                walkGraphAndScore(keywords.getSingleElement()).forEach((k, v) ->
                         accumulator.merge(k, v, (d1, d2) -> d1 + d2)
                 );
                 return accumulator;
@@ -904,7 +666,7 @@ public class QuickSearch<T> {
         private Function<String, Set<String>> keywordsExtractor = DEFAULT_KEYWORDS_EXTRACTOR;
         private UNMATCHED_POLICY unmatchedPolicy = BACKTRACKING;
         private ACCUMULATION_POLICY accumulationPolicy = UNION;
-        private boolean enableForkJoin = true;
+        private boolean enableForkJoin = false;
         private int cacheLimit = 0;
 
         public QuickSearchBuilder withKeywordMatchScorer(BiFunction<String, String, Double> scorer) {

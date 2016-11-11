@@ -229,8 +229,8 @@ public class ImmutableSet<T> extends AbstractSet<T> {
      * @param <S>     type
      * @return set of unique items across both collections
      */
-    public static <S> ImmutableSet<S> fromCollections(final Collection<? extends S> source,
-                                                      final Collection<? extends S> source2) {
+    public static <S> ImmutableSet<S> mergeCollections(final Collection<? extends S> source,
+                                                       final Collection<? extends S> source2) {
         Objects.requireNonNull(source);
         Objects.requireNonNull(source2);
 

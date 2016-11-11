@@ -216,7 +216,7 @@ public class ImmutableSetTest {
 
     @Test
     public void fromCollections() {
-        Set<String> set = ImmutableSet.fromCollections(Arrays.asList("cat", "dog"), Arrays.asList("red", "blue"));
+        Set<String> set = ImmutableSet.mergeCollections(Arrays.asList("cat", "dog"), Arrays.asList("red", "blue"));
         assertFalse(set.isEmpty());
         assertEquals(4, set.size());
         assertEquals(new HashSet<>(Arrays.asList("red", "cat", "dog", "blue")), set);
@@ -224,7 +224,7 @@ public class ImmutableSetTest {
 
     @Test
     public void fromCollections1() {
-        Set<String> set = ImmutableSet.fromCollections(Collections.emptySet(), Arrays.asList("red", "blue"));
+        Set<String> set = ImmutableSet.mergeCollections(Collections.emptySet(), Arrays.asList("red", "blue"));
         assertFalse(set.isEmpty());
         assertEquals(2, set.size());
         assertEquals(new HashSet<>(Arrays.asList("red", "blue")), set);
@@ -232,7 +232,7 @@ public class ImmutableSetTest {
 
     @Test
     public void fromCollections2() {
-        Set<String> set = ImmutableSet.fromCollections(Arrays.asList("red", "blue"), Collections.emptySet());
+        Set<String> set = ImmutableSet.mergeCollections(Arrays.asList("red", "blue"), Collections.emptySet());
         assertFalse(set.isEmpty());
         assertEquals(2, set.size());
         assertEquals(new HashSet<>(Arrays.asList("red", "blue")), set);
@@ -240,7 +240,7 @@ public class ImmutableSetTest {
 
     @Test
     public void fromCollections3() {
-        Set<String> set = ImmutableSet.fromCollections(Collections.emptySet(), Collections.emptySet());
+        Set<String> set = ImmutableSet.mergeCollections(Collections.emptySet(), Collections.emptySet());
         assertTrue(set.isEmpty());
         assertEquals(0, set.size());
         assertEquals(Collections.emptySet(), set);

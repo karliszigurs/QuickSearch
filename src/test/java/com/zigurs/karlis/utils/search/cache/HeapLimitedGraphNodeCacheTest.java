@@ -55,16 +55,16 @@ public class HeapLimitedGraphNodeCacheTest {
     @Test
     public void queryUncacheable() {
         cache.getFromCacheOrSupplier(new GraphNode<>("verylongname"), supplierFunction);
-        assertEquals(1, cache.getStatistics().getUncacheable());
-        assertEquals(true, cache.getStatistics().isEnabled());
+        assertEquals(1, cache.getStats().getUncacheable());
+        assertEquals(true, cache.getStats().isEnabled());
     }
 
     @Test
     public void queryCached() {
         cache.getFromCacheOrSupplier(new GraphNode<>("hey"), supplierFunction);
         cache.getFromCacheOrSupplier(new GraphNode<>("hey"), supplierFunction);
-        assertEquals(1, cache.getStatistics().getHits());
-        assertEquals(true, cache.getStatistics().isEnabled());
+        assertEquals(1, cache.getStats().getHits());
+        assertEquals(true, cache.getStats().isEnabled());
     }
 
     @Test
@@ -77,8 +77,8 @@ public class HeapLimitedGraphNodeCacheTest {
             cache.getFromCacheOrSupplier(new GraphNode<>("d"), supplierFunction);
         }
 
-        assertEquals(0, cache.getStatistics().getSize());
-        assertEquals(10, cache.getStatistics().getEvictions());
-        assertFalse(cache.getStatistics().isEnabled());
+        assertEquals(0, cache.getStats().getSize());
+        assertEquals(10, cache.getStats().getEvictions());
+        assertFalse(cache.getStats().isEnabled());
     }
 }

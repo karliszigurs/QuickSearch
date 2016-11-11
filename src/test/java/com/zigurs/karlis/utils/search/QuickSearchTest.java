@@ -722,6 +722,7 @@ public class QuickSearchTest {
     public void checkCacheReports() {
         searchInstance = QuickSearch.builder()
                 .withAccumulationPolicy(INTERSECTION)
+                .withForkJoinProcessing()
                 .withCache()
                 .build();
 
@@ -747,7 +748,6 @@ public class QuickSearchTest {
         assertEquals(9, searchInstance.getCacheStats().get().getSize());
         assertEquals(0, searchInstance.getCacheStats().get().getUncacheable());
     }
-
 
     @Test
     public void checkCacheMissing() {

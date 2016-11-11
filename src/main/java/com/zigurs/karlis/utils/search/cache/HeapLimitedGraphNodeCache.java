@@ -184,7 +184,7 @@ public class HeapLimitedGraphNodeCache<T> implements Cache<GraphNode<T>, Map<T, 
         isDisabled = keyLengthLimit < 1;
 
         if (isDisabled) {
-            cache.clear(); // DO NOT call clearCache() here, lock may be non-re-entrant
+            cache.clear(); // DO NOT call clear() here, lock may be non-re-entrant
             currentEntries = 0L;
             return;
         }
@@ -217,7 +217,7 @@ public class HeapLimitedGraphNodeCache<T> implements Cache<GraphNode<T>, Map<T, 
     }
 
     @Override
-    public void clearCache() {
+    public void clear() {
         long stamp = mapLock.readLock();
         try {
             if (!cache.isEmpty()) {
@@ -235,7 +235,7 @@ public class HeapLimitedGraphNodeCache<T> implements Cache<GraphNode<T>, Map<T, 
     }
 
     @Override
-    public CacheStatistics getStatistics() {
+    public CacheStatistics getStats() {
         return new HeapLimitedGraphNodeCacheStatistics(
                 hits,
                 misses,

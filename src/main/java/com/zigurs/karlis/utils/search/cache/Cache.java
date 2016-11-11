@@ -30,8 +30,8 @@ public interface Cache<K, V> {
 
     V getFromCacheOrSupplier(K rootNode, Function<K, V> supplier);
 
-    void clearCache();
+    void clear();
 
-    CacheStatistics getStatistics();
+    CacheStatistics getStats();
 
 }
