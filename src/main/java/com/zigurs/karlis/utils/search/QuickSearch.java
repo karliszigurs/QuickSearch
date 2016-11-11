@@ -18,13 +18,13 @@
 package com.zigurs.karlis.utils.search;
 
 import com.zigurs.karlis.utils.search.cache.CacheStatistics;
+import com.zigurs.karlis.utils.search.fj.FJIntersectionTask;
+import com.zigurs.karlis.utils.search.fj.FJUnionTask;
 import com.zigurs.karlis.utils.search.model.Item;
 import com.zigurs.karlis.utils.search.model.Result;
 import com.zigurs.karlis.utils.search.model.Stats;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.RecursiveTask;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -469,7 +469,7 @@ public class QuickSearch<T> {
 
     private Map<T, Double> findAndScoreUnion(final ImmutableSet<String> suppliedFragments) {
         if (enableForkJoin) {
-            return new FJUnionTask(suppliedFragments).fork().join();
+            return new FJUnionTask<>(suppliedFragments, this::walkGraphAndScore).fork().join();
 
         } else {
             final Map<T, Double> accumulatedItems = new HashMap<>();
@@ -485,7 +485,7 @@ public class QuickSearch<T> {
 
     private Map<T, Double> findAndScoreIntersection(final ImmutableSet<String> suppliedFragments) {
         if (enableForkJoin) {
-            return new FJIntersectionTask(suppliedFragments).fork().join();
+            return new FJIntersectionTask<>(suppliedFragments, this::walkGraphAndScore, this::intersectMaps).fork().join();
 
         } else {
             Map<T, Double> accumulatedItems = null;
@@ -560,9 +560,9 @@ public class QuickSearch<T> {
     }
 
     private static ImmutableSet<String> prepareKeywords(final String keywordsString,
-                                                              final Function<String, Set<String>> extractorFunction,
-                                                              final Function<String, String> normalizerFunction,
-                                                              final boolean internKeywords) {
+                                                        final Function<String, Set<String>> extractorFunction,
+                                                        final Function<String, String> normalizerFunction,
+                                                        final boolean internKeywords) {
         return ImmutableSet.fromCollection(
                 extractorFunction.apply(keywordsString).stream()
                         .filter(s -> s != null)
@@ -571,86 +571,6 @@ public class QuickSearch<T> {
                         .map(s -> internKeywords ? s.intern() : s)
                         .collect(Collectors.toSet()) // implies distinct
         );
-    }
-
-    /*
-     * Fork & join tasks
-     */
-
-    private class FJIntersectionTask extends RecursiveTask<Map<T, Double>> {
-
-        private final ImmutableSet<String> keywords;
-
-        private FJIntersectionTask(final ImmutableSet<String> keywords) {
-            this.keywords = keywords;
-        }
-
-        @Override
-        protected Map<T, Double> compute() {
-            if (keywords.size() == 1)
-                return walkGraphAndScore(keywords.getSingleElement());
-
-            ImmutableSet<String>[] splits = keywords.split();
-
-            FJIntersectionTask left = new FJIntersectionTask(splits[0]);
-            left.fork();
-
-            FJIntersectionTask right = new FJIntersectionTask(splits[1]);
-            right.fork();
-
-            Map<T, Double> leftMap = left.join();
-
-            if (leftMap.isEmpty()) {
-                right.cancel(true); // Worth a try...
-                return leftMap;
-            }
-
-            Map<T, Double> rightMap = right.join();
-
-            if (rightMap.isEmpty())
-                return rightMap;
-
-            return intersectMaps(leftMap, rightMap);
-        }
-    }
-
-    private class FJUnionTask extends RecursiveTask<Map<T, Double>> {
-
-        private final ImmutableSet<String> keywords;
-        private final ConcurrentHashMap<T, Double> accumulator;
-
-        private FJUnionTask(final ImmutableSet<String> keywords) {
-            this.keywords = keywords;
-            this.accumulator = new ConcurrentHashMap<>();
-        }
-
-        private FJUnionTask(final ImmutableSet<String> keywords,
-                            final ConcurrentHashMap<T, Double> accumulator) {
-            this.keywords = keywords;
-            this.accumulator = accumulator;
-        }
-
-        @Override
-        protected Map<T, Double> compute() {
-            if (keywords.size() == 1) {
-                walkGraphAndScore(keywords.getSingleElement()).forEach((k, v) ->
-                        accumulator.merge(k, v, (d1, d2) -> d1 + d2)
-                );
-                return accumulator;
-            }
-
-            ImmutableSet<String>[] splits = keywords.split();
-
-            FJUnionTask left = new FJUnionTask(splits[0], accumulator);
-            left.fork();
-            FJUnionTask right = new FJUnionTask(splits[1], accumulator);
-            right.fork();
-
-            left.join();
-            right.join();
-
-            return accumulator;
-        }
     }
 
     /*

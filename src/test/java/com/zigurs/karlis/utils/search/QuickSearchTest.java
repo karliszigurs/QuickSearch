@@ -750,6 +750,36 @@ public class QuickSearchTest {
     }
 
     @Test
+    public void checkCacheReportsUnion() {
+        searchInstance = QuickSearch.builder()
+                .withAccumulationPolicy(UNION)
+                .withForkJoinProcessing()
+                .withCache()
+                .build();
+
+        addItem("test1", "one two");
+        addItem("test2", "two three");
+        addItem("test3", "three four");
+        addItem("test4", "three five");
+        addItem("test5", "three six");
+        addItem("test6", "three seven");
+        addItem("test7", "zebra cat");
+
+        assertEquals("Unexpected result size", 6, searchInstance.findItems("two three", 10).size());
+        assertEquals("Unexpected result size", 2, searchInstance.findItems("two", 10).size());
+        assertEquals("Unexpected result size", 6, searchInstance.findItems("three two", 10).size());
+        assertEquals("Unexpected result size", 7, searchInstance.findItems("three cat two zebra", 10).size());
+
+        assertTrue(searchInstance.getCacheStats().isPresent());
+
+        assertEquals(5, searchInstance.getCacheStats().get().getHits());
+        assertEquals(0, searchInstance.getCacheStats().get().getEvictions());
+        assertEquals(4, searchInstance.getCacheStats().get().getMisses());
+        assertEquals(9, searchInstance.getCacheStats().get().getSize());
+        assertEquals(0, searchInstance.getCacheStats().get().getUncacheable());
+    }
+
+    @Test
     public void checkCacheMissing() {
         searchInstance = QuickSearch.builder()
                 .withAccumulationPolicy(UNION)
