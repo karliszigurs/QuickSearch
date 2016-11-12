@@ -18,7 +18,7 @@ public final class QuickSearchConfigurationFunctionHelpers {
     /**
      * //TODO - update doc
      */
-    public static final void testKeywordsExtractorFunction(final Function<String, Set<String>> function) {
+    public static void testKeywordsExtractorFunction(final Function<String, Set<String>> function) {
         try {
             if (function.apply("") == null || function.apply("testinput") == null)
                 throw new IllegalArgumentException("Keywords extractor function failed non-null result test");
@@ -32,7 +32,7 @@ public final class QuickSearchConfigurationFunctionHelpers {
     /**
      * //TODO - update doc
      */
-    public static final void testKeywordNormalizerFunction(final Function<String, String> function) {
+    public static void testKeywordNormalizerFunction(final Function<String, String> function) {
         try {
             if (function.apply("") == null || function.apply("testinput") == null)
                 throw new IllegalArgumentException("Keyword normalizer function failed non-null output test");
@@ -46,7 +46,7 @@ public final class QuickSearchConfigurationFunctionHelpers {
     /**
      * //TODO - update doc
      */
-    public static final void testKeywordMatchScorerFunction(final BiFunction<String, String, Double> function) {
+    public static void testKeywordMatchScorerFunction(final BiFunction<String, String, Double> function) {
         try {
             function.apply("testinput", "testinput");
         } catch (Exception e) {

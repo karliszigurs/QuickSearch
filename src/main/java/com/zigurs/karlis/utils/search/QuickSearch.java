@@ -17,9 +17,9 @@
  */
 package com.zigurs.karlis.utils.search;
 
-import com.zigurs.karlis.utils.search.cache.CacheStatistics;
 import com.zigurs.karlis.utils.search.fj.FJIntersectionTask;
 import com.zigurs.karlis.utils.search.fj.FJUnionTask;
+import com.zigurs.karlis.utils.search.graph.QSGraph;
 import com.zigurs.karlis.utils.search.model.Item;
 import com.zigurs.karlis.utils.search.model.Result;
 import com.zigurs.karlis.utils.search.model.Stats;
@@ -237,7 +237,7 @@ public class QuickSearch<T> {
 
         enableForkJoin = builder.enableForkJoin;
 
-        graph = new QSGraph<>(builder.cacheLimit);
+        graph = new QSGraph<>();
     }
 
     /**
@@ -308,7 +308,7 @@ public class QuickSearch<T> {
         if (searchKeywords.isEmpty())
             return Optional.empty();
 
-        List<ScoreWrapper<T>> results = doSearch(searchKeywords, 1);
+        List<SearchResult<T>> results = doSearch(searchKeywords, 1);
 
         if (results.isEmpty())
             return Optional.empty();
@@ -333,13 +333,13 @@ public class QuickSearch<T> {
         if (searchKeywords.isEmpty())
             return Collections.emptyList();
 
-        List<ScoreWrapper<T>> results = doSearch(searchKeywords, numberOfTopItems);
+        List<SearchResult<T>> results = doSearch(searchKeywords, numberOfTopItems);
 
         if (results.isEmpty()) {
             return Collections.emptyList();
         } else {
             return results.stream()
-                    .map(ScoreWrapper::unwrap)
+                    .map(SearchResult::unwrap)
                     .collect(Collectors.toList());
         }
     }
@@ -360,12 +360,12 @@ public class QuickSearch<T> {
         if (searchKeywords.isEmpty())
             return Optional.empty();
 
-        List<ScoreWrapper<T>> results = doSearch(searchKeywords, 1);
+        List<SearchResult<T>> results = doSearch(searchKeywords, 1);
 
         if (results.isEmpty()) {
             return Optional.empty();
         } else {
-            ScoreWrapper<T> w = results.get(0);
+            SearchResult<T> w = results.get(0);
             return Optional.of(
                     new Item<>(
                             w.unwrap(),
@@ -393,7 +393,7 @@ public class QuickSearch<T> {
         if (searchKeywords.isEmpty())
             return new Result<>(searchString, Collections.emptyList());
 
-        List<ScoreWrapper<T>> results = doSearch(searchKeywords, numberOfTopItems);
+        List<SearchResult<T>> results = doSearch(searchKeywords, numberOfTopItems);
 
         if (results.isEmpty()) {
             return new Result<>(searchString, Collections.emptyList());
@@ -427,15 +427,6 @@ public class QuickSearch<T> {
         return graph.getStats();
     }
 
-    /**
-     * Access cache statistics if cache is enabled.
-     *
-     * @return Optional containing cache statistics if cache is enabled, empty otherwise
-     */
-    public Optional<CacheStatistics> getCacheStats() {
-        return graph.getCacheStats();
-    }
-
     /*
      * Implementation methods
      */
@@ -444,14 +435,14 @@ public class QuickSearch<T> {
         return searchString == null || searchString.isEmpty() || numItems < 1;
     }
 
-    private List<ScoreWrapper<T>> doSearch(final ImmutableSet<String> searchKeywords,
+    private List<SearchResult<T>> doSearch(final ImmutableSet<String> searchKeywords,
                                            final int maxItemsToList) {
         return sortAndLimit(
                 findAndScore(searchKeywords).entrySet(),
                 maxItemsToList,
                 (e1, e2) -> e2.getValue().compareTo(e1.getValue())
         ).stream()
-                .map(e -> new ScoreWrapper<>(e.getKey(), e.getValue()))
+                .map(e -> new SearchResult<>(e.getKey(), e.getValue()))
                 .collect(Collectors.toList());
     }
 
@@ -515,24 +506,9 @@ public class QuickSearch<T> {
         Map<T, Double> smaller = left.size() < right.size() ? left : right;
         Map<T, Double> bigger = smaller == left ? right : left;
 
-        /* Cache disabled, we can reuse the supplied maps directly */
-        // TODO - replace cache check with direct check if map is mutable.
-        if (!graph.isCacheEnabled()) {
-            smaller.keySet().retainAll(bigger.keySet());
-            smaller.entrySet().forEach(e -> e.setValue(e.getValue() + bigger.get(e.getKey())));
-            return smaller;
-        } else {
-            /* Cache present, new map needed. Expensive, but safe */
-            Map<T, Double> mergedMap = new LinkedHashMap<>(smaller.size());
-
-            smaller.entrySet().forEach(e -> {
-                Double newValue = bigger.get(e.getKey());
-                if (newValue != null)
-                    mergedMap.put(e.getKey(), e.getValue() + newValue);
-            });
-
-            return mergedMap;
-        }
+        smaller.keySet().retainAll(bigger.keySet());
+        smaller.entrySet().forEach(e -> e.setValue(e.getValue() + bigger.get(e.getKey())));
+        return smaller;
     }
 
     /*
@@ -638,6 +614,30 @@ public class QuickSearch<T> {
 
         public <T> QuickSearch<T> build() {
             return new QuickSearch<>(this);
+        }
+    }
+
+    /**
+     * Internal wrapper of item and score for results list.
+     * <p>
+     * Not for external use.
+     */
+    private static class SearchResult<T> {
+
+        private final T item;
+        private final double score;
+
+        private SearchResult(final T item, final double score) {
+            this.item = item;
+            this.score = score;
+        }
+
+        private T unwrap() {
+            return item;
+        }
+
+        private Double getScore() {
+            return score;
         }
     }
 }

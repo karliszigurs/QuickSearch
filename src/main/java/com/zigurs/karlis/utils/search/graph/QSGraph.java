@@ -15,11 +15,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.zigurs.karlis.utils.search;
+package com.zigurs.karlis.utils.search.graph;
 
-import com.zigurs.karlis.utils.search.cache.Cache;
-import com.zigurs.karlis.utils.search.cache.CacheStatistics;
-import com.zigurs.karlis.utils.search.cache.HeapLimitedGraphNodeCache;
+import com.zigurs.karlis.utils.search.ImmutableSet;
 import com.zigurs.karlis.utils.search.model.Stats;
 
 import java.util.*;
@@ -27,11 +25,6 @@ import java.util.concurrent.locks.StampedLock;
 import java.util.function.BiFunction;
 
 public class QSGraph<T> {
-
-    /**
-     * Cache of visited items for any particular graph node.
-     */
-    private final Cache<GraphNode<T>, Map<T, Double>> cache;
 
     /**
      * Map providing quick entry point to a particular node in the graph.
@@ -48,19 +41,6 @@ public class QSGraph<T> {
      * Stamped lock governing access to the graph modifying functions.
      */
     private final StampedLock stampedLock = new StampedLock();
-
-    /**
-     * Construct an instance with a specified cache limit - 0 for disabled,
-     * -1 for unlimited, positive integer for target cache size limit in bytes.
-     *
-     * @param cacheLimit max cache size limit in bytes
-     */
-    public QSGraph(int cacheLimit) {
-        if (cacheLimit > 0)
-            cache = new HeapLimitedGraphNodeCache<>(cacheLimit);
-        else
-            cache = null;
-    }
 
     /*
      * Public interface
@@ -84,8 +64,6 @@ public class QSGraph<T> {
                 itemKeywordsMap.put(item, ImmutableSet.mergeCollections(itemKeywordsMap.get(item), suppliedKeywords));
             else
                 itemKeywordsMap.put(item, ImmutableSet.fromCollection(suppliedKeywords));
-
-            clearCache();
         } finally {
             stampedLock.unlockWrite(writeLock);
         }
@@ -112,7 +90,6 @@ public class QSGraph<T> {
             }
 
             itemKeywordsMap.remove(item);
-            clearCache();
         } finally {
             stampedLock.unlockWrite(writeLock);
         }
@@ -131,14 +108,7 @@ public class QSGraph<T> {
                                        final BiFunction<String, String, Double> scorerFunction) {
         long readLock = stampedLock.readLock();
         try {
-
-            GraphNode<T> root = fragmentsNodesMap.get(fragment);
-
-            if (root == null)
-                return Collections.emptyMap();
-            else
-                return walkAndScore(root, scorerFunction);
-
+            return walkAndScoreImpl(fragment, scorerFunction);
         } finally {
             stampedLock.unlockRead(readLock);
         }
@@ -174,7 +144,6 @@ public class QSGraph<T> {
         try {
             fragmentsNodesMap.clear();
             itemKeywordsMap.clear();
-            clearCache();
         } finally {
             stampedLock.unlockWrite(writeLock);
         }
@@ -193,39 +162,9 @@ public class QSGraph<T> {
         );
     }
 
-    /**
-     * Retrieve some basic cache statistics if cache is enabled, empty {@link Optional} otherwise.
-     *
-     * @return {@link Optional} of {@link CacheStatistics} if cache is active
-     */
-    public Optional<CacheStatistics> getCacheStats() {
-        // TODO - again, ignoring locking here
-        if (cache != null)
-            return Optional.of(cache.getStats());
-        else
-            return Optional.empty();
-    }
-
-    /**
-     * Helper function to enable callers to understand if it's safe to mangle
-     * maps returned from the graph (if cache is disabled).
-     * <p>
-     * TODO - horrible, horrible, get rid of this!
-     *
-     * @return true if the cache is enabled
-     */
-    public boolean isCacheEnabled() {
-        return cache != null;
-    }
-
     /*
      * Implementation code
      */
-
-    private void clearCache() {
-        if (cache != null)
-            cache.clear();
-    }
 
     private void createAndRegisterNode(final GraphNode<T> parent,
                                        final String identity,
@@ -275,23 +214,14 @@ public class QSGraph<T> {
      * Graph walking
      */
 
-    private Map<T, Double> walkAndScore(final GraphNode<T> root,
-                                        final BiFunction<String, String, Double> scorerFunction) {
-        final Map<T, Double> accumulator = new LinkedHashMap<>(root.getItemsSizeHint() > 0 ? root.getItemsSizeHint() : 16);
-        final Set<String> visitsTracker = new HashSet<>(root.getNodesSizeHint() > 0 ? root.getNodesSizeHint() : 16);
+    private Map<T, Double> walkAndScoreImpl(final String fragment,
+                                            final BiFunction<String, String, Double> scorerFunction) {
+        GraphNode<T> root = fragmentsNodesMap.get(fragment);
 
-        Map<T, Double> result;
-
-        if (cache != null)
-            result = cache.getFromCacheOrSupplier(root, rootNode -> walkAndScore(rootNode.getFragment(), rootNode, accumulator, visitsTracker, scorerFunction));
+        if (root == null)
+            return Collections.emptyMap();
         else
-            result = walkAndScore(root.getFragment(), root, accumulator, visitsTracker, scorerFunction);
-
-        /* Store size hints to prevent rehash operations on repeat visits */
-        root.setItemsSizeHint(result.size());
-        root.setNodesSizeHint(visitsTracker.size());
-
-        return result;
+            return walkAndScore(root.getFragment(), root, new HashMap<>(), new HashSet<>(), scorerFunction);
     }
 
     private Map<T, Double> walkAndScore(final String originalFragment,
@@ -313,5 +243,105 @@ public class QSGraph<T> {
         });
 
         return accumulated;
+    }
+
+    /*
+     * Graph node that may contain a set of links to parent nodes
+     * and a set of concrete items associated with this node.
+     *
+     * The underlying idea is to have a hierarchical graph (ok, multi-root tree)
+     * where arbitrary nodes can have items associated with them. Each particular node
+     * serves as an entry point to traverse the graph upwards of it and
+     * operate on associated items.
+     */
+    private static final class GraphNode<V> {
+
+        private final String fragment;
+        private Set<V> items;
+        private Set<GraphNode<V>> parents;
+
+        /**
+         * Create a node with immutable identity string.
+         *
+         * @param fragment any string you like
+         */
+        private GraphNode(final String fragment) {
+            Objects.requireNonNull(fragment);
+            this.fragment = fragment;
+            this.items = ImmutableSet.empty();
+            this.parents = ImmutableSet.empty();
+        }
+
+        /**
+         * Retrieve identifier.
+         *
+         * @return selected identifier
+         */
+        private String getFragment() {
+            return fragment;
+        }
+
+        /**
+         * Retrieve set containing node items. The set will likely be read only
+         * and you _must_ use add and remove methods to add and remove items.
+         *
+         * @return Immutable, possibly empty, set of associated items.
+         */
+        private Set<V> getItems() {
+            return items;
+        }
+
+        /**
+         * Register an item with this node.
+         *
+         * @param item item to add.
+         */
+        private void addItem(final V item) {
+            if (items.isEmpty())
+                items = ImmutableSet.fromSingle(item);
+            else
+                items = ImmutableSet.addAndCreate(items, item);
+        }
+
+        /**
+         * Remove an item from this node if it is present.
+         *
+         * @param item item to remove.
+         */
+        private void removeItem(final V item) {
+            items = ImmutableSet.removeAndCreate(items, item);
+        }
+
+        /**
+         * Retrieve set containing known node parents. The set will likely
+         * be read only and you _must_ use add and remove methods to ... add
+         * and remove parents.
+         *
+         * @return Immutable, possibly empty, set of known parent nodes.
+         */
+        private Set<GraphNode<V>> getParents() {
+            return parents;
+        }
+
+        /**
+         * Add a parent node if not already known.
+         *
+         * @param parent parent to add.
+         */
+        private void addParent(final GraphNode<V> parent) {
+            if (parents.isEmpty())
+                parents = ImmutableSet.fromSingle(parent);
+            else
+                parents = ImmutableSet.addAndCreate(parents, parent);
+        }
+
+        /**
+         * Remove a parent node if known.
+         *
+         * @param parent parent to remove.
+         */
+        private void removeParent(final GraphNode<V> parent) {
+            parents = ImmutableSet.removeAndCreate(parents, parent);
+        }
     }
 }

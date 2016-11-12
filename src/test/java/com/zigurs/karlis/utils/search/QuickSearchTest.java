@@ -719,7 +719,7 @@ public class QuickSearchTest {
     }
 
     @Test
-    public void checkCacheReports() {
+    public void fjIntersectionWorks() {
         searchInstance = QuickSearch.builder()
                 .withAccumulationPolicy(INTERSECTION)
                 .withForkJoinProcessing()
@@ -739,18 +739,10 @@ public class QuickSearchTest {
         assertEquals("Unexpected result size", 1, searchInstance.findItems("three two", 10).size());
         assertEquals("Unexpected result size", 0, searchInstance.findItems("three cat two zebra", 10).size());
         assertEquals("Unexpected result size", 0, searchInstance.findItems("cat three two", 10).size());
-
-        assertTrue(searchInstance.getCacheStats().isPresent());
-
-        assertEquals(8, searchInstance.getCacheStats().get().getHits());
-        assertEquals(0, searchInstance.getCacheStats().get().getEvictions());
-        assertEquals(4, searchInstance.getCacheStats().get().getMisses());
-        assertEquals(9, searchInstance.getCacheStats().get().getSize());
-        assertEquals(0, searchInstance.getCacheStats().get().getUncacheable());
     }
 
     @Test
-    public void checkCacheReportsUnion() {
+    public void fjUnionWorks() {
         searchInstance = QuickSearch.builder()
                 .withAccumulationPolicy(UNION)
                 .withForkJoinProcessing()
@@ -769,14 +761,6 @@ public class QuickSearchTest {
         assertEquals("Unexpected result size", 2, searchInstance.findItems("two", 10).size());
         assertEquals("Unexpected result size", 6, searchInstance.findItems("three two", 10).size());
         assertEquals("Unexpected result size", 7, searchInstance.findItems("three cat two zebra", 10).size());
-
-        assertTrue(searchInstance.getCacheStats().isPresent());
-
-        assertEquals(5, searchInstance.getCacheStats().get().getHits());
-        assertEquals(0, searchInstance.getCacheStats().get().getEvictions());
-        assertEquals(4, searchInstance.getCacheStats().get().getMisses());
-        assertEquals(9, searchInstance.getCacheStats().get().getSize());
-        assertEquals(0, searchInstance.getCacheStats().get().getUncacheable());
     }
 
     @Test
@@ -788,8 +772,6 @@ public class QuickSearchTest {
         addItem("test1", "one two");
 
         assertEquals("Unexpected result size", 1, searchInstance.findItems("two three", 10).size());
-
-        assertFalse(searchInstance.getCacheStats().isPresent());
     }
 
     @Test
