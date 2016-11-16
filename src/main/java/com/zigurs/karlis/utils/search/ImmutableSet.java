@@ -298,8 +298,8 @@ public class ImmutableSet<T> extends AbstractSet<T> {
             return (ImmutableSet<T>) source;
 
         if (source instanceof Set) {
-            ((Set) source).remove(null);
             Set set = (Set) source;
+            set.remove(null);
             return new ImmutableSet<>((T[]) set.toArray());
         }
 
