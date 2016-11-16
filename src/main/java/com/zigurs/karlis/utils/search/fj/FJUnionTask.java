@@ -24,12 +24,24 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.RecursiveTask;
 import java.util.function.Function;
 
+/**
+ * Fork-join task computing the union of maps (summing values)
+ * provided for all specified keywords.
+ *
+ * @param <T> type of keys of maps being merged
+ */
 public class FJUnionTask<T> extends RecursiveTask<Map<T, Double>> {
 
     private final ImmutableSet<String> keywords;
     private final ConcurrentHashMap<T, Double> accumulator;
     private final Function<String, Map<T, Double>> supplierFunction;
 
+    /**
+     * Constructor.
+     *
+     * @param keywords         Immutable set of keywords this task should split down and accumulate
+     * @param supplierFunction supplier of maps to calculate union of
+     */
     public FJUnionTask(final ImmutableSet<String> keywords,
                        final Function<String, Map<T, Double>> supplierFunction) {
         this(keywords, supplierFunction, new ConcurrentHashMap<>());

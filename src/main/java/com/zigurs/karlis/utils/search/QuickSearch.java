@@ -29,9 +29,8 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import static com.zigurs.karlis.utils.search.QuickSearch.ACCUMULATION_POLICY.UNION;
-import static com.zigurs.karlis.utils.search.QuickSearch.UNMATCHED_POLICY.BACKTRACKING;
-import static com.zigurs.karlis.utils.search.helpers.QuickSearchConfigurationFunctionHelpers.*;
+import static com.zigurs.karlis.utils.search.QuickSearch.AccumulationPolicy.UNION;
+import static com.zigurs.karlis.utils.search.QuickSearch.UnmatchedPolicy.BACKTRACKING;
 import static com.zigurs.karlis.utils.sort.MagicSort.sortAndLimit;
 
 /**
@@ -101,7 +100,7 @@ public class QuickSearch<T> {
      * candidate match is found (e.g. supplied 'terminal' will be shortened until it
      * reaches 'ter' where it can match against 'terra').
      */
-    public enum UNMATCHED_POLICY {
+    public enum UnmatchedPolicy {
         EXACT, BACKTRACKING
     }
 
@@ -115,7 +114,7 @@ public class QuickSearch<T> {
      * INTERSECTION is significantly more performant as it discards
      * candidates as early as possible.
      */
-    public enum ACCUMULATION_POLICY {
+    public enum AccumulationPolicy {
         UNION, INTERSECTION
     }
 
@@ -177,9 +176,10 @@ public class QuickSearch<T> {
      * Items rank in the results is determined by the sum of all score results.
      */
     public static final BiFunction<String, String, Double> DEFAULT_MATCH_SCORER = (keywordMatch, keyword) -> {
-        double matchScore = (double) keywordMatch.length() / (double) keyword.length(); // reaches maximum if lengths match (both are identical)
+        /* 0...1 depending on the length ratio */
+        double matchScore = (double) keywordMatch.length() / (double) keyword.length();
 
-        // bonus boost for start of term
+        /* boost by 1 if matches start of keyword */
         if (keyword.startsWith(keywordMatch))
             matchScore += 1.0;
 
@@ -190,8 +190,8 @@ public class QuickSearch<T> {
      * Instance properties
      */
 
-    private final QuickSearch.ACCUMULATION_POLICY accumulationPolicy;
-    private final UNMATCHED_POLICY unmatchedPolicy;
+    private final AccumulationPolicy accumulationPolicy;
+    private final UnmatchedPolicy unmatchedPolicy;
 
     private final BiFunction<String, String, Double> keywordMatchScorer;
     private final Function<String, String> keywordNormalizer;
@@ -210,31 +210,8 @@ public class QuickSearch<T> {
         keywordsExtractor = builder.keywordsExtractor;
         keywordNormalizer = builder.keywordNormalizer;
         keywordMatchScorer = builder.keywordMatchScorer;
-
-        Objects.requireNonNull(keywordsExtractor);
-        Objects.requireNonNull(keywordNormalizer);
-        Objects.requireNonNull(keywordMatchScorer);
-
         unmatchedPolicy = builder.unmatchedPolicy;
         accumulationPolicy = builder.accumulationPolicy;
-
-        Objects.requireNonNull(unmatchedPolicy);
-        Objects.requireNonNull(accumulationPolicy);
-
-        /*
-         * Quick sanity check on the supplied functions to ensure
-         * they confirm to behavior expected internally.
-         */
-
-        testKeywordsExtractorFunction(keywordsExtractor);
-        testKeywordNormalizerFunction(keywordNormalizer);
-        testKeywordMatchScorerFunction(keywordMatchScorer);
-
-        /*
-         * Wire in cache interceptors, if supplied. Otherwise
-         * provide internal supplier and null clearer.
-         */
-
         enableForkJoin = builder.enableForkJoin;
 
         graph = new QSGraph<>();
@@ -476,7 +453,7 @@ public class QuickSearch<T> {
 
     private Map<T, Double> findAndScoreIntersection(final ImmutableSet<String> suppliedFragments) {
         if (enableForkJoin) {
-            return new FJIntersectionTask<>(suppliedFragments, this::walkGraphAndScore, this::intersectMaps).fork().join();
+            return new FJIntersectionTask<>(suppliedFragments, this::walkGraphAndScore).fork().join();
 
         } else {
             Map<T, Double> accumulatedItems = null;
@@ -499,16 +476,6 @@ public class QuickSearch<T> {
 
             return accumulatedItems;
         }
-    }
-
-    private Map<T, Double> intersectMaps(final Map<T, Double> left,
-                                         final Map<T, Double> right) {
-        Map<T, Double> smaller = left.size() < right.size() ? left : right;
-        Map<T, Double> bigger = smaller == left ? right : left;
-
-        smaller.keySet().retainAll(bigger.keySet());
-        smaller.entrySet().forEach(e -> e.setValue(e.getValue() + bigger.get(e.getKey())));
-        return smaller;
     }
 
     /*
@@ -550,42 +517,80 @@ public class QuickSearch<T> {
     }
 
     /*
-     * Configuration and builder
+     * Helpers
      */
 
-    public static class QuickSearchBuilder {
+    /**
+     * Returns intersection of two provided maps (or empty map if no
+     * keys overlap) summing the values.
+     * <p>
+     * For performance reasons this function _modifies maps supplied_  and possibly
+     * returns an instance of one of the supplied (by then modified) maps.
+     *
+     * @param left  map to intersect
+     * @param right map to intersect
+     * @param <T>   type of keys
+     * @return intersection with values summed
+     */
+    public static <T> Map<T, Double> intersectMaps(final Map<T, Double> left,
+                                                   final Map<T, Double> right) {
+        Map<T, Double> smaller = left.size() < right.size() ? left : right;
+        Map<T, Double> bigger = smaller == left ? right : left;
 
-        private static final int DEFAULT_CACHE_HEAP_LIMIT = 100 * 1024 * 1024;
+        smaller.keySet().retainAll(bigger.keySet());
+        smaller.entrySet().forEach(e -> e.setValue(e.getValue() + bigger.get(e.getKey())));
+        return smaller;
+    }
+
+    /*
+     * Builder.
+     */
+
+    /**
+     * {@link QuickSearch} builder class.
+     * <p>
+     * Access and use: {@code QuickSearch.builder().build();}
+     */
+    public static class QuickSearchBuilder {
 
         private BiFunction<String, String, Double> keywordMatchScorer = DEFAULT_MATCH_SCORER;
         private Function<String, String> keywordNormalizer = DEFAULT_KEYWORD_NORMALIZER;
         private Function<String, Set<String>> keywordsExtractor = DEFAULT_KEYWORDS_EXTRACTOR;
-        private UNMATCHED_POLICY unmatchedPolicy = BACKTRACKING;
-        private ACCUMULATION_POLICY accumulationPolicy = UNION;
+        private UnmatchedPolicy unmatchedPolicy = BACKTRACKING;
+        private AccumulationPolicy accumulationPolicy = UNION;
         private boolean enableForkJoin = false;
-        private int cacheLimit = 0;
 
         public QuickSearchBuilder withKeywordMatchScorer(BiFunction<String, String, Double> scorer) {
+            Objects.requireNonNull(scorer);
+
             keywordMatchScorer = scorer;
             return this;
         }
 
         public QuickSearchBuilder withKeywordNormalizer(Function<String, String> normalizer) {
+            Objects.requireNonNull(normalizer);
+
             keywordNormalizer = normalizer;
             return this;
         }
 
-        public QuickSearchBuilder withKeywordExtractor(Function<String, Set<String>> extractor) {
+        public QuickSearchBuilder withKeywordsExtractor(Function<String, Set<String>> extractor) {
+            Objects.requireNonNull(extractor);
+
             keywordsExtractor = extractor;
             return this;
         }
 
-        public QuickSearchBuilder withUnmatchedPolicy(UNMATCHED_POLICY policy) {
+        public QuickSearchBuilder withUnmatchedPolicy(UnmatchedPolicy policy) {
+            Objects.requireNonNull(policy);
+
             unmatchedPolicy = policy;
             return this;
         }
 
-        public QuickSearchBuilder withAccumulationPolicy(ACCUMULATION_POLICY policy) {
+        public QuickSearchBuilder withAccumulationPolicy(AccumulationPolicy policy) {
+            Objects.requireNonNull(policy);
+
             accumulationPolicy = policy;
             return this;
         }
@@ -593,23 +598,6 @@ public class QuickSearch<T> {
         public QuickSearchBuilder withForkJoinProcessing() {
             enableForkJoin = true;
             return this;
-        }
-
-        public QuickSearchBuilder withCacheLimit(int limitInHeapBytes) {
-            if (limitInHeapBytes == -1) {
-                cacheLimit = Integer.MAX_VALUE;
-                return this;
-            }
-
-            if (limitInHeapBytes < 1)
-                return this;
-
-            cacheLimit = limitInHeapBytes;
-            return this;
-        }
-
-        public QuickSearchBuilder withCache() {
-            return withCacheLimit(DEFAULT_CACHE_HEAP_LIMIT);
         }
 
         public <T> QuickSearch<T> build() {

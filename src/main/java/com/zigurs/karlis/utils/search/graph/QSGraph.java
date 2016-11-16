@@ -24,6 +24,13 @@ import java.util.*;
 import java.util.concurrent.locks.StampedLock;
 import java.util.function.BiFunction;
 
+/**
+ * QuickSearch
+ * {@code keyword fragments [many:many] keywords [many:many] stored items}
+ * graph/tree implementation.
+ *
+ * @param <T> type of items stored
+ */
 public class QSGraph<T> {
 
     /**
@@ -61,7 +68,7 @@ public class QSGraph<T> {
             suppliedKeywords.forEach(keyword -> createAndRegisterNode(null, keyword, item));
 
             if (itemKeywordsMap.containsKey(item))
-                itemKeywordsMap.put(item, ImmutableSet.mergeCollections(itemKeywordsMap.get(item), suppliedKeywords));
+                itemKeywordsMap.put(item, ImmutableSet.fromCollections(itemKeywordsMap.get(item), suppliedKeywords));
             else
                 itemKeywordsMap.put(item, ImmutableSet.fromCollection(suppliedKeywords));
         } finally {
@@ -117,16 +124,12 @@ public class QSGraph<T> {
     /**
      * Retrieve the stored keywords set associated with the item
      * (or empty set if the item mapping is not recognized).
-     * <p>
-     * Warning - there's a good chance that the returned set will be
-     * immutable in some form or another, caller should make a copy
-     * before operating on it.
      *
      * @param item previously registered item
-     * @return set of associated keywords
+     * @return set of associated keywords, possibly empty
      */
-    public Set<String> getItemKeywords(T item) {
-        // TODO - can we safely avoid locking here? I think we can...
+    public Set<String> getItemKeywords(final T item) {
+        /* safe to skip locking */
         ImmutableSet<String> keywords = itemKeywordsMap.get(item);
 
         if (keywords == null)
@@ -136,8 +139,7 @@ public class QSGraph<T> {
     }
 
     /**
-     * Clear this graph. Resets the graph to a virgin state as if it has been
-     * just constructed.
+     * Clear this graph.
      */
     public void clear() {
         long writeLock = stampedLock.writeLock();
@@ -155,7 +157,7 @@ public class QSGraph<T> {
      * @return stats object containing sizes of internal collections
      */
     public Stats getStats() {
-        // TODO - again, ignoring locking here
+        /* safe to ignore locking */
         return new Stats(
                 itemKeywordsMap.size(),
                 fragmentsNodesMap.size()
@@ -257,8 +259,8 @@ public class QSGraph<T> {
     private static final class GraphNode<V> {
 
         private final String fragment;
-        private Set<V> items;
-        private Set<GraphNode<V>> parents;
+        private ImmutableSet<V> items;
+        private ImmutableSet<GraphNode<V>> parents;
 
         /**
          * Create a node with immutable identity string.
@@ -268,8 +270,8 @@ public class QSGraph<T> {
         private GraphNode(final String fragment) {
             Objects.requireNonNull(fragment);
             this.fragment = fragment;
-            this.items = ImmutableSet.empty();
-            this.parents = ImmutableSet.empty();
+            this.items = ImmutableSet.emptySet();
+            this.parents = ImmutableSet.emptySet();
         }
 
         /**
@@ -297,10 +299,7 @@ public class QSGraph<T> {
          * @param item item to add.
          */
         private void addItem(final V item) {
-            if (items.isEmpty())
-                items = ImmutableSet.fromSingle(item);
-            else
-                items = ImmutableSet.addAndCreate(items, item);
+            items = ImmutableSet.add(items, item);
         }
 
         /**
@@ -309,7 +308,7 @@ public class QSGraph<T> {
          * @param item item to remove.
          */
         private void removeItem(final V item) {
-            items = ImmutableSet.removeAndCreate(items, item);
+            items = ImmutableSet.remove(items, item);
         }
 
         /**
@@ -329,10 +328,7 @@ public class QSGraph<T> {
          * @param parent parent to add.
          */
         private void addParent(final GraphNode<V> parent) {
-            if (parents.isEmpty())
-                parents = ImmutableSet.fromSingle(parent);
-            else
-                parents = ImmutableSet.addAndCreate(parents, parent);
+            parents = ImmutableSet.add(parents, parent);
         }
 
         /**
@@ -341,7 +337,7 @@ public class QSGraph<T> {
          * @param parent parent to remove.
          */
         private void removeParent(final GraphNode<V> parent) {
-            parents = ImmutableSet.removeAndCreate(parents, parent);
+            parents = ImmutableSet.remove(parents, parent);
         }
     }
 }

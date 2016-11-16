@@ -21,21 +21,31 @@ import com.zigurs.karlis.utils.search.ImmutableSet;
 
 import java.util.Map;
 import java.util.concurrent.RecursiveTask;
-import java.util.function.BiFunction;
 import java.util.function.Function;
 
+import static com.zigurs.karlis.utils.search.QuickSearch.intersectMaps;
+
+/**
+ * Fork-join task computing the intersection of maps (summing values)
+ * provided for all specified keywords.
+ *
+ * @param <T> type of keys of maps being intersected
+ */
 public class FJIntersectionTask<T> extends RecursiveTask<Map<T, Double>> {
 
     private final ImmutableSet<String> keywords;
     private final Function<String, Map<T, Double>> supplierFunction;
-    private final BiFunction<Map<T, Double>, Map<T, Double>, Map<T, Double>> mergeFunction;
 
+    /**
+     * Constructor.
+     *
+     * @param keywords         Immutable set of keywords this task should split down and accumulate
+     * @param supplierFunction supplier of maps to intersect for given keyword
+     */
     public FJIntersectionTask(final ImmutableSet<String> keywords,
-                              final Function<String, Map<T, Double>> supplierFunction,
-                              final BiFunction<Map<T, Double>, Map<T, Double>, Map<T, Double>> mergeFunction) {
+                              final Function<String, Map<T, Double>> supplierFunction) {
         this.keywords = keywords;
         this.supplierFunction = supplierFunction;
-        this.mergeFunction = mergeFunction;
     }
 
     @Override
@@ -45,10 +55,10 @@ public class FJIntersectionTask<T> extends RecursiveTask<Map<T, Double>> {
 
         ImmutableSet<String>[] splits = keywords.split();
 
-        FJIntersectionTask<T> left = new FJIntersectionTask<>(splits[0], supplierFunction, mergeFunction);
+        FJIntersectionTask<T> left = new FJIntersectionTask<>(splits[0], supplierFunction);
         left.fork();
 
-        FJIntersectionTask<T> right = new FJIntersectionTask<>(splits[1], supplierFunction, mergeFunction);
+        FJIntersectionTask<T> right = new FJIntersectionTask<>(splits[1], supplierFunction);
         right.fork();
 
         Map<T, Double> leftMap = left.join();
@@ -63,6 +73,6 @@ public class FJIntersectionTask<T> extends RecursiveTask<Map<T, Double>> {
         if (rightMap.isEmpty())
             return rightMap;
 
-        return mergeFunction.apply(leftMap, rightMap);
+        return intersectMaps(leftMap, rightMap);
     }
 }

@@ -1,5 +1,3 @@
 /target
 /.idea
-/quicksearch.iml
-sonar.token.txt
-*.sh
+/QuickSearch.iml

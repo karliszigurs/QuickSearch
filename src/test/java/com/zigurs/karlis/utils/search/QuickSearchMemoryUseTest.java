@@ -20,13 +20,12 @@ package com.zigurs.karlis.utils.search;
 import org.github.jamm.MemoryMeter;
 import org.junit.Test;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 public class QuickSearchMemoryUseTest {
 
-    private static final boolean MEASURE_LARGE_COLLECTIONS = false;
-
-    public final static String[][] USA_STATES = {
+    private final static String[][] USA_STATES = {
             {"AL", "Alabama", "Montgomery", "December 14, 1819"},
             {"AK", "Alaska", "Juneau", "January 3, 1959"},
             {"AZ", "Arizona", "Phoenix", "February 14, 1912"},
@@ -80,57 +79,37 @@ public class QuickSearchMemoryUseTest {
     };
 
     @Test
-    public void measureMemoryUse() {
+    public void fewItemsCountCheck() {
         /*
-         * Measured on Java 1.8.0_102
+         * as measured on Java 1.8.0_102
          */
+        final long fewItemsTarget = 561_784;
+        final int fewItemsCount = 1_000;
 
-//        final long JDK_COLLECTIONS_TARGET = 117_416_608; // 100k items, no cache
-//        final long GUAVA_MULTIMAP_TARGET = 104_140_960; // 100k items, no cache
-//        final long CUSTOM_TREE_TARGET = 54_255_008; // 100k items, no cache
-//        final long CUSTOM_TREE_TARGET = 54_255_008; // 100k items, no cache
-        final long CUSTOM_TREE_TARGET_INTERN = 19_448_040; // 100k items, no cache + keyword intern.
-        final long CUSTOM_SMALL_TREE_TARGET_INTERN = 579_776; // itemsCount = 1000;
-
-        final long measured = measureMemoryUseImpl(false, 0);
-        assertTrue("Instance size exceeds target", measured < ((MEASURE_LARGE_COLLECTIONS ? CUSTOM_TREE_TARGET_INTERN : CUSTOM_SMALL_TREE_TARGET_INTERN) * 1.1));
+        assertTrue(fewItemsTarget * 1.1 > measureMemoryUseImpl(fewItemsCount));
     }
 
     @Test
-    public void measureMemoryUseWithCache() {
-        final int capMB = 80;
-        final long measured = measureMemoryUseImpl(true, capMB * 1024 * 1024);
-        assertTrue("Instance size exceeds target", measured < (((MEASURE_LARGE_COLLECTIONS ? capMB : 0) + 20) * 1024 * 1024) * 1.1);
+    public void manyItemsCountCheck() {
+        /*
+         * as measured on Java 1.8.0_102
+         */
+        final long manyItemsTarget = 19_445_928;
+        final int manyItemsCount = 100_000;
+
+        assertTrue(manyItemsTarget * 1.1 > measureMemoryUseImpl(manyItemsCount));
     }
 
-    @Test
-    public void measureMemoryUseWithCacheDisabledItself() {
-        final long measured = measureMemoryUseImpl(true, 20 * 1024 * 1024);
-        assertTrue("Instance size exceeds target", measured < ((20 * 1024 * 1024) * 1.1));
-    }
-
-    @Test
-    public void measureMemoryUseWithUnlimitedCache() {
-        final long measured = measureMemoryUseImpl(true, Integer.MAX_VALUE);
-        /* Currently as-measured, to detect regressions. */
-        assertTrue("Instance size exceeds target", measured < 200 * 1024 * 1024);
-    }
-
-    public long measureMemoryUseImpl(boolean useCache, int cacheSize) {
+    private long measureMemoryUseImpl(final int itemsCount) {
         QuickSearch<String> searchInstance;
-        if (useCache)
-            searchInstance = QuickSearch.builder().withCacheLimit(cacheSize).build();
-        else
-            searchInstance = QuickSearch.builder().build();
-
-        final int itemsCount = MEASURE_LARGE_COLLECTIONS ? 100_000 : 1_000;
+        searchInstance = QuickSearch.builder().build();
 
         for (int i = 0; i < itemsCount; i++) {
             String[] items = USA_STATES[i % USA_STATES.length];
             searchInstance.addItem(items[0] + "-" + i, String.format("%s %s %s %s", items[0], items[1], items[2], items[3]));
         }
 
-        // Force population of caches, if active
+        // exercise it a bit
         for (char character = 'a'; character <= 'z'; character++) {
             for (char character2 = 'a'; character2 <= 'z'; character2++) {
                 searchInstance.findItem(String.valueOf(character) + String.valueOf(character2));
@@ -139,10 +118,7 @@ public class QuickSearchMemoryUseTest {
             }
         }
 
-        // Finish by populating worst case scenario
-        for (char character = 'a'; character <= 'z'; character++) {
-            searchInstance.findItem(String.valueOf(character));
-        }
+        assertEquals(10, searchInstance.findItems("a", 10).size());
 
         MemoryMeter meter = new MemoryMeter().withGuessing(MemoryMeter.Guess.ALWAYS_UNSAFE);
         return meter.measureDeep(searchInstance);

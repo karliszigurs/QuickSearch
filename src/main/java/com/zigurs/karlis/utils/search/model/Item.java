@@ -20,7 +20,7 @@ package com.zigurs.karlis.utils.search.model;
 import java.util.Set;
 
 /**
- * Container for augumented search result result containing the keywords
+ * Container for augmented search result result containing the keywords
  * associated with the result and the calculated search result score.
  *
  * @param <T> wrapped response result type
@@ -38,7 +38,9 @@ public class Item<T> {
      * @param itemKeywords set of non-null keywords associated with result
      * @param score        search result score for the result
      */
-    public Item(final T result, final Set<String> itemKeywords, final double score) {
+    public Item(final T result,
+                final Set<String> itemKeywords,
+                final double score) {
         this.result = result;
         this.itemKeywords = itemKeywords;
         this.score = score;

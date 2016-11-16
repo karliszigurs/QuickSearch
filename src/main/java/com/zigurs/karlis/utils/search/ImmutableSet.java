@@ -21,29 +21,28 @@ import java.util.*;
 import java.util.function.Consumer;
 
 /**
- * Array backed implementation of a set (yes, it is wrong. Very).
+ * Immutable, array backed, {@link Set} of unique (as determined by their respective
+ * {@link Object#hashCode()} &amp; {@link Object#equals(Object)} methods), non-{@code null} elements.
  * <p>
- * The rationale is to make memory profile and reads as lightweight as possible
- * even if it comes at the expense of modifying operations. If you can, try to use
- * .forEach to iterate over the set as it avoids allocating an iterator instance.
+ * The rationale is to have as lightweight as possible memory profile and read cost while still
+ * retaining {@link Set} semantics - in this case at cost of modifying operations.
  * <p>
- * Since it is to be used to contain non-null, unique, values Set interface seems to be most appropriate.
+ * Call to any <em>modifying</em> operations on an instance will throw an exception,
+ * contents of {@link ImmutableSet} should be modified using supplied helper functions
+ * that return a new immutable instance of set after applying requested modification
+ * (leaving the original {@link ImmutableSet} intact).
  * <p>
- * Comes at a cost of being a bit thread unsafe, modifying itself, etc.
- * <p>
- * To be used in QuickSearch and behind write lock _ONLY_!
- * <p>
- * This class does not permit <tt>null</tt> elements.
+ * This implementation does not permit {@code null} elements.
  *
- * @param <T> type this set instance will operate on
+ * @param <T> type of elements of this set
  */
 @SuppressWarnings("unchecked")
 public class ImmutableSet<T> extends AbstractSet<T> {
 
     /**
-     * Static, shareable empty iterator.
+     * Static, shareable and empty iterator.
      */
-    private static final Iterator NULL_ITERATOR = new Iterator() {
+    private static final Iterator EMPTY_ITERATOR = new Iterator() {
         @Override
         public boolean hasNext() {
             return false;
@@ -56,19 +55,18 @@ public class ImmutableSet<T> extends AbstractSet<T> {
     };
 
     /**
-     * Pass around the same instance for empty sets. Yay for less allocations.
+     * Reusable instance for empty sets.
      */
     private static final ImmutableSet EMPTY_SET = new ImmutableSet(new Object[0]) {
         @Override
         public Iterator iterator() {
-            return NULL_ITERATOR;
-        }
-
-        @Override
-        public ImmutableSet safeCopy() {
-            return EMPTY_SET;
+            return EMPTY_ITERATOR;
         }
     };
+
+    /*
+     * Implementation
+     */
 
     /**
      * Array with elements in this set.
@@ -81,193 +79,8 @@ public class ImmutableSet<T> extends AbstractSet<T> {
     private int hashCode = 0;
 
     private ImmutableSet(final T[] array) {
+        Objects.requireNonNull(array);
         this.array = array;
-    }
-
-    /**
-     * Empty set of given type.
-     *
-     * @param <S> type
-     * @return empty set
-     */
-    public static <S> ImmutableSet<S> empty() {
-        return (ImmutableSet<S>) EMPTY_SET;
-    }
-
-    /**
-     * Set with one member.
-     *
-     * @param item item to wrap in set
-     * @param <S>  type
-     * @return set of type with specified member
-     */
-    public static <S> ImmutableSet<S> fromSingle(final S item) {
-        Objects.requireNonNull(item);
-
-        return new ImmutableSet<>((S[]) new Object[]{item});
-    }
-
-    /**
-     * Expand given collection with a specified item and return a set.
-     * <p>
-     * Given as convenience method that performs better if operating on
-     * ImmutableSet already.
-     *
-     * @param source base collection
-     * @param item   item to add
-     * @param <S>    type
-     * @return set of items
-     */
-    public static <S> ImmutableSet<S> addAndCreate(final Collection<? extends S> source,
-                                                   final S item) {
-        Objects.requireNonNull(source);
-        Objects.requireNonNull(item);
-
-        if (source.isEmpty())
-            return new ImmutableSet<>((S[]) new Object[]{item});
-
-        if (source instanceof ImmutableSet) {
-            ImmutableSet<S> set = (ImmutableSet<S>) source;
-
-            if (set.contains(item))
-                return set;
-
-            Object[] destination = new Object[set.array.length + 1];
-            System.arraycopy(set.array, 0, destination, 0, set.array.length);
-            destination[destination.length - 1] = item;
-
-            return new ImmutableSet<>((S[]) destination);
-        } else {
-            Set<S> set = new HashSet<>();
-            set.addAll(source);
-            set.add(item);
-            set = removeNullFromSet(set);
-            return new ImmutableSet<>((S[]) set.toArray());
-        }
-    }
-
-    /**
-     * Create a set consisting of supplied collection with the specified item removed.
-     * Again, ideally operating on a ImmutableSet itself as the source collection.
-     *
-     * @param source      source collection
-     * @param surplusItem item to remove
-     * @param <S>         type
-     * @return set of original collection items minus specified item
-     */
-    public static <S> ImmutableSet<S> removeAndCreate(final Collection<? extends S> source,
-                                                      final S surplusItem) {
-        Objects.requireNonNull(source);
-        Objects.requireNonNull(surplusItem);
-
-        if (source instanceof ImmutableSet) {
-            return removeViaCompacting((ImmutableSet<S>) source, surplusItem);
-        } else {
-            Set<S> set = new HashSet<>();
-            set.addAll(source);
-            set.remove(surplusItem);
-            set = removeNullFromSet(set);
-            return new ImmutableSet<>((S[]) set.toArray());
-        }
-    }
-
-    private static <S> ImmutableSet<S> removeViaCompacting(final ImmutableSet<S> set,
-                                                           final S surplusItem) {
-        if (set.isEmpty())
-            return set;
-
-        S[] source = set.array;
-        Object[] destination = new Object[source.length - 1];
-
-        int destPtr = 0;
-        for (int i = 0; i < source.length; i++) {
-            if (itemsEqual(source[i], surplusItem)) {
-                if (destPtr < destination.length) // more to copy
-                    System.arraycopy(source, i + 1, destination, i, source.length - (i + 1));
-                return new ImmutableSet<>((S[]) destination);
-            } else if (destPtr < destination.length) { // end of copy without match
-                destination[destPtr++] = source[i];
-            }
-        }
-
-        /* No items were removed, set unchanged */
-        return set;
-    }
-
-    /**
-     * Create a read only set from a specified collection.
-     *
-     * @param source source collection
-     * @param <S>    type
-     * @return read only set
-     */
-    public static <S> ImmutableSet<S> fromCollection(final Collection<? extends S> source) {
-        Objects.requireNonNull(source);
-
-        if (source.isEmpty())
-            return empty();
-
-        if (source instanceof ImmutableSet)
-            return (ImmutableSet<S>) source;
-
-        if (source instanceof Set) {
-            Set set = removeNullFromSet((Set) source);
-            return new ImmutableSet<>((S[]) set.toArray());
-        }
-
-        Set<S> set = new HashSet<>();
-        set.addAll(source);
-        set = removeNullFromSet(set);
-        return new ImmutableSet<>((S[]) set.toArray());
-    }
-
-    /**
-     * Create set from union of two collections.
-     *
-     * @param source  first source collection
-     * @param source2 second source collection
-     * @param <S>     type
-     * @return set of unique items across both collections
-     */
-    public static <S> ImmutableSet<S> mergeCollections(final Collection<? extends S> source,
-                                                       final Collection<? extends S> source2) {
-        Objects.requireNonNull(source);
-        Objects.requireNonNull(source2);
-
-        /*
-         * Avoid any actual work, if we can help it
-         */
-        boolean sourceEmpty = source.isEmpty();
-        boolean source2Empty = source2.isEmpty();
-
-        if (sourceEmpty && source2Empty)
-            return empty();
-
-        if (sourceEmpty)
-            return fromCollection(source2);
-
-        if (source2Empty)
-            return fromCollection(source);
-
-        /*
-         * Ah well, brute force it is.
-         */
-        Set<S> set = new HashSet<>();
-        set.addAll(source);
-        set.addAll(source2);
-        set = removeNullFromSet(set);
-        return new ImmutableSet<>((S[]) set.toArray());
-    }
-
-    private static Set removeNullFromSet(Set source) {
-        source.remove(null);
-        return source;
-    }
-
-    private static <S> boolean itemsEqual(S one, S two) {
-        return one == two ||
-                (one.hashCode() == two.hashCode() &&
-                        one.equals(two));
     }
 
     @Override
@@ -279,22 +92,75 @@ public class ImmutableSet<T> extends AbstractSet<T> {
     public boolean contains(final Object o) {
         Objects.requireNonNull(o);
 
-        //noinspection ForLoopReplaceableByForEach
-        for (int i = 0; i < array.length; i++) {
-            /* Try cheaper checks first */
-            if (array[i] == o || (array[i].hashCode() == o.hashCode() && array[i].equals(o))) {
+        for (T element : array)
+            if (itemsAreEqual(element, o))
                 return true;
-            }
-        }
 
         return false;
     }
 
+    @Override
+    public Iterator<T> iterator() {
+        return new ImmutableSetIterator(array);
+    }
+
+    @Override
+    public void forEach(final Consumer<? super T> consumer) {
+        Objects.requireNonNull(consumer);
+
+        for (T element : array)
+            consumer.accept(element);
+    }
+
     /**
-     * Convenience call to retrieve a single item in the set and
-     * avoid creating iterator just for single access.
+     * Follows {@link AbstractSet#hashCode()} semantics - hash code is calculated from
+     * the elements in the set and will be equal to other sets that contain the
+     * same (hashcodes of) elements.
      *
-     * @return single item from the set
+     * @return calculated hashcode
+     */
+    @Override
+    public int hashCode() {
+        if (hashCode != 0)
+            return hashCode;
+
+        int h = 0;
+        for (T element : array)
+            h += element.hashCode();
+
+        hashCode = h; // cache for future calls
+        return hashCode;
+    }
+
+    /**
+     * Follows {@link AbstractSet#equals(Object)} semantics.
+     *
+     * @param that object to compare to
+     * @return {@code true} if compared to set consisting of equal elements
+     */
+    @Override
+    public boolean equals(Object that) {
+        if (that == this)
+            return true;
+
+        if (!(that instanceof Set))
+            return false;
+
+        Set<?> set = (Set<?>) that;
+
+        return (set.size() == size())
+                && containsAll(set);
+    }
+
+    /*
+     * Extended functionality
+     */
+
+    /**
+     * Convenience call to retrieve a single element from the set
+     * and avoid creating iterator just for single access.s
+     *
+     * @return single element from set
      */
     public T getSingleElement() {
         if (isEmpty())
@@ -304,10 +170,9 @@ public class ImmutableSet<T> extends AbstractSet<T> {
     }
 
     /**
-     * Convenience call to split the set in two, if possible. Helper for more
-     * efficient FJ code.
+     * Convenience call to split the set in two halves (if 2+ elements are present).
      *
-     * @return Array of ether 0 (empty), 1 (size 1) or 2 (size > 1) elements splitting this set in half
+     * @return Array of 0 (if empty), 1 (if size is 1) or 2 (size &gt; 1) sets representing halves.
      */
     public ImmutableSet<T>[] split() {
         int size = size();
@@ -326,79 +191,192 @@ public class ImmutableSet<T> extends AbstractSet<T> {
         return new ImmutableSet[]{first, second};
     }
 
-    @Override
-    public Iterator<T> iterator() {
-        return new ArrayIterator(array);
-    }
+    /*
+     * Helpers
+     */
 
-    @Override
-    public void forEach(final Consumer<? super T> action) {
-        Objects.requireNonNull(action);
-
-        //noinspection ForLoopReplaceableByForEach
-        for (int i = 0; i < array.length; i++) {
-            action.accept(array[i]);
-        }
-    }
-
-    public ImmutableSet<T> safeCopy() {
-        return new ImmutableSet<>(Arrays.copyOf(array, array.length));
+    /**
+     * Empty set of given type.
+     *
+     * @param <T> type
+     * @return empty set
+     */
+    public static <T> ImmutableSet<T> emptySet() {
+        return (ImmutableSet<T>) EMPTY_SET;
     }
 
     /**
-     * Follows AbstractSet.hashCode() semantics, that is - hash code is calculated from
-     * the elements in the set and will be equal to other sets that contain the same (hashcodes of)
-     * elements.
+     * Set of single element.
      *
-     * @return calculated hashcode
+     * @param element element to wrap
+     * @param <T>     type
+     * @return set containing single element
      */
-    @Override
-    public int hashCode() {
-        if (hashCode != 0)
-            return hashCode;
+    public static <T> ImmutableSet<T> singletonSet(final T element) {
+        Objects.requireNonNull(element);
+
+        return new ImmutableSet<>((T[]) new Object[]{element});
+    }
+
+    /**
+     * Create a new {@link ImmutableSet} by adding an item to existing set.
+     *
+     * @param set        set to add to
+     * @param newElement element to add
+     * @param <T>        type of items in set
+     * @return new instance with the element added or original set if element was already present
+     */
+    public static <T> ImmutableSet<T> add(final ImmutableSet<T> set,
+                                          final T newElement) {
+        Objects.requireNonNull(set);
+        Objects.requireNonNull(newElement);
+
+        /* no-op if already contains the element */
+        if (set.contains(newElement))
+            return set;
+
+        if (set.isEmpty())
+            return singletonSet(newElement);
+
+        Object[] destination = new Object[set.array.length + 1];
+        System.arraycopy(set.array, 0, destination, 0, set.array.length);
+        destination[destination.length - 1] = newElement;
+
+        return new ImmutableSet<>((T[]) destination);
+    }
+
+    /**
+     * Create an {@link ImmutableSet} instance by removing an element
+     * from an existing {@link ImmutableSet}.
+     *
+     * @param set             non-{@code null} set
+     * @param elementToRemove element to remove
+     * @param <T>             type of items in set
+     * @return new instance with specified item removed or supplied set instance if specified item was not present
+     */
+    public static <T> ImmutableSet<T> remove(final ImmutableSet<T> set,
+                                             final T elementToRemove) {
+        Objects.requireNonNull(set);
+        Objects.requireNonNull(elementToRemove);
+
+        if (set.isEmpty())
+            return set;
+
+        T[] source = set.array;
+        Object[] contentsCopy = new Object[source.length - 1];
+
+        int contentsCopyIndex = 0;
+        for (int i = 0; i < source.length; i++) {
+            if (itemsAreEqual(source[i], elementToRemove)) {
+                if (contentsCopyIndex < contentsCopy.length) // more to copy
+                    System.arraycopy(source, i + 1, contentsCopy, i, source.length - (i + 1));
+                return new ImmutableSet<>((T[]) contentsCopy);
+            } else if (contentsCopyIndex < contentsCopy.length) { // end of copy without match
+                contentsCopy[contentsCopyIndex++] = source[i];
+            }
+        }
+
+        /* No items were removed, set unchanged */
+        return set;
+    }
+
+    /**
+     * Create a {@link ImmutableSet} of unique, non-{@code null} elements
+     * from the specified {@link Collection}.
+     *
+     * @param source source collection
+     * @param <T>    type
+     * @return immutable set of unique, non-null elements
+     */
+    public static <T> ImmutableSet<T> fromCollection(final Collection<? extends T> source) {
+        Objects.requireNonNull(source);
+
+        if (source.isEmpty())
+            return emptySet();
+
+        if (source instanceof ImmutableSet)
+            return (ImmutableSet<T>) source;
+
+        if (source instanceof Set) {
+            ((Set) source).remove(null);
+            Set set = (Set) source;
+            return new ImmutableSet<>((T[]) set.toArray());
+        }
+
+        /* and brute force fallback */
+        Set<T> set = new HashSet<>();
+
+        set.addAll(source);
+        set.remove(null);
+
+        return new ImmutableSet<>((T[]) set.toArray());
+    }
+
+    /**
+     * Create an {@link ImmutableSet} instance consisting of union of two {@link Collection}s.
+     *
+     * @param left  first source collection
+     * @param right second source collection
+     * @param <T>   type
+     * @return set of all unique, non-null elements from both collections
+     */
+    public static <T> ImmutableSet<T> fromCollections(final Collection<? extends T> left,
+                                                      final Collection<? extends T> right) {
+        Objects.requireNonNull(left);
+        Objects.requireNonNull(right);
 
         /*
-         * It must be dully noted that as we have an array
-         * to operate on directly, it's far more efficient
-         * than iterators, streams or foreach.
+         * Avoid any actual work, if we can help it
          */
+        if (left.isEmpty() && right.isEmpty())
+            return emptySet();
 
-        int h = 0;
-        //noinspection ForLoopReplaceableByForEach
-        for (int i = 0; i < array.length; i++)
-            h += array[i].hashCode();
+        if (left.isEmpty())
+            return fromCollection(right);
 
-        hashCode = h;
-        return hashCode;
+        if (right.isEmpty())
+            return fromCollection(left);
+
+        /* brute force it is */
+        Set<T> set = new HashSet<>();
+
+        set.addAll(left);
+        set.addAll(right);
+        set.remove(null);
+
+        return new ImmutableSet<>((T[]) set.toArray());
     }
 
     /**
-     * Follows AbstractSet.equals() semantics. That is, it is compared as a set
-     * and matches if it contains the same elements.
+     * Helper to determine equality using cheapest possible cost.
+     * <p>
+     * Compares by reference, then discards if {@link Object#hashCode()}s differ
+     * and only calls {@link Object#equals(Object)} as a last resort.
      *
-     * @param o object to compare to
-     * @return if matches AbstractSet.equals() semantics
+     * @param left  item to compare
+     * @param right item to compare
+     * @param <T>   type
+     * @return true if {@code left.equals(right)}
      */
-    @Override
-    public boolean equals(Object o) {
-        if (o == this)
-            return true;
-
-        if (!(o instanceof Set))
-            return false;
-
-        Set<?> set = (Set<?>) o;
-
-        return set.size() == size() &&
-                containsAll(set);
+    public static <T> boolean itemsAreEqual(T left, T right) {
+        return left == right ||
+                (left.hashCode() == right.hashCode() &&
+                        left.equals(right));
     }
 
-    private static class ArrayIterator<I> implements Iterator<I> {
+    /**
+     * Simple array iterator
+     *
+     * @param <T> type of array elements
+     */
+    private static class ImmutableSetIterator<T> implements Iterator<T> {
 
-        private final I[] innerArray;
+        private final T[] innerArray;
         private int index = 0;
 
-        private ArrayIterator(I[] array) {
+        private ImmutableSetIterator(T[] array) {
+            Objects.requireNonNull(array);
+
             innerArray = array;
         }
 
@@ -408,7 +386,7 @@ public class ImmutableSet<T> extends AbstractSet<T> {
         }
 
         @Override
-        public I next() {
+        public T next() {
             if (index >= innerArray.length) {
                 throw new NoSuchElementException();
             }

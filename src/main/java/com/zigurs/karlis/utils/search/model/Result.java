@@ -35,7 +35,8 @@ public class Result<T> {
      * @param searchString  search string that generated this result set
      * @param responseItems found items
      */
-    public Result(final String searchString, final List<Item<T>> responseItems) {
+    public Result(final String searchString,
+                  final List<Item<T>> responseItems) {
         this.searchString = searchString;
         this.responseItems = responseItems;
     }
