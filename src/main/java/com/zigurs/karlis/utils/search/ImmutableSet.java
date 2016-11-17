@@ -183,12 +183,12 @@ public class ImmutableSet<T> extends AbstractSet<T> {
         if (size == 1)
             return new ImmutableSet[]{this};
 
-        int firstHalf = size / 2;
+        int leftHalf = size / 2;
 
-        ImmutableSet<T> first = new ImmutableSet<>(Arrays.copyOfRange(array, 0, firstHalf));
-        ImmutableSet<T> second = new ImmutableSet<>(Arrays.copyOfRange(array, firstHalf, size));
+        ImmutableSet<T> left = new ImmutableSet<>(Arrays.copyOfRange(array, 0, leftHalf));
+        ImmutableSet<T> right = new ImmutableSet<>(Arrays.copyOfRange(array, leftHalf, size));
 
-        return new ImmutableSet[]{first, second};
+        return new ImmutableSet[]{left, right};
     }
 
     /*
@@ -315,8 +315,8 @@ public class ImmutableSet<T> extends AbstractSet<T> {
     /**
      * Create an {@link ImmutableSet} instance consisting of union of two {@link Collection}s.
      *
-     * @param left  first source collection
-     * @param right second source collection
+     * @param left  left source collection
+     * @param right right source collection
      * @param <T>   type
      * @return set of all unique, non-null elements from both collections
      */
