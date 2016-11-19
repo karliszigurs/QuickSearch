@@ -83,7 +83,7 @@ public class QuickSearchMemoryUseTest {
         /*
          * as measured on Java 1.8.0_102
          */
-        final long fewItemsTarget = 561_784;
+        final long fewItemsTarget = 894_104;
         final int fewItemsCount = 1_000;
 
         assertTrue(fewItemsTarget * 1.1 > measureMemoryUseImpl(fewItemsCount));
@@ -94,7 +94,7 @@ public class QuickSearchMemoryUseTest {
         /*
          * as measured on Java 1.8.0_102
          */
-        final long manyItemsTarget = 19_445_928;
+        final long manyItemsTarget = 52_668_168;
         final int manyItemsCount = 100_000;
 
         assertTrue(manyItemsTarget * 1.1 > measureMemoryUseImpl(manyItemsCount));
@@ -121,6 +121,8 @@ public class QuickSearchMemoryUseTest {
         assertEquals(10, searchInstance.findItems("a", 10).size());
 
         MemoryMeter meter = new MemoryMeter().withGuessing(MemoryMeter.Guess.ALWAYS_UNSAFE);
-        return meter.measureDeep(searchInstance);
+        long measured = meter.measureDeep(searchInstance);
+        System.out.println(measured);
+        return measured;
     }
 }

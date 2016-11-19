@@ -25,7 +25,7 @@ import java.util.Set;
  *
  * @param <T> wrapped response result type
  */
-public class Item<T> {
+public class ResultItem<T> {
 
     private final T result;
     private final Set<String> itemKeywords;
@@ -38,9 +38,9 @@ public class Item<T> {
      * @param itemKeywords set of non-null keywords associated with result
      * @param score        search result score for the result
      */
-    public Item(final T result,
-                final Set<String> itemKeywords,
-                final double score) {
+    public ResultItem(final T result,
+                      final Set<String> itemKeywords,
+                      final double score) {
         this.result = result;
         this.itemKeywords = itemKeywords;
         this.score = score;

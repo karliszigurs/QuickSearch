@@ -18,7 +18,7 @@
 package com.zigurs.karlis.utils.search.graph;
 
 import com.zigurs.karlis.utils.search.ImmutableSet;
-import com.zigurs.karlis.utils.search.model.Stats;
+import com.zigurs.karlis.utils.search.model.QuickSearchStats;
 
 import java.util.*;
 import java.util.concurrent.locks.StampedLock;
@@ -156,9 +156,9 @@ public class QSGraph<T> {
      *
      * @return stats object containing sizes of internal collections
      */
-    public Stats getStats() {
+    public QuickSearchStats getStats() {
         /* safe to ignore locking */
-        return new Stats(
+        return new QuickSearchStats(
                 itemKeywordsMap.size(),
                 fragmentsNodesMap.size()
         );
@@ -235,7 +235,8 @@ public class QSGraph<T> {
 
         if (!node.getItems().isEmpty()) {
             Double score = keywordMatchScorer.apply(originalFragment, node.getFragment());
-            node.getItems().forEach(item -> accumulated.merge(item, score, (d1, d2) -> d1.compareTo(d2) > 0 ? d1 : d2));
+            if (score > 0.0)
+                node.getItems().forEach(item -> accumulated.merge(item, score, (d1, d2) -> d1.compareTo(d2) > 0 ? d1 : d2));
         }
 
         node.getParents().forEach(parent -> {

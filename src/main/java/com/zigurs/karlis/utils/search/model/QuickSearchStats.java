@@ -20,7 +20,7 @@ package com.zigurs.karlis.utils.search.model;
 /**
  * Container for quick search instance stats
  */
-public class Stats {
+public class QuickSearchStats {
 
     private final int items;
     private final int fragments;
@@ -31,8 +31,8 @@ public class Stats {
      * @param items     in the search instance
      * @param fragments in the search instance
      */
-    public Stats(final int items,
-                 final int fragments) {
+    public QuickSearchStats(final int items,
+                            final int fragments) {
         this.items = items;
         this.fragments = fragments;
     }

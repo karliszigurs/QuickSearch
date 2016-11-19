@@ -28,7 +28,7 @@ import static org.junit.Assert.*;
 public class ImmutableSetTest {
 
     @Test
-    public void shouldCreateEmptySet() {
+    public void empty() {
         Set<String> set = ImmutableSet.emptySet();
         assertTrue(set.isEmpty());
         assertEquals(0, set.size());
@@ -118,36 +118,16 @@ public class ImmutableSetTest {
     }
 
     @Test
-    public void shouldReturnElementOnSingleQuerySingletonSet() {
-        ImmutableSet<String> one = ImmutableSet.singletonSet("one");
-        assertEquals("one", one.getSingleElement());
-    }
-
-    @Test(expected = IndexOutOfBoundsException.class)
-    public void shouldThrowExceptionOnSingleQueryOnEmptySet() {
-        ImmutableSet<String> empty = ImmutableSet.emptySet();
-        assertEquals("one", empty.getSingleElement());
-    }
-
-    @Test
-    public void shouldGetAnElementFromSetOnSingleQuery() {
-        ImmutableSet<String> multiple = ImmutableSet.fromCollection(Arrays.asList("one", "two", "three"));
-        /* Implementation specific. I know it's going to be "one" here */
-        assertEquals("one", multiple.getSingleElement());
-    }
-
-    @Test(expected = IndexOutOfBoundsException.class)
-    public void shouldSkipAllNullsAndThrowExceptionOnSingleQuery() {
+    public void shouldSkipAllNulls() {
         ImmutableSet<String> multiple = ImmutableSet.fromCollection(Arrays.asList(null, null, null));
         assertTrue(multiple.isEmpty());
-        assertEquals("one", multiple.getSingleElement());
     }
 
     @Test
     public void shouldSkipNullsInSource() {
         ImmutableSet<String> multiple = ImmutableSet.fromCollection(Arrays.asList(null, null, null, "one"));
-        assertEquals("one", multiple.getSingleElement());
         assertEquals(1, multiple.size());
+        assertEquals("one", multiple.iterator().next());
     }
 
     @Test
@@ -160,16 +140,16 @@ public class ImmutableSetTest {
     public void shouldReturnSingleEntryForSplitSingleton() {
         ImmutableSet<String> single = ImmutableSet.singletonSet("one");
         assertEquals(1, single.split().length);
-        assertEquals("one", (single.split()[0].getSingleElement()));
+        assertEquals("one", (single.split()[0].iterator().next()));
     }
 
     @Test
     public void shouldSplitTwoElementsRepeatedly() {
         ImmutableSet<String> two = ImmutableSet.fromCollection(Arrays.asList("one", "two"));
         assertEquals(2, two.split().length);
-        assertEquals("one", two.split()[0].getSingleElement());
+        assertEquals("one", two.split()[0].iterator().next());
         assertEquals(1, two.split()[0].size());
-        assertEquals("two", two.split()[1].getSingleElement());
+        assertEquals("two", two.split()[1].iterator().next());
         assertEquals(1, two.split()[1].size());
     }
 
@@ -177,9 +157,9 @@ public class ImmutableSetTest {
     public void shouldSplitThreeElements() {
         ImmutableSet<String> two = ImmutableSet.fromCollection(Arrays.asList("one", "two", "three"));
         assertEquals(2, two.split().length);
-        assertEquals("one", (two.split()[0].getSingleElement()));
+        assertEquals("one", (two.split()[0].iterator().next()));
         assertEquals(1, (two.split()[0].size()));
-        assertEquals("two", (two.split()[1].getSingleElement()));
+        assertEquals("two", (two.split()[1].iterator().next()));
         assertEquals(2, (two.split()[1].size()));
     }
 
@@ -201,7 +181,6 @@ public class ImmutableSetTest {
 
         assertEquals(1009, mergedAgain.size());
     }
-
 
     @Test
     public void shouldCreateFromSingleCollection() {

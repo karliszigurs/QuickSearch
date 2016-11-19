@@ -21,20 +21,31 @@ import java.util.*;
 import java.util.function.Consumer;
 
 /**
- * Immutable, array backed, {@link Set} of unique (as determined by their respective
- * {@link Object#hashCode()} &amp; {@link Object#equals(Object)} methods), non-{@code null} elements.
+ * <strong>Immutable</strong>, array backed, {@link Set} of unique (as determined by
+ * their respective {@link Object#equals(Object)} method), non-{@code null} elements.
  * <p>
- * The rationale is to have as lightweight as possible memory profile and read cost while still
- * retaining {@link Set} semantics - in this case at cost of modifying operations.
+ * The rationale is to have as lightweight as possible memory profile and iteration cost
+ * while retaining {@link Set} semantics - in this case at cost of modifying operations.
+ * Fully obeys JDK Collections {@link Set} semantics.
  * <p>
- * Call to any <em>modifying</em> operations on an instance will throw an exception,
- * contents of {@link ImmutableSet} should be modified using supplied helper functions
- * that return a new immutable instance of set after applying requested modification
- * (leaving the original {@link ImmutableSet} intact).
+ * Comes with helper functions {@link ImmutableSet#add(ImmutableSet, Object)} and
+ * {@link ImmutableSet#remove(ImmutableSet, Object)} that create a new {@link ImmutableSet}
+ * instance after applying requested modification (leaving the original {@link ImmutableSet} intact).
+ * <p>
+ * Calls to any modifying operations on an instance will throw an exception.
  * <p>
  * This implementation does not permit {@code null} elements.
+ * <p>
+ * <small><strong>Note:</strong> Due to use of underlying unsorted array calling
+ * {@link #contains(Object)} is quite inefficient and expensive.
+ * If you want to use this approach (you shouldn't) in context of heavy {@link #contains(Object)}
+ * use I'd suggest sorting the underlying array after each modification and using
+ * {@link Arrays#binarySearch(Object[], Object, Comparator)} to determine presence
+ * of an item in the set.</small>
+ * <p>
+ * This implementation is thread-safe.
  *
- * @param <T> type of elements of this set
+ * @author Karlis Zigurs, 2016
  */
 @SuppressWarnings("unchecked")
 public class ImmutableSet<T> extends AbstractSet<T> {
@@ -76,7 +87,7 @@ public class ImmutableSet<T> extends AbstractSet<T> {
     /**
      * Cached hashcode
      */
-    private int hashCode = 0;
+    private int cachedHashCode = 0;
 
     private ImmutableSet(final T[] array) {
         Objects.requireNonNull(array);
@@ -122,15 +133,15 @@ public class ImmutableSet<T> extends AbstractSet<T> {
      */
     @Override
     public int hashCode() {
-        if (hashCode != 0)
-            return hashCode;
+        if (cachedHashCode != 0)
+            return cachedHashCode;
 
         int h = 0;
         for (T element : array)
             h += element.hashCode();
 
-        hashCode = h; // cache for future calls
-        return hashCode;
+        cachedHashCode = h; // cache for future calls
+        return cachedHashCode;
     }
 
     /**
@@ -158,22 +169,11 @@ public class ImmutableSet<T> extends AbstractSet<T> {
      */
 
     /**
-     * Convenience call to retrieve a single element from the set
-     * and avoid creating iterator just for single access.s
+     * Convenience call for parallel processing to split the set in
+     * two halves in an efficient fashion.
      *
-     * @return single element from set
-     */
-    public T getSingleElement() {
-        if (isEmpty())
-            throw new IndexOutOfBoundsException();
-
-        return array[0];
-    }
-
-    /**
-     * Convenience call to split the set in two halves (if 2+ elements are present).
-     *
-     * @return Array of 0 (if empty), 1 (if size is 1) or 2 (size &gt; 1) sets representing halves.
+     * @return Array of new ImmutableSet instances of size none (if empty),
+     * one (if single element) or two instances representing halves (if 2+ elements present).
      */
     public ImmutableSet<T>[] split() {
         int size = size();

@@ -17,163 +17,136 @@
  */
 package com.zigurs.karlis.utils.search;
 
-import com.zigurs.karlis.utils.search.fj.FJIntersectionTask;
-import com.zigurs.karlis.utils.search.fj.FJUnionTask;
 import com.zigurs.karlis.utils.search.graph.QSGraph;
-import com.zigurs.karlis.utils.search.model.Item;
+import com.zigurs.karlis.utils.search.model.QuickSearchStats;
 import com.zigurs.karlis.utils.search.model.Result;
-import com.zigurs.karlis.utils.search.model.Stats;
+import com.zigurs.karlis.utils.search.model.ResultItem;
+import com.zigurs.karlis.utils.search.parallel.IntersectionTask;
+import com.zigurs.karlis.utils.search.parallel.UnionTask;
 
 import java.util.*;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import static com.zigurs.karlis.utils.search.QuickSearch.AccumulationPolicy.UNION;
+import static com.zigurs.karlis.utils.search.QuickSearch.MergePolicy.UNION;
 import static com.zigurs.karlis.utils.search.QuickSearch.UnmatchedPolicy.BACKTRACKING;
 import static com.zigurs.karlis.utils.sort.MagicSort.sortAndLimit;
 
 /**
- * Simple and lightweight in-memory quick search provider.
+ * Simple and lightweight in-memory search library.
  * <p>
- * Fit for low latency querying of small to medium sized datasets (limited by memory) to enable users
- * immediately see the top hits for their partially entered search string. Based on production experience
- * this approach is well perceived by users and their ability to see the top hits immediately allows
- * them to adjust their queries on the fly getting to the desired result faster.
+ * Fit for speedy querying of small to medium sized data sets (up to 10-20GB of JVM heap) for
+ * (as an example) providing real-time incremental search to users as they type the search string
+ * or fairly efficient faceted filtering of fairly large collections.
  * <p>
- * By implementing this functionality directly in the app or corresponding backend the overall complexity of the
- * project can be significantly reduced - there is no need to care about maintaining search infrastructure, servers,
- * software or APIs.
+ * Internally it works by breaking down supplied item keywords into all possible fragments
+ * (e.g. four into f,fo,fou,o,ou,our,ur,r...) and building an internal lookup graph where a fragment
+ * contains links to all longer fragments it is part of and items associated with them
+ * (e.g. fo &raquo; fou &raquo; four &raquo; Number(4)).
  * <p>
- * Example uses can include:
+ * <small><em>(Technically it's incremental merge of unique leafs across a set of arbitrary entry points
+ * in an acyclic multi-root digraph, but that's a bunch of complex words I'm not sure of correct use
+ * of in half the cases anyway. However if you are a github stalking recruiter or want to give me some fungible
+ * currency in exchange of overcomplicated solutions to trivial problems - try to hire me anyway!)</em></small>
+ * <p>
+ * Further documentation and benchmarks can be found at https://github.com/karliszigurs/QuickSearch.
+ * <p>
+ * Example uses include:
  * <ul>
- * <li>Selecting from a list of existing contacts</li>
- * <li>Looking for a particular city (associating it with known aliases, landmarks, state, etc)</li>
- * <li>Searching for an item in an online (book) shop</li>
- * <li>Used in background to highlight items that match the (partial) keywords entered. A.la. OSX System Preferences search</li>
- * <li>Navigating large navigation trees, in example all sporting events for a year</li>
+ * <li>Searching a contacts list</li>
+ * <li>Searching for a city based on landmark keywords (e.g. "tower bridge")</li>
+ * <li>Searching for a category or item in an online shop based on keywords</li>
+ * <li>Implement a sprawling multi-facet filter over large data sets (e.g. all your cloud instances)</li>
+ * <li>Use in background to highlight UI elements corresponding to query (a-la OSX preferences search)</li>
+ * <li><em>and so on...</em></li>
  * </ul>
  * <p>
- * Typical use case would be including it in ether application or a web server, maintaining the
- * data set (ether via provided add and remove methods or by clearing and repopulating the search contents
- * completely) and exposing an API to user that accepts a free-form input and returns corresponding matching items.
+ * Each entry is associated with a set of keywords the search will be performed against, therefore it is possible
+ * to add aliases and facet descriptions. Can also include alternate spellings and so on.
+ * <pre>{@code
+ *  // Quick Start Example
+ *  QuickSearch<String> qs = new QuickSearch<>(); // create instance
+ *
+ *  qs.addItem("Cat", "cat domestic mammal"); // add a few items
+ *  qs.addItem("Dog", "dog domestic mammal");
+ *  qs.addItem("Lobster", "lobster crustacean");
+ *  qs.addItem("Shrimp", "shrimp crustacean");
+ *  qs.addItem("Pigeon", "pigeon urban menace");
+ *
+ *  List<String> mammals = qs.findItems("mammal", 10); // find top 10 items matching mammal
+ *  Optional<String> shrimp = qs.findItem("shrimp"); // find a top result for shrimp, if such exists
+ * }</pre>
  * <p>
- * Each entry is associated with a number of keywords that are not exposed to user, therefore it is possible to add
- * name aliases or item class descriptions to keywords. Same applies to letting users discover items by unique identifiers
- * or alternate spellings.
+ * A few use examples are available in {@code QuickSearchUseCasesTest.java} class under tests.
  * <p>
- * An example contacts list is provided as example (entry followed by assigned keywords):
- * <table summary="">
- * <tr><th>Item</th><th>Supplied keywords</th></tr>
- * <tr><td>"Jane Doe, 1234"</td><td>"Jane Doe Marketing Manager SEO Community MySpace 1234"</td></tr>
- * <tr><td>"Alice Stuggard, 9473"</td><td>"Alice Stuggard Tech Cryptography Manager RSA 9473"</td></tr>
- * <tr><td>"Robert Howard, 6866"</td><td>"Robert Bob Howard Tech Necromancy Summoning Undead Cryptography BOFH RSA DOD Laundry 6866"</td></tr>
- * <tr><td>"Eve Moneypenny, 9223"</td><td>"Eve Moneypenny Accounting Manager Q OSA 9223"</td></tr>
- * </table>
+ * A number of configuration options are available and documented via {@link QuickSearchBuilder}.
  * <p>
- * In the example above if the user enters <code><strong>"Mana"</strong></code> he will be served a list of Jane,
- * Alice and Eve as their keyword <code><strong>"Manager"</strong></code> is matched by
- * <code><strong>"Mana"</strong></code>. Now user should see that the result set is sufficiently narrow and
- * can tailor his search further by continuing on to type <code><strong>"Mana a"</strong></code> - which will lead
- * to Alice and Eve being promoted to top of results. Alice because of her name match and Eve because of her department.
- * <code><strong>"Mana acc"</strong></code> will narrow the results to Eve only as she is only one in the search set
- * that can match both <code><strong>*mana*</strong></code> and <code><strong>*acc*</strong></code>.
- * <p>
- * Example use:
- * <p>
- * <code>QuickSearch&lt;String&gt; qs = new QuickSearch&lt;&gt;();<br>
- * qs.addItem("Villain", "Roy Batty Lord Voldemort Colonel Kurtz");<br>
- * qs.addItem("Hero", "Walt Kowalksi Jake Blues Shaun");<br>
- * System.out.println(qs.findItem("walk")); // finds "Hero"</code>
- * <p>
- * Concurrency - This class is thread safe. Implementation is completely passive
- * and can be deployed horizontally as identical datasets will produce identical search results.
+ * This class is thread safe. You'll get a cookie if you manage to break it. <small>I don't expect to part with any cookies.</small>
  *
  * @author Karlis Zigurs, 2016
  */
 public class QuickSearch<T> {
 
     /**
-     * Matching policy to apply to unmatched keywords. In case of EXACT only
-     * exact supplied keyword matches will be considered, in case of BACKTRACKING
-     * any keywords with no matches will be incrementally shortened until first
-     * candidate match is found (e.g. supplied 'terminal' will be shortened until it
-     * reaches 'ter' where it can match against 'terra').
+     * Matching policy to apply to unmatched search keywords.
+     * <p>
+     * In case of {@link UnmatchedPolicy#BACKTRACKING} a keyword that is not matched
+     * will be incrementally truncated (e.g. 'banana' &raquo; 'banan' &raquo; 'bana' &raquo; 'ban')
+     * until a matching fragment is found (in example 'banana' will be incrementally truncated to 'ban'
+     * which will happen to match if 'band' had been previously added to index).
+     * <p>
+     * In case of {@link UnmatchedPolicy#IGNORE} any keywords not matched directly will be considered
+     * empty. Note that if used in conjunction with {@link MergePolicy#INTERSECTION} this means
+     * that whole result set will be automatically empty.
      */
     public enum UnmatchedPolicy {
-        EXACT, BACKTRACKING
+        IGNORE, BACKTRACKING
     }
 
     /**
-     * If multiple keywords are supplied select strategy to accumulate result set.
+     * Select results set accumulation policy if query contains multiple keywords.
      * <p>
-     * UNION will consider all items found for each keyword in the result,
-     * INTERSECTION will consider only items that are matched by all the supplied
-     * keywords.
+     * {@link MergePolicy#UNION} merges result sets for each keyword summing
+     * individual scores as supplied by keywords scorer function with the final result
+     * containing all items encountered during search.
      * <p>
-     * INTERSECTION is significantly more performant as it discards
-     * candidates as early as possible.
+     * {@link MergePolicy#INTERSECTION} merges result sets retaining only items that
+     * are present in results from each of the keywords.
+     * <p>
+     * As a note, this means that if any single keyword results in no found elements during
+     * search while using {@link MergePolicy#INTERSECTION} the final results will be empty.
      */
-    public enum AccumulationPolicy {
+    public enum MergePolicy {
         UNION, INTERSECTION
     }
 
     /**
-     * Function to 'clean up' supplied keyword and user input strings. We assume that the input is
-     * going to be ether free form or malformed, therefore this allows to apply required actions to generate
-     * a 'clean' set of keywords from the input string.
+     * Default keywords extractor function that splits the user supplied item keywords or
+     * search string by word character and white space boundaries.
      * <p>
-     * In example both "one two,three-four" and "one$two%three^four" as inputs will produce
-     * set of 4 strings [one,two,three,four] on the output.
+     * As an example both "one two,three-four" and "one$two%three^four" input strings will
+     * produce a set of 4 extracted keywords to use during search - [one,two,three,four].
+     * <p>
+     * Further details at {@link QuickSearchBuilder#withKeywordsExtractor(Function)}.
      */
     public static final Function<String, Set<String>> DEFAULT_KEYWORDS_EXTRACTOR =
             s -> Arrays.stream(s.replaceAll("[^\\w]+", " ").split("[\\s]+")).collect(Collectors.toSet());
 
     /**
-     * Function to sanitize search keywords before using them internally. Applied to both keywords
-     * supplied with items and to user input before performing search.
+     * Default keywords 'normalizer' function that ensures that all input keywords are in consistent format.
      * <p>
-     * Rationale is to allow somewhat relaxed free-form text input (e.g. phone devices automatically capitalising
-     * entered keywords) and extra capability to remap special characters to their latin alphabet equivalents.
-     * <p>
-     * The normalized representation has no specific requirements, this is just a convenience method.
-     * Simply returning the supplied string will mean that the search results contain only exact (and case
-     * sensitive) matches. It is also possible to return empty strings here, in which case the supplied
-     * keyword will be ignored.
-     * <p>
-     * Example transformations:
-     * <table summary="">
-     * <tr><th>Original</th><th>Transformed</th><th>Reason</th></tr>
-     * <tr><td><code>"New York"</code></td><td><code>"new york"</code></td><td>remove upper case</td></tr>
-     * <tr><td><code>"Pythøn"</code></td><td><code>"python"</code></td><td>replace special characters</td></tr>
-     * <tr><td><code>"HERMSGERVØRDENBRØTBØRDA"</code></td><td><code>"hermsgervordenbrotborda"</code></td><td>it could happen...</td></tr>
-     * <tr><td><code>"Россия"</code></td><td><code>"rossiya"</code></td><td>translate cyrilic alphabet to latin</td></tr>
-     * </table>
-     * <p>
-     * Default implementation assumes that String.trim().toLowerCase() is sufficient.
+     * Further details at {@link QuickSearchBuilder#withKeywordNormalizer(Function)}.
      */
     public static final Function<String, String> DEFAULT_KEYWORD_NORMALIZER = s -> s.trim().toLowerCase();
 
     /**
-     * Function scoring user supplied input against corresponding keywords associated with search items.
+     * Default keyword matches scoring function assigning a match a score between 0 and 1
+     * and boosting score if match is encountered at the start of the keyword.
      * <p>
-     * An example invocations might request to compare <code><strong>"swe"</strong></code> against
-     * <code><strong>"sweater"</strong></code> or <code><strong>"count"</strong></code> against
-     * <code><strong>"accounting"</strong></code>.
+     * Provided for general use.
      * <p>
-     * Default implementation returns the ratio between search term and keyword lengths with additional boost
-     * if the search term matches beginning of the keyword.
-     * <p>
-     * In example, while matching user input against known keyword "password", the following will be calculated:
-     * <ul>
-     * <li>Input "pa" -&gt; low match (0.25), but boosted (+1) due to matching start of the keyword.</li>
-     * <li>Input "swo" -&gt; low match (0.37), not boosted</li>
-     * <li>Input "assword" -&gt; high match (0.87), not boosted</li>
-     * <li>Input "password" -&gt; high match (1), also boosted by matching the beginning of the line (+1)</li>
-     * </ul>
-     * <p>
-     * All keywords supplied by user are scored against all matching keywords associated with a searchable item.
-     * Items rank in the results is determined by the sum of all score results.
+     * Further details at {@link QuickSearchBuilder#withKeywordMatchScorer(BiFunction)}.
      */
     public static final BiFunction<String, String, Double> DEFAULT_MATCH_SCORER = (keywordMatch, keyword) -> {
         /* 0...1 depending on the length ratio */
@@ -186,44 +159,57 @@ public class QuickSearch<T> {
         return matchScore;
     };
 
+    /**
+     * Alternative keyword matches scoring function filtering only exact matches to result set.
+     * <p>
+     * Provided for use cases where exact match between supplied search string and keyword is required
+     * (e.g. faceted filtering).
+     * <p>
+     * Further details at {@link QuickSearchBuilder#withKeywordMatchScorer(BiFunction)}.
+     */
+    public static final BiFunction<String, String, Double> EXACT_MATCH_SCORER = (candidate, keyword) -> {
+        /* Only allow exact matches through (returning < 0.0 means skip this candidate) */
+        return candidate.length() == keyword.length() ? 1.0 : -1.0;
+    };
+
     /*
-     * Instance properties
+     * Configuration properties
      */
 
-    private final AccumulationPolicy accumulationPolicy;
+    private final MergePolicy mergePolicy;
     private final UnmatchedPolicy unmatchedPolicy;
 
     private final BiFunction<String, String, Double> keywordMatchScorer;
     private final Function<String, String> keywordNormalizer;
     private final Function<String, Set<String>> keywordsExtractor;
 
-    private final QSGraph<T> graph;
-
     private final boolean enableForkJoin;
 
-    /**
-     * Private constructor, use builder instead.
-     *
-     * @param builder supplies configuration
+    /*
+     * Actual data is stored in {@link QSGraph} instance.
      */
+
+    private final QSGraph<T> graph;
+
+    /**
+     * Create a QuickSearch instance with default configuration parameters.
+     * <p>
+     * This is suited for general use case of matching free-form user
+     * input against all possible matches.
+     */
+    public QuickSearch() {
+        this(new QuickSearchBuilder()); // with defaults from builder
+    }
+
     private QuickSearch(final QuickSearchBuilder builder) {
         keywordsExtractor = builder.keywordsExtractor;
         keywordNormalizer = builder.keywordNormalizer;
         keywordMatchScorer = builder.keywordMatchScorer;
         unmatchedPolicy = builder.unmatchedPolicy;
-        accumulationPolicy = builder.accumulationPolicy;
+        mergePolicy = builder.mergePolicy;
         enableForkJoin = builder.enableForkJoin;
 
         graph = new QSGraph<>();
-    }
-
-    /**
-     * QuickSearchBuilder instance to configure search object.
-     *
-     * @return builder instance
-     */
-    public static QuickSearchBuilder builder() {
-        return new QuickSearchBuilder();
     }
 
     /*
@@ -231,35 +217,34 @@ public class QuickSearch<T> {
      */
 
     /**
-     * Add an item with corresponding keywords, e.g. an online store item Shoe with
-     * keywords <code><strong>"Shoe Red 10 Converse cheap free"</strong></code>.
+     * Add an item with corresponding keywords string, e.g. an online store item Shoe with
+     * keywords string "Shoe Red 10 Converse cheap free".
      * <p>
-     * You can expand the keywords stored against an item by adding it again with extra keywords.
-     * If the item is already in the database any new keywords will be mapped to it.
+     * Can also be used to expand the keywords of item previously added. If this method is
+     * invoked with an item that is already part of the index any keywords not previously known
+     * will be added to mappings for this item (in addition to existing ones).
      *
-     * @param item     Item to return for search results
-     * @param keywords Arbitrary list of keywords separated by space, comma, special characters, freeform text...
-     * @return True if the item was added, false if no keywords to map against the item were found (therefore item was not added)
+     * @param item     Item to return in search results
+     * @param keywords keywords string. See {@link QuickSearchBuilder#withKeywordsExtractor(Function)}
+     * @return true if the item was added, false if validations before adding failed
      */
     public boolean addItem(final T item, final String keywords) {
         if (item == null || keywords == null || keywords.isEmpty())
             return false;
 
-        ImmutableSet<String> keywordsSet = prepareKeywords(keywords, keywordsExtractor, keywordNormalizer, true);
+        ImmutableSet<String> keywordsSet = prepareKeywords(keywords);
 
         if (keywordsSet.isEmpty())
             return false;
 
-        addItemImpl(item, keywordsSet);
-
-        return true;
+        return addItemImpl(item, keywordsSet);
     }
 
     /**
-     * Remove an item, if it exists. Calling this method ensures that specified item
-     * and any keywords it was associated with is gone.
+     * Remove an item, if it exists. Calling this method ensures that
+     * specified item and any keywords it was associated with is gone.
      * <p>
-     * Or it does nothing if no such item was present.
+     * No effect or side-effects if supplied item is not known.
      *
      * @param item Item to remove
      */
@@ -271,16 +256,22 @@ public class QuickSearch<T> {
     }
 
     /**
-     * Find top matching item for the supplied search string
+     * Retrieve (find) top matching item for specified search string.
+     * <p>
+     * Note that the call to this method is not guaranteed to return the same item
+     * if multiple items in the instance have identical score for the supplied search
+     * string and the instance is modified between invocations (adding or removing
+     * seemingly unrelated items) or search instance is configured to use parallel
+     * processing.
      *
-     * @param searchString Raw search string
-     * @return Optional containing (or not) the top scoring item
+     * @param searchString raw search string
+     * @return {@link Optional} wrapping (or not) the top scoring item found in instance
      */
     public Optional<T> findItem(final String searchString) {
         if (isInvalidRequest(searchString, 1))
             return Optional.empty();
 
-        ImmutableSet<String> searchKeywords = prepareKeywords(searchString, keywordsExtractor, keywordNormalizer, false);
+        ImmutableSet<String> searchKeywords = prepareKeywords(searchString);
 
         if (searchKeywords.isEmpty())
             return Optional.empty();
@@ -294,18 +285,17 @@ public class QuickSearch<T> {
     }
 
     /**
-     * Find top n items matching the supplied search string. Supplied string will be processed by
-     * keyword extracting and normalizing functions before used for search.
+     * Retrieve (find) top n items matching the supplied search string.
      *
-     * @param searchString     Raw search string, e.g. "new york pizza"
-     * @param numberOfTopItems Number of items the returned result should be limited to
-     * @return List of 0 to numberOfTopItems elements
+     * @param searchString     raw search string, e.g. "new york pizza"
+     * @param numberOfTopItems number of items the returned result should be limited to (1 to Integer.MAX_VALUE)
+     * @return list (possibly empty) containing up to n top search results
      */
     public List<T> findItems(final String searchString, final int numberOfTopItems) {
         if (isInvalidRequest(searchString, numberOfTopItems))
             return Collections.emptyList();
 
-        ImmutableSet<String> searchKeywords = prepareKeywords(searchString, keywordsExtractor, keywordNormalizer, false);
+        ImmutableSet<String> searchKeywords = prepareKeywords(searchString);
 
         if (searchKeywords.isEmpty())
             return Collections.emptyList();
@@ -322,17 +312,17 @@ public class QuickSearch<T> {
     }
 
     /**
-     * Find top matching item for the supplied search string and return it
-     * wrapped in the augumented response object.
+     * Retrieve (find) top matching item for the supplied search string and return it wrapped in the
+     * {@link ResultItem} response object containing known keywords and assigned search score.
      *
-     * @param searchString Raw search string
-     * @return Possibly empty Optional wrapping item, keywords and score
+     * @param searchString raw search string
+     * @return {@link Optional} wrapping (or not) the top scoring item, keywords and score found in instance
      */
-    public Optional<Item<T>> findItemWithDetail(final String searchString) {
+    public Optional<ResultItem<T>> findItemWithDetail(final String searchString) {
         if (isInvalidRequest(searchString, 1))
             return Optional.empty();
 
-        ImmutableSet<String> searchKeywords = prepareKeywords(searchString, keywordsExtractor, keywordNormalizer, false);
+        ImmutableSet<String> searchKeywords = prepareKeywords(searchString);
 
         if (searchKeywords.isEmpty())
             return Optional.empty();
@@ -344,7 +334,7 @@ public class QuickSearch<T> {
         } else {
             SearchResult<T> w = results.get(0);
             return Optional.of(
-                    new Item<>(
+                    new ResultItem<>(
                             w.unwrap(),
                             graph.getItemKeywords(w.unwrap()),
                             w.getScore()
@@ -354,53 +344,53 @@ public class QuickSearch<T> {
     }
 
     /**
-     * Request an augumented result containing the search string, scores for all items
-     * and list of keywords matched (can be used to provide hints to user).
+     * Retrieve (find) an augmented search result containing the search string and
+     * wrapped found items with their scores and keywords.
      *
-     * @param searchString     Raw search string, e.g. "new york pizza"
-     * @param numberOfTopItems Number of items the result should be limited to
-     * @return Result object containing 0 to n top scoring items and corresponding metadata
+     * @param searchString     raw search string, e.g. "new york pizza"
+     * @param numberOfTopItems number of items the returned result should be limited to (1 to Integer.MAX_VALUE)
+     * @return wrapper containing zero to n top scoring items and search string
      */
     public Result<T> findItemsWithDetail(final String searchString, final int numberOfTopItems) {
         if (isInvalidRequest(searchString, numberOfTopItems))
-            return new Result<>(searchString != null ? searchString : "", Collections.emptyList());
+            return new Result<>(searchString, Collections.emptyList(), numberOfTopItems);
 
-        ImmutableSet<String> searchKeywords = prepareKeywords(searchString, keywordsExtractor, keywordNormalizer, false);
+        ImmutableSet<String> searchKeywords = prepareKeywords(searchString);
 
         if (searchKeywords.isEmpty())
-            return new Result<>(searchString, Collections.emptyList());
+            return new Result<>(searchString, Collections.emptyList(), numberOfTopItems);
 
         List<SearchResult<T>> results = doSearch(searchKeywords, numberOfTopItems);
 
         if (results.isEmpty()) {
-            return new Result<>(searchString, Collections.emptyList());
+            return new Result<>(searchString, Collections.emptyList(), numberOfTopItems);
         } else {
             return new Result<>(
                     searchString,
-                    results.stream()
-                            .map(i -> new Item<>(
-                                    i.unwrap(),
-                                    graph.getItemKeywords(i.unwrap()),
-                                    i.getScore())
-                            )
-                            .collect(Collectors.toList())
+                    results.stream().map(i -> new ResultItem<>(
+                            i.unwrap(),
+                            graph.getItemKeywords(i.unwrap()),
+                            i.getScore())
+                    ).collect(Collectors.toList()),
+                    numberOfTopItems
             );
         }
     }
 
     /**
-     * Clear the search database.
+     * Clear the search index.
      */
     public void clear() {
         graph.clear();
     }
 
     /**
-     * Returns an overview of contained maps sizes.
+     * Returns an overview of contained graph size. To be fair this is not
+     * really useful as anything beyond as quick sanity check.
      *
-     * @return stats listing number of items, keywords and fragments known
+     * @return stats listing number of items and keyword fragments known
      */
-    public Stats getStats() {
+    public QuickSearchStats getStats() {
         return graph.getStats();
     }
 
@@ -426,10 +416,10 @@ public class QuickSearch<T> {
     private Map<T, Double> findAndScore(final ImmutableSet<String> suppliedFragments) {
         /* Avoid calling into merges if we are looking for only one keyword */
         if (suppliedFragments.size() == 1)
-            return walkGraphAndScore(suppliedFragments.getSingleElement());
+            return walkGraphAndScore(suppliedFragments.iterator().next());
 
         /* Merges will be inevitable */
-        if (accumulationPolicy == UNION)
+        if (mergePolicy == UNION)
             return findAndScoreUnion(suppliedFragments);
         else // implied (withAccumulationPolicy == INTERSECTION)
             return findAndScoreIntersection(suppliedFragments);
@@ -437,7 +427,7 @@ public class QuickSearch<T> {
 
     private Map<T, Double> findAndScoreUnion(final ImmutableSet<String> suppliedFragments) {
         if (enableForkJoin) {
-            return new FJUnionTask<>(suppliedFragments, this::walkGraphAndScore).fork().join();
+            return new UnionTask<>(suppliedFragments, this::walkGraphAndScore).fork().join();
 
         } else {
             final Map<T, Double> accumulatedItems = new HashMap<>();
@@ -453,7 +443,7 @@ public class QuickSearch<T> {
 
     private Map<T, Double> findAndScoreIntersection(final ImmutableSet<String> suppliedFragments) {
         if (enableForkJoin) {
-            return new FJIntersectionTask<>(suppliedFragments, this::walkGraphAndScore).fork().join();
+            return new IntersectionTask<>(suppliedFragments, this::walkGraphAndScore).fork().join();
 
         } else {
             Map<T, Double> accumulatedItems = null;
@@ -461,7 +451,7 @@ public class QuickSearch<T> {
             for (String suppliedFragment : suppliedFragments) {
                 Map<T, Double> fragmentItems = walkGraphAndScore(suppliedFragment);
 
-                if (fragmentItems.isEmpty()) // results will be empty too, return early
+                if (fragmentItems.isEmpty()) // results will be empty too, can skip the remainder
                     return fragmentItems;
 
                 if (accumulatedItems == null) {
@@ -482,8 +472,9 @@ public class QuickSearch<T> {
      * Interfacing with the graph
      */
 
-    private void addItemImpl(final T item, final Set<String> suppliedKeywords) {
+    private boolean addItemImpl(final T item, final Set<String> suppliedKeywords) {
         graph.registerItem(item, suppliedKeywords);
+        return true;
     }
 
     private void removeItemImpl(final T item) {
@@ -502,17 +493,17 @@ public class QuickSearch<T> {
         return result;
     }
 
-    private static ImmutableSet<String> prepareKeywords(final String keywordsString,
-                                                        final Function<String, Set<String>> extractorFunction,
-                                                        final Function<String, String> normalizerFunction,
-                                                        final boolean internKeywords) {
+    private ImmutableSet<String> prepareKeywords(final String keywordsString) {
         return ImmutableSet.fromCollection(
-                extractorFunction.apply(keywordsString).stream()
-                        .filter(s -> s != null)
-                        .map(normalizerFunction)
+                keywordsExtractor.apply(keywordsString).stream()
+                        .filter(s -> s != null) /* guarantee non-null, trimmed and non-empty string to normalizer */
+                        .map(String::trim)
                         .filter(s -> !s.isEmpty())
-                        .map(s -> internKeywords ? s.intern() : s)
-                        .collect(Collectors.toSet()) // implies distinct
+                        .map(keywordNormalizer)
+                        .filter(s -> s != null) /* and non-null, trimmed and non-empty string after normalizer */
+                        .map(String::trim)      /* can't trust those potentially user supplied functions... */
+                        .filter(s -> !s.isEmpty())
+                        .collect(Collectors.toSet()) /* and distinct */
         );
     }
 
@@ -521,11 +512,11 @@ public class QuickSearch<T> {
      */
 
     /**
-     * Returns intersection of two provided maps (or empty map if no
-     * keys overlap) summing the values.
+     * Returns intersection of two provided {@link Map}{@code <T, Double} maps
+     * (or empty map if no keys overlap) summing the values.
      * <p>
-     * For performance reasons this function _modifies maps supplied_  and possibly
-     * returns an instance of one of the supplied (by then modified) maps.
+     * For performance reasons this function <em>modifies the maps supplied</em> and
+     * possibly returns an instance of one of the supplied (by then modified) maps.
      *
      * @param left  map to intersect
      * @param right map to intersect
@@ -547,59 +538,201 @@ public class QuickSearch<T> {
      */
 
     /**
-     * {@link QuickSearch} builder class.
+     * Shortcut to access a new {@link QuickSearchBuilder} instance
+     * and start configuring a new {@link QuickSearch} instance.
+     *
+     * @return new {@link QuickSearchBuilder} instance
+     */
+    public static QuickSearchBuilder builder() {
+        return new QuickSearchBuilder();
+    }
+
+    /**
+     * {@link QuickSearch} configuration builder class.
      * <p>
      * Access and use: {@code QuickSearch.builder().build();}
      */
     public static class QuickSearchBuilder {
 
+        /*
+         * Defaults
+         */
         private BiFunction<String, String, Double> keywordMatchScorer = DEFAULT_MATCH_SCORER;
         private Function<String, String> keywordNormalizer = DEFAULT_KEYWORD_NORMALIZER;
         private Function<String, Set<String>> keywordsExtractor = DEFAULT_KEYWORDS_EXTRACTOR;
         private UnmatchedPolicy unmatchedPolicy = BACKTRACKING;
-        private AccumulationPolicy accumulationPolicy = UNION;
+        private MergePolicy mergePolicy = UNION;
         private boolean enableForkJoin = false;
 
-        public QuickSearchBuilder withKeywordMatchScorer(BiFunction<String, String, Double> scorer) {
-            Objects.requireNonNull(scorer);
+        /**
+         * Specify a keywords match scorer function.
+         * <p>
+         * This function is invoked for each visited graph node that has leafs (items) that will be added
+         * to generated result set (for a single keyword - the scores from all encounters of a particular
+         * item are summed during merge phase). In example it may be invoked to score a match
+         * between "ban" and "banana" or "banana" and "banana".
+         * <p>
+         * The first parameter is the user supplied keyword, second is the existing keyword of the node being visited.
+         * <p>
+         * {@link QuickSearch} guarantees that the user supplied keyword will always be a substring (or a match
+         * for) of the node keyword.
+         * <p>
+         * Function should return a Double assigning arbitrary score as required.
+         * <p>
+         * Function can return negative value to skip adding the items for this particular match.
+         * <p>
+         * Two default functions are available: {@link #DEFAULT_MATCH_SCORER} for user facing
+         * implementations assigning a match score between 0 and 1 depending on the match length
+         * and {@link #EXACT_MATCH_SCORER} for use cases where exact matching is desired.
+         * <p>
+         * This should be a true <strong>function in a mathematical sense</strong> as it will be called
+         * frequently, from multiple threads and in undefined order during the search graph traversal phase.
+         * If you try to inject IO blocking, database lookups, remote service requests or functionality
+         * like calculation of running averages you are going to have a bad time and things will break badly.
+         * <p>
+         * <small>If you have a use case where such functionality would actually
+         * make sense I'd be very interested to hear about it.</small>
+         *
+         * @param scorerFunction function to use for keywords match scoring
+         * @return current {@link QuickSearchBuilder} instance for configuration chaining
+         */
+        public QuickSearchBuilder withKeywordMatchScorer(BiFunction<String, String, Double> scorerFunction) {
+            Objects.requireNonNull(scorerFunction);
 
-            keywordMatchScorer = scorer;
+            keywordMatchScorer = scorerFunction;
             return this;
         }
 
-        public QuickSearchBuilder withKeywordNormalizer(Function<String, String> normalizer) {
-            Objects.requireNonNull(normalizer);
+        /**
+         * Specify a keywords 'extractor' function the created {@link QuickSearch} instance should apply to
+         * user (and item) supplied keyword strings.
+         * <p>
+         * Function should accept a raw input string as an input and return a {@link Set} of extracted keywords
+         * that should be assigned to the item (when called from {@link #addItem(Object, String)} or should
+         * be treated as user supplied keywords.
+         * <p>
+         * In default and most basic implementation (available as {@link #DEFAULT_KEYWORDS_EXTRACTOR} the
+         * function can simply extract all alpha-numerical sequences and ensure they are consistently lower
+         * or upper case (which should be sufficient for almost all possible use cases), but special cases
+         * may require overriding it (e.g. if directly parsing machine generated formats).
+         * <p>
+         * Note that the keywords extracted by this function will be additionally processed by keywords
+         * normaliser function - {@link #withKeywordNormalizer(Function)}.
+         * <p>
+         * This should be a true <strong>function in a mathematical sense</strong> as it will be called
+         * frequently, from multiple threads and in undefined order when adding items or initiating
+         * searches. If you try to inject IO blocking, database lookups, remote service requests or functionality
+         * like calculation of running averages you are going to have a bad time and things will break badly.
+         * <p>
+         * <small>If you have a use case where such functionality would actually
+         * make sense I'd be very interested to hear about it.</small>
+         *
+         * @param extractorFunction function to extract keywords from raw input strings
+         * @return current {@link QuickSearchBuilder} instance for configuration chaining
+         */
+        public QuickSearchBuilder withKeywordsExtractor(Function<String, Set<String>> extractorFunction) {
+            Objects.requireNonNull(extractorFunction);
 
-            keywordNormalizer = normalizer;
+            keywordsExtractor = extractorFunction;
             return this;
         }
 
-        public QuickSearchBuilder withKeywordsExtractor(Function<String, Set<String>> extractor) {
-            Objects.requireNonNull(extractor);
+        /**
+         * Specify a keywords normalizer function.
+         * <p>
+         * This function should ensure that all semantically
+         * equivalent strings (e.g. "London" and "lonDon") have consistent internal representation
+         * both for item keywords and keywords used in search.
+         * <p>
+         * Applied to keywords extracted by keywords extractor function for both supplied item keywords
+         * and user supplied raw search string. Can be extended to (in example) replace special
+         * characters with common romanizations, skip or introduce common prefixes/suffixes, etc.
+         * <p>
+         * The normalized representation has no specific requirements.  Simply returning the supplied
+         * string will mean that the search results contain only exact (and case sensitive) matches.
+         * It is also possible to return empty or null strings here, in which case the original
+         * keyword will be ignored.
+         * <p>
+         * Example transformations:
+         * <table summary="">
+         * <tr><th>original</th><th>transformed to</th><th>possible rationale</th></tr>
+         * <tr><td><code>"New York"</code></td><td><code>"new york"</code></td><td>all lower case internally</td></tr>
+         * <tr><td><code>"Pythøn"</code></td><td><code>"python"</code></td><td>replace special characters</td></tr>
+         * <tr><td><code>"HERMSGERVØRDENBRØTBØRDA"</code></td><td><code>"hermsgervordenbrotborda"</code></td><td>møøse trained by...</td></tr>
+         * <tr><td><code>"Россия"</code></td><td><code>"rossiya"</code></td><td>transliterate cyrilic alphabet to latin</td></tr>
+         * </table>
+         * <p>
+         * Default implementation available at {@link #DEFAULT_KEYWORD_NORMALIZER} simply ensures that the keyword
+         * is trimmed and all lower-case.
+         * <p>
+         * This should be a true <strong>function in a mathematical sense</strong> as it will be called
+         * frequently, from multiple threads and in undefined order when adding items or initiating
+         * searches. If you try to inject IO blocking, database lookups, remote service requests or functionality
+         * like calculation of running averages you are going to have a bad time and things will break badly.
+         * <p>
+         * <small>If you have a use case where such functionality would actually
+         * make sense I'd be very interested to hear about it.</small>
+         *
+         * @param normalizerFunction function as described above
+         * @return current {@link QuickSearchBuilder} instance for configuration chaining
+         */
+        public QuickSearchBuilder withKeywordNormalizer(Function<String, String> normalizerFunction) {
+            Objects.requireNonNull(normalizerFunction);
 
-            keywordsExtractor = extractor;
+            keywordNormalizer = normalizerFunction;
             return this;
         }
 
-        public QuickSearchBuilder withUnmatchedPolicy(UnmatchedPolicy policy) {
-            Objects.requireNonNull(policy);
+        /**
+         * Set {@link UnmatchedPolicy} for created {@link QuickSearch} instance.
+         *
+         * @param unmatchedPolicy policy to use
+         * @return current {@link QuickSearchBuilder} instance for configuration chaining
+         */
+        public QuickSearchBuilder withUnmatchedPolicy(UnmatchedPolicy unmatchedPolicy) {
+            Objects.requireNonNull(unmatchedPolicy);
 
-            unmatchedPolicy = policy;
+            this.unmatchedPolicy = unmatchedPolicy;
             return this;
         }
 
-        public QuickSearchBuilder withAccumulationPolicy(AccumulationPolicy policy) {
-            Objects.requireNonNull(policy);
+        /**
+         * Set {@link MergePolicy} for created {@link QuickSearch} instance.
+         *
+         * @param mergePolicy policy to use
+         * @return current {@link QuickSearchBuilder} instance for configuration chaining
+         */
+        public QuickSearchBuilder withMergePolicy(MergePolicy mergePolicy) {
+            Objects.requireNonNull(mergePolicy);
 
-            accumulationPolicy = policy;
+            this.mergePolicy = mergePolicy;
             return this;
         }
 
-        public QuickSearchBuilder withForkJoinProcessing() {
+        /**
+         * Enable parallel (fork-join) processing in the created {@link QuickSearch} instance.
+         * <p>
+         * Provides noticeable processing speedups in case if working with lots of search
+         * keywords (faceting) across large data sets.
+         * <p>
+         * Only enable if used in m2m use cases and you can benchmark it proving that it
+         * improves your use case. This can be considered an experimental feature and may
+         * be removed in the future (ether made default or removed as not worth the
+         * maintenance complexity).
+         *
+         * @return current {@link QuickSearchBuilder} instance for configuration chaining
+         */
+        public QuickSearchBuilder withParallelProcessing() {
             enableForkJoin = true;
             return this;
         }
 
+        /**
+         * One shiny {@link QuickSearch} instance with specified configuration parameters coming up.
+         *
+         * @param <T> required instance type
+         * @return new {@link QuickSearch} instance with this {@link QuickSearchBuilder}s configuration
+         */
         public <T> QuickSearch<T> build() {
             return new QuickSearch<>(this);
         }
@@ -607,8 +740,6 @@ public class QuickSearch<T> {
 
     /**
      * Internal wrapper of item and score for results list.
-     * <p>
-     * Not for external use.
      */
     private static class SearchResult<T> {
 

@@ -27,18 +27,22 @@ import java.util.List;
 public class Result<T> {
 
     private final String searchString;
-    private final List<Item<T>> responseItems;
+    private final List<ResultItem<T>> responseResultItems;
+    private final int requestedMaxItems;
 
     /**
      * Construct an instance
      *
-     * @param searchString  search string that generated this result set
-     * @param responseItems found items
+     * @param searchString        search string that generated this result set
+     * @param responseResultItems found items
+     * @param requestedMaxItems   requested results count
      */
     public Result(final String searchString,
-                  final List<Item<T>> responseItems) {
+                  final List<ResultItem<T>> responseResultItems,
+                  final int requestedMaxItems) {
         this.searchString = searchString;
-        this.responseItems = responseItems;
+        this.responseResultItems = responseResultItems;
+        this.requestedMaxItems = requestedMaxItems;
     }
 
     /**
@@ -53,9 +57,18 @@ public class Result<T> {
     /**
      * Query.
      *
-     * @return list of 0 to n top scoring search items
+     * @return list of zero to n top scoring search items
      */
-    public List<Item<T>> getResponseItems() {
-        return responseItems;
+    public List<ResultItem<T>> getResponseResultItems() {
+        return responseResultItems;
+    }
+
+    /**
+     * Query.
+     *
+     * @return number of top items requested in the search request
+     */
+    public int getRequestedMaxItems() {
+        return requestedMaxItems;
     }
 }

@@ -15,61 +15,64 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.zigurs.karlis.utils.search.fj;
+package com.zigurs.karlis.utils.search.parallel;
 
 import com.zigurs.karlis.utils.search.ImmutableSet;
 
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.RecursiveTask;
 import java.util.function.Function;
 
+import static com.zigurs.karlis.utils.search.QuickSearch.intersectMaps;
+
 /**
- * Fork-join task computing the union of maps (summing values)
+ * Fork-join task computing the intersection of maps (summing values)
  * provided for all specified keywords.
  *
- * @param <T> type of keys of maps being merged
+ * @param <T> type of keys of maps being intersected
  */
-public class FJUnionTask<T> extends RecursiveTask<Map<T, Double>> {
+public class IntersectionTask<T> extends RecursiveTask<Map<T, Double>> {
 
     private final ImmutableSet<String> keywords;
-    private final ConcurrentHashMap<T, Double> accumulator;
     private final Function<String, Map<T, Double>> supplierFunction;
 
     /**
      * Constructor.
      *
      * @param keywords         Immutable set of keywords this task should split down and accumulate
-     * @param supplierFunction supplier of maps to calculate union of
+     * @param supplierFunction supplier of maps to intersect for given keyword
      */
-    public FJUnionTask(final ImmutableSet<String> keywords,
-                       final Function<String, Map<T, Double>> supplierFunction) {
-        this(keywords, supplierFunction, new ConcurrentHashMap<>());
-    }
-
-    private FJUnionTask(final ImmutableSet<String> keywords,
-                        final Function<String, Map<T, Double>> supplierFunction,
-                        final ConcurrentHashMap<T, Double> accumulator) {
+    public IntersectionTask(final ImmutableSet<String> keywords,
+                            final Function<String, Map<T, Double>> supplierFunction) {
         this.keywords = keywords;
         this.supplierFunction = supplierFunction;
-        this.accumulator = accumulator;
     }
 
     @Override
     protected Map<T, Double> compute() {
         if (keywords.size() == 1)
-            return supplierFunction.apply(keywords.getSingleElement());
+            return supplierFunction.apply(keywords.iterator().next());
 
         ImmutableSet<String>[] splits = keywords.split();
 
-        FJUnionTask<T> left = new FJUnionTask<>(splits[0], supplierFunction, accumulator);
+        IntersectionTask<T> left = new IntersectionTask<>(splits[0], supplierFunction);
         left.fork();
-        FJUnionTask<T> right = new FJUnionTask<>(splits[1], supplierFunction, accumulator);
+
+        IntersectionTask<T> right = new IntersectionTask<>(splits[1], supplierFunction);
         right.fork();
 
-        left.join().forEach((k, v) -> accumulator.merge(k, v, (d1, d2) -> d1 + d2));
-        right.join().forEach((k, v) -> accumulator.merge(k, v, (d1, d2) -> d1 + d2));
+        Map<T, Double> leftMap = left.join();
 
-        return accumulator;
+        if (leftMap.isEmpty()) {
+            right.cancel(true); // Worth a try...
+            return leftMap;
+        }
+
+        Map<T, Double> rightMap = right.join();
+
+        if (rightMap.isEmpty())
+            return rightMap;
+
+        return intersectMaps(leftMap, rightMap);
     }
 }

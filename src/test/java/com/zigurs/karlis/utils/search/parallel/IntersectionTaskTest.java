@@ -1,4 +1,4 @@
-package com.zigurs.karlis.utils.search.fj;
+package com.zigurs.karlis.utils.search.parallel;
 
 import com.zigurs.karlis.utils.search.ImmutableSet;
 import org.junit.Test;
@@ -11,14 +11,14 @@ import java.util.function.Function;
 
 import static org.junit.Assert.assertTrue;
 
-public class FJIntersectionTaskTest {
+public class IntersectionTaskTest {
 
     @Test
     public void allMapsAreEmpty() {
         Function<String, Map<String, Double>> supplierFunction = string -> new HashMap<>();
         ImmutableSet<String> set = ImmutableSet.fromCollection(Arrays.asList("one", "two", "three", "four"));
 
-        FJIntersectionTask<String> task = new FJIntersectionTask<>(set, supplierFunction);
+        IntersectionTask<String> task = new IntersectionTask<>(set, supplierFunction);
         task.fork();
         assertTrue(task.join().isEmpty());
     }
@@ -44,7 +44,7 @@ public class FJIntersectionTaskTest {
 
         ImmutableSet<String> set = ImmutableSet.fromCollection(Arrays.asList("one", "two", "three"));
 
-        FJIntersectionTask<String> task = new FJIntersectionTask<>(set, supplierFunction);
+        IntersectionTask<String> task = new IntersectionTask<>(set, supplierFunction);
         task.fork();
         assertTrue(task.join().isEmpty());
     }
