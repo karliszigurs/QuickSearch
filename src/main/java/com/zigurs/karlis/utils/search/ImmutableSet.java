@@ -90,7 +90,8 @@ public class ImmutableSet<T> extends AbstractSet<T> {
 
     @Override
     public boolean contains(final Object o) {
-        Objects.requireNonNull(o);
+        if (o == null)
+            return false;
 
         for (T element : array)
             if (itemsAreEqual(element, o))

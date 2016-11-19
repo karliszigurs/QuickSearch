@@ -28,14 +28,14 @@ import static org.junit.Assert.*;
 public class ImmutableSetTest {
 
     @Test
-    public void empty() {
+    public void shouldCreateEmptySet() {
         Set<String> set = ImmutableSet.emptySet();
         assertTrue(set.isEmpty());
         assertEquals(0, set.size());
     }
 
     @Test
-    public void fromSingle() {
+    public void shouldCreateSingletonSet() {
         String cat = "cat";
         Set<String> set = ImmutableSet.singletonSet(cat);
         assertFalse(set.isEmpty());
@@ -44,7 +44,7 @@ public class ImmutableSetTest {
     }
 
     @Test
-    public void addAndCreate() {
+    public void shouldAddToSingletonSet() {
         String cat = "cat";
         String dog = "dog";
 
@@ -56,7 +56,7 @@ public class ImmutableSetTest {
     }
 
     @Test
-    public void addAndCreate1() {
+    public void shouldNotAddRepeatedly() {
         String cat = "cat";
         String dog = "dog";
 
@@ -69,7 +69,7 @@ public class ImmutableSetTest {
     }
 
     @Test
-    public void removeAndCreate() {
+    public void shouldAddAndRemoveCorrectly() {
         String cat = "cat";
         String dog = "dog";
 
@@ -82,7 +82,7 @@ public class ImmutableSetTest {
     }
 
     @Test
-    public void removeAndCreate1() {
+    public void shouldRemoveSingleElementAndReturnEmpty() {
         ImmutableSet<String> single = ImmutableSet.singletonSet("cat");
         Set<String> set = ImmutableSet.remove(single, "cat");
         assertTrue(set.isEmpty());
@@ -90,7 +90,7 @@ public class ImmutableSetTest {
     }
 
     @Test
-    public void removeAndCreate2() {
+    public void shouldNotRemoveNonExistingElement() {
         ImmutableSet<String> single = ImmutableSet.singletonSet("cat");
         Set<String> set = ImmutableSet.remove(single, "dog");
         assertFalse(set.isEmpty());
@@ -99,7 +99,7 @@ public class ImmutableSetTest {
     }
 
     @Test
-    public void removeAndCreate4() {
+    public void shouldSurviveRemovingMatchingHashCodeButNotEquals() {
         assertEquals("FB".hashCode(), "Ea".hashCode());
 
         ImmutableSet<String> single = ImmutableSet.fromCollection(Arrays.asList("FB", "one"));
@@ -110,7 +110,7 @@ public class ImmutableSetTest {
     }
 
     @Test
-    public void removeAndCreate5() {
+    public void shouldSurviveRemovingNonExistentEntry() {
         ImmutableSet<String> single = ImmutableSet.emptySet();
         Set<String> set = ImmutableSet.remove(single, "Ea");
         assertTrue(set.isEmpty());
@@ -118,50 +118,53 @@ public class ImmutableSetTest {
     }
 
     @Test
-    public void getFirst() {
+    public void shouldReturnElementOnSingleQuerySingletonSet() {
         ImmutableSet<String> one = ImmutableSet.singletonSet("one");
         assertEquals("one", one.getSingleElement());
     }
 
     @Test(expected = IndexOutOfBoundsException.class)
-    public void getFirstFromEmpty() {
+    public void shouldThrowExceptionOnSingleQueryOnEmptySet() {
         ImmutableSet<String> empty = ImmutableSet.emptySet();
         assertEquals("one", empty.getSingleElement());
     }
 
     @Test
-    public void getFirstFromMultiple() {
+    public void shouldGetAnElementFromSetOnSingleQuery() {
         ImmutableSet<String> multiple = ImmutableSet.fromCollection(Arrays.asList("one", "two", "three"));
+        /* Implementation specific. I know it's going to be "one" here */
         assertEquals("one", multiple.getSingleElement());
     }
 
     @Test(expected = IndexOutOfBoundsException.class)
-    public void getFirstFromNulls() {
+    public void shouldSkipAllNullsAndThrowExceptionOnSingleQuery() {
         ImmutableSet<String> multiple = ImmutableSet.fromCollection(Arrays.asList(null, null, null));
+        assertTrue(multiple.isEmpty());
         assertEquals("one", multiple.getSingleElement());
     }
 
     @Test
-    public void getFirstFromNullsAndItems() {
+    public void shouldSkipNullsInSource() {
         ImmutableSet<String> multiple = ImmutableSet.fromCollection(Arrays.asList(null, null, null, "one"));
         assertEquals("one", multiple.getSingleElement());
+        assertEquals(1, multiple.size());
     }
 
     @Test
-    public void getSplitEmpty() {
+    public void shouldReturnEmptyArrayForEmptySplit() {
         ImmutableSet<String> empty = ImmutableSet.emptySet();
         assertEquals(0, empty.split().length);
     }
 
     @Test
-    public void getSplitSingle() {
+    public void shouldReturnSingleEntryForSplitSingleton() {
         ImmutableSet<String> single = ImmutableSet.singletonSet("one");
         assertEquals(1, single.split().length);
         assertEquals("one", (single.split()[0].getSingleElement()));
     }
 
     @Test
-    public void getSplitTwo() {
+    public void shouldSplitTwoElementsRepeatedly() {
         ImmutableSet<String> two = ImmutableSet.fromCollection(Arrays.asList("one", "two"));
         assertEquals(2, two.split().length);
         assertEquals("one", two.split()[0].getSingleElement());
@@ -171,7 +174,7 @@ public class ImmutableSetTest {
     }
 
     @Test
-    public void getSplitThree() {
+    public void shouldSplitThreeElements() {
         ImmutableSet<String> two = ImmutableSet.fromCollection(Arrays.asList("one", "two", "three"));
         assertEquals(2, two.split().length);
         assertEquals("one", (two.split()[0].getSingleElement()));
@@ -181,7 +184,27 @@ public class ImmutableSetTest {
     }
 
     @Test
-    public void fromCollection() {
+    public void shouldSplitLotsOfElements() {
+        List<String> source = new ArrayList<>();
+        for (int i = 0; i < 1009; i++)
+            source.add("test" + i);
+
+        ImmutableSet<String> set = ImmutableSet.fromCollection(source);
+        ImmutableSet<String>[] split = set.split();
+
+        assertEquals(2, split.length);
+
+        assertEquals(504, split[0].size());
+        assertEquals(505, split[1].size());
+
+        ImmutableSet<String> mergedAgain = ImmutableSet.fromCollections(split[0], split[1]);
+
+        assertEquals(1009, mergedAgain.size());
+    }
+
+
+    @Test
+    public void shouldCreateFromSingleCollection() {
         Set<String> set = ImmutableSet.fromCollection(Arrays.asList("cat", "dog"));
         assertFalse(set.isEmpty());
         assertEquals(2, set.size());
@@ -189,15 +212,15 @@ public class ImmutableSetTest {
     }
 
     @Test
-    public void fromCollection1() {
-        Set<String> set = ImmutableSet.fromCollection(Collections.emptySet());
+    public void shouldCreateEmptyFromOneEmptyCollection() {
+        Set<String> set = ImmutableSet.fromCollection(Collections.emptyList());
         assertTrue(set.isEmpty());
         assertEquals(0, set.size());
         assertEquals(Collections.emptySet(), set);
     }
 
     @Test
-    public void fromCollections() {
+    public void shouldCreateUnionFromSuppliedCollections() {
         Set<String> set = ImmutableSet.fromCollections(Arrays.asList("cat", "dog"), Arrays.asList("red", "blue"));
         assertFalse(set.isEmpty());
         assertEquals(4, set.size());
@@ -205,7 +228,7 @@ public class ImmutableSetTest {
     }
 
     @Test
-    public void fromCollections1() {
+    public void shouldCreateSetIfOneCollectionIsEmptyAgain() {
         Set<String> set = ImmutableSet.fromCollections(Collections.emptySet(), Arrays.asList("red", "blue"));
         assertFalse(set.isEmpty());
         assertEquals(2, set.size());
@@ -213,7 +236,7 @@ public class ImmutableSetTest {
     }
 
     @Test
-    public void fromCollections2() {
+    public void shouldCreateSetIfOneCollectionIsEmpty() {
         Set<String> set = ImmutableSet.fromCollections(Arrays.asList("red", "blue"), Collections.emptySet());
         assertFalse(set.isEmpty());
         assertEquals(2, set.size());
@@ -221,7 +244,7 @@ public class ImmutableSetTest {
     }
 
     @Test
-    public void fromCollections3() {
+    public void shouldCreateEmptySetFromEmptyCollections() {
         Set<String> set = ImmutableSet.fromCollections(Collections.emptySet(), Collections.emptySet());
         assertTrue(set.isEmpty());
         assertEquals(0, set.size());
@@ -229,7 +252,7 @@ public class ImmutableSetTest {
     }
 
     @Test
-    public void contains() {
+    public void shouldFindContainsItem() {
         ImmutableSet<String> set = ImmutableSet.emptySet();
         for (int i = 0; i < 1000; i++) {
             set = ImmutableSet.add(set, "Item" + i);
@@ -241,15 +264,17 @@ public class ImmutableSetTest {
     }
 
     @Test
-    public void contains1() {
+    public void equalHashcodesShouldNotMatch() {
+        /* following two have identical hashcodes */
         assertEquals("FB".hashCode(), "Ea".hashCode());
         Set<String> set = ImmutableSet.singletonSet("FB");
         assertFalse(set.contains("Ea"));
     }
 
     @Test
-    public void iterator() {
+    public void noSurpriseNullElements() {
         ImmutableSet<String> set = ImmutableSet.emptySet();
+
         for (int i = 0; i < 1000; i++) {
             set = ImmutableSet.add(set, "Item" + i);
         }
@@ -259,7 +284,7 @@ public class ImmutableSetTest {
     }
 
     @Test(expected = NoSuchElementException.class)
-    public void iterator1() {
+    public void finiteIteratorShouldTerminate() {
         ImmutableSet<String> set = ImmutableSet.emptySet();
         for (int i = 0; i < 10; i++) {
             set = ImmutableSet.add(set, "Item" + i);
@@ -273,7 +298,7 @@ public class ImmutableSetTest {
     }
 
     @Test
-    public void forEach() {
+    public void shouldPassOverAllElementsInForEach() {
         ImmutableSet<String> set = ImmutableSet.emptySet();
         for (int i = 0; i < 1000; i++) {
             set = ImmutableSet.add(set, "Item" + i);
@@ -286,23 +311,23 @@ public class ImmutableSetTest {
     }
 
     @Test
-    public void equalsTest() {
+    public void shouldNotEqualDifferentSingletonSets() {
         Set<String> setOne = ImmutableSet.singletonSet("one");
         Set<String> setTwo = ImmutableSet.singletonSet("two");
         assertFalse(setOne.equals(setTwo));
     }
 
     @Test
-    public void equalsTest1() {
+    public void shouldEqualSingleTonSetsAndSetHashcode() {
         Set<String> setOne = ImmutableSet.singletonSet("one");
         Set<String> setTwo = ImmutableSet.singletonSet("one");
         assertTrue(setOne.equals(setTwo));
-        assertFalse(setOne.hashCode() == 0);
         assertEquals(setOne.hashCode(), setTwo.hashCode());
+        assertFalse(setOne.hashCode() == 0);
     }
 
     @Test
-    public void equalsTest2() {
+    public void shouldEqualDifferentlyCreatedSets() {
         Set<String> setOne = ImmutableSet.fromCollection(Arrays.asList("one", "two"));
         Set<String> setTwo = ImmutableSet.fromCollection(Arrays.asList("two", "one"));
         assertTrue(setOne.equals(setTwo));
@@ -310,28 +335,29 @@ public class ImmutableSetTest {
     }
 
     @Test
-    public void equalsTest3() {
+    public void shouldNotEqualOverlappingSets() {
         Set<String> setOne = ImmutableSet.fromCollection(Arrays.asList("one", "two"));
         Set<String> setTwo = ImmutableSet.fromCollection(Arrays.asList("two", "three"));
         assertFalse(setOne.equals(setTwo));
     }
 
     @Test
-    public void equalsTest4() {
+    public void shouldNotEqualSingletonSet() {
         Set<String> setOne = ImmutableSet.fromCollection(Arrays.asList("one", "two"));
         Set<String> setTwo = Collections.singleton("three");
         assertFalse(setOne.equals(setTwo));
+        assertFalse(setTwo.equals(setOne));
     }
 
     @Test
-    public void equalsTest5() {
+    public void shouldNotEqualDifferentSets() {
         Set<String> setOne = ImmutableSet.fromCollection(Arrays.asList("one", "two"));
         Set<String> setTwo = ImmutableSet.singletonSet("three");
         assertFalse(setOne.equals(setTwo));
     }
 
     @Test
-    public void equalsTest6() {
+    public void shouldCompareToCollectionsSet() {
         Set<String> setOne = ImmutableSet.fromCollection(Arrays.asList("one", "two"));
         Set<String> setTwo = new HashSet<>(Arrays.asList("one", "two"));
         assertTrue(setOne.equals(setTwo));
@@ -339,33 +365,27 @@ public class ImmutableSetTest {
     }
 
     @Test
-    public void equalsTest7() {
-        Set<String> setOne = ImmutableSet.fromCollection(Arrays.asList("one", "two"));
-        Collection<String> setTwo = Arrays.asList("one", "two");
-        assertFalse(setOne.equals(setTwo));
-        assertNotEquals(setOne.hashCode(), setTwo.hashCode());
+    public void shouldNotCompareToList() {
+        Set<String> set = ImmutableSet.fromCollection(Arrays.asList("one", "two"));
+        Collection<String> list = Arrays.asList("one", "two");
+        assertFalse(set.equals(list));
+        assertNotEquals(set.hashCode(), list.hashCode());
     }
 
     @Test
-    public void emptySetTest() {
+    public void emptySetShouldReportEmpty() {
         Set<String> set = ImmutableSet.emptySet();
         assertTrue(set.isEmpty());
     }
 
     @Test
-    public void emptySetTest1() {
+    public void emptySizeShouldBeZero() {
         Set<String> set = ImmutableSet.emptySet();
         assertEquals(0, set.size());
     }
 
-    @Test
-    public void emptySetTest3() {
-        Set<String> set = ImmutableSet.emptySet();
-        assertFalse(set.contains("cat"));
-    }
-
     @Test(expected = NoSuchElementException.class)
-    public void emptySetTest4() {
+    public void emptyIteratorShouldThrowException() {
         Set<String> set = ImmutableSet.emptySet();
         Iterator<String> iterator = set.iterator();
         assertFalse(iterator.hasNext());
@@ -373,15 +393,30 @@ public class ImmutableSetTest {
     }
 
     @Test
-    public void emptySetTest5() {
+    public void emptyHashCodeShouldMatchCollectionsEmptyHashCode() {
         Set<String> set = ImmutableSet.emptySet();
         assertEquals(0, set.hashCode());
+        assertEquals(new HashSet<>().hashCode(), set.hashCode());
     }
 
     @Test
-    public void emptySetTest6() {
+    public void emptyShouldMatchCollectionsEmpty() {
         Set<String> set = ImmutableSet.emptySet();
         assertTrue(set.equals(ImmutableSet.emptySet()));
         assertTrue(set.equals(Collections.emptySet()));
+    }
+
+    @Test
+    public void shouldContain() {
+        ImmutableSet<String> multiple = ImmutableSet.fromCollection(Arrays.asList("one", "two", "three"));
+        //noinspection RedundantStringConstructorCall
+        assertTrue(multiple.contains(new String("two")));
+    }
+
+    @Test
+    public void shouldNotContain() {
+        ImmutableSet<String> multiple = ImmutableSet.fromCollection(Arrays.asList("one", "two", "three"));
+        assertFalse(multiple.contains("moon"));
+        assertFalse(multiple.contains(null));
     }
 }
