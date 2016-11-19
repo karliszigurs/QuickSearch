@@ -188,7 +188,7 @@ public class QuickSearchUseCasesTest {
         private final T object;
         private final Set<String> facets;
 
-        public FacetedObject(T object, Set<String> facets) {
+        private FacetedObject(T object, Set<String> facets) {
             Objects.requireNonNull(object);
             Objects.requireNonNull(facets);
 
@@ -196,11 +196,11 @@ public class QuickSearchUseCasesTest {
             this.facets = facets;
         }
 
-        public T getObject() {
+        private T getObject() {
             return object;
         }
 
-        public Set<String> getFacets() {
+        private Set<String> getFacets() {
             return facets;
         }
     }

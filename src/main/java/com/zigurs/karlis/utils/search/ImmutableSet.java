@@ -359,7 +359,7 @@ public class ImmutableSet<T> extends AbstractSet<T> {
      * @param <T>   type
      * @return true if {@code left.equals(right)}
      */
-    public static <T> boolean itemsAreEqual(T left, T right) {
+    private static <T> boolean itemsAreEqual(T left, T right) {
         return left == right ||
                 (left.hashCode() == right.hashCode() &&
                         left.equals(right));
