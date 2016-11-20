@@ -130,8 +130,6 @@ public class QuickSearchMemoryUseTest {
         assertEquals(10, searchInstance.findItems("a", 10).size());
 
         MemoryMeter meter = new MemoryMeter().withGuessing(MemoryMeter.Guess.ALWAYS_UNSAFE);
-        long measured = meter.measureDeep(searchInstance);
-        System.out.println(measured);
-        return measured;
+        return meter.measureDeep(searchInstance);
     }
 }
