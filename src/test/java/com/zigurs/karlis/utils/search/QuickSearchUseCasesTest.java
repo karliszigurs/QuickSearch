@@ -29,7 +29,7 @@ public class QuickSearchUseCasesTest {
         List<String> mammals = quickSearch.findItems("mammal", 10);
 
         /* And verify that we got Cat and Dog in return */
-        assertEquals(Arrays.asList(new String[]{"Cat", "Dog"}), mammals);
+        assertEquals(new HashSet<>(Arrays.asList("Dog", "Cat")), new HashSet<>(mammals));
     }
 
     @Test
@@ -129,7 +129,7 @@ public class QuickSearchUseCasesTest {
         assertEquals(5, foundCategories.size());
     }
 
-    private class StoreCategory {
+    private class StoreCategory implements Comparable<StoreCategory> {
 
         private final String displayName;
         private final StoreCategory parentCategory;
@@ -181,9 +181,14 @@ public class QuickSearchUseCasesTest {
         private int getMenuDepth() {
             return menuDepth;
         }
+
+        @Override
+        public int compareTo(StoreCategory o) {
+            return displayName.compareTo(o.displayName);
+        }
     }
 
-    private class FacetedObject<T> {
+    private class FacetedObject<T extends Comparable<T>> implements Comparable<FacetedObject<T>> {
 
         private final T object;
         private final Set<String> facets;
@@ -202,6 +207,11 @@ public class QuickSearchUseCasesTest {
 
         private Set<String> getFacets() {
             return facets;
+        }
+
+        @Override
+        public int compareTo(FacetedObject<T> o) {
+            return object.compareTo(o.object);
         }
     }
 }

@@ -17,6 +17,7 @@
  */
 package com.zigurs.karlis.utils.search;
 
+import java.lang.reflect.Array;
 import java.util.*;
 import java.util.function.Consumer;
 
@@ -28,27 +29,20 @@ import java.util.function.Consumer;
  * while retaining {@link Set} semantics - in this case at cost of modifying operations.
  * Fully obeys JDK Collections {@link Set} semantics.
  * <p>
- * Comes with helper functions {@link ImmutableSet#add(ImmutableSet, Object)} and
- * {@link ImmutableSet#remove(ImmutableSet, Object)} that create a new {@link ImmutableSet}
+ * Comes with helper functions {@link ImmutableSet#add(ImmutableSet, Comparable)} and
+ * {@link ImmutableSet#remove(ImmutableSet, Comparable)} that create a new {@link ImmutableSet}
  * instance after applying requested modification (leaving the original {@link ImmutableSet} intact).
  * <p>
  * Calls to any modifying operations on an instance will throw an exception.
  * <p>
  * This implementation does not permit {@code null} elements.
  * <p>
- * <small><strong>Note:</strong> Due to use of underlying unsorted array calling
- * {@link #contains(Object)} is quite inefficient and expensive.
- * If you want to use this approach (you shouldn't) in context of heavy {@link #contains(Object)}
- * use I'd suggest sorting the underlying array after each modification and using
- * {@link Arrays#binarySearch(Object[], Object, Comparator)} to determine presence
- * of an item in the set.</small>
- * <p>
  * This implementation is thread-safe.
  *
  * @author Karlis Zigurs, 2016
  */
 @SuppressWarnings("unchecked")
-public class ImmutableSet<T> extends AbstractSet<T> {
+public class ImmutableSet<T extends Comparable<T>> extends AbstractSet<T> {
 
     /**
      * Static, shareable and empty iterator.
@@ -68,7 +62,7 @@ public class ImmutableSet<T> extends AbstractSet<T> {
     /**
      * Reusable instance for empty sets.
      */
-    private static final ImmutableSet EMPTY_SET = new ImmutableSet(new Object[0]) {
+    private static final ImmutableSet EMPTY_SET = new ImmutableSet(new Comparable[0]) {
         @Override
         public Iterator iterator() {
             return EMPTY_ITERATOR;
@@ -90,7 +84,15 @@ public class ImmutableSet<T> extends AbstractSet<T> {
     private int cachedHashCode = 0;
 
     private ImmutableSet(final T[] array) {
+        this(array, true);
+    }
+
+    private ImmutableSet(final T[] array, boolean shouldSort) {
         Objects.requireNonNull(array);
+
+        if (shouldSort)
+            Arrays.parallelSort(array);
+
         this.array = array;
     }
 
@@ -101,14 +103,10 @@ public class ImmutableSet<T> extends AbstractSet<T> {
 
     @Override
     public boolean contains(final Object o) {
-        if (o == null)
+        if (o == null || !(o instanceof Comparable))
             return false;
 
-        for (T element : array)
-            if (itemsAreEqual(element, o))
-                return true;
-
-        return false;
+        return Arrays.binarySearch(array, o) > -1;
     }
 
     @Override
@@ -202,7 +200,7 @@ public class ImmutableSet<T> extends AbstractSet<T> {
      * @param <T> type
      * @return empty set
      */
-    public static <T> ImmutableSet<T> emptySet() {
+    public static <T extends Comparable<T>> ImmutableSet<T> emptySet() {
         return (ImmutableSet<T>) EMPTY_SET;
     }
 
@@ -213,10 +211,10 @@ public class ImmutableSet<T> extends AbstractSet<T> {
      * @param <T>     type
      * @return set containing single element
      */
-    public static <T> ImmutableSet<T> singletonSet(final T element) {
+    public static <T extends Comparable<T>> ImmutableSet<T> singletonSet(final T element) {
         Objects.requireNonNull(element);
 
-        return new ImmutableSet<>((T[]) new Object[]{element});
+        return new ImmutableSet<>((T[]) new Comparable[]{element});
     }
 
     /**
@@ -227,23 +225,31 @@ public class ImmutableSet<T> extends AbstractSet<T> {
      * @param <T>        type of items in set
      * @return new instance with the element added or original set if element was already present
      */
-    public static <T> ImmutableSet<T> add(final ImmutableSet<T> set,
-                                          final T newElement) {
+    public static <T extends Comparable<T>> ImmutableSet<T> add(final ImmutableSet<T> set,
+                                                                final T newElement) {
         Objects.requireNonNull(set);
         Objects.requireNonNull(newElement);
-
-        /* no-op if already contains the element */
-        if (set.contains(newElement))
-            return set;
 
         if (set.isEmpty())
             return singletonSet(newElement);
 
-        Object[] destination = new Object[set.array.length + 1];
-        System.arraycopy(set.array, 0, destination, 0, set.array.length);
-        destination[destination.length - 1] = newElement;
+        int insertionPoint = Arrays.binarySearch(set.array, newElement);
 
-        return new ImmutableSet<>((T[]) destination);
+        if (insertionPoint > -1)
+            return set; // already contains
+
+        /*
+         * Might as well add it then... since we've just done the binary search insertion point lookup
+         */
+
+        insertionPoint = (-insertionPoint) - 1;
+
+        T[] destination = (T[]) Array.newInstance(Comparable.class, set.array.length + 1);
+        System.arraycopy(set.array, 0, destination, 0, insertionPoint); // copy up to
+        System.arraycopy(set.array, insertionPoint, destination, insertionPoint + 1, set.array.length - insertionPoint);
+        destination[insertionPoint] = newElement;
+
+        return new ImmutableSet<>(destination, false);
     }
 
     /**
@@ -255,30 +261,33 @@ public class ImmutableSet<T> extends AbstractSet<T> {
      * @param <T>             type of items in set
      * @return new instance with specified item removed or supplied set instance if specified item was not present
      */
-    public static <T> ImmutableSet<T> remove(final ImmutableSet<T> set,
-                                             final T elementToRemove) {
+    public static <T extends Comparable<T>> ImmutableSet<T> remove(final ImmutableSet<T> set,
+                                                                   final T elementToRemove) {
         Objects.requireNonNull(set);
         Objects.requireNonNull(elementToRemove);
 
         if (set.isEmpty())
             return set;
 
-        T[] source = set.array;
-        Object[] contentsCopy = new Object[source.length - 1];
+        // Check if present
+        int insertionPoint = Arrays.binarySearch(set.array, elementToRemove);
+        if (insertionPoint < 0)
+            return set; // not present
 
-        int contentsCopyIndex = 0;
-        for (int i = 0; i < source.length; i++) {
-            if (itemsAreEqual(source[i], elementToRemove)) {
-                if (contentsCopyIndex < contentsCopy.length) // more to copy
-                    System.arraycopy(source, i + 1, contentsCopy, i, source.length - (i + 1));
-                return new ImmutableSet<>((T[]) contentsCopy);
-            } else if (contentsCopyIndex < contentsCopy.length) { // end of copy without match
-                contentsCopy[contentsCopyIndex++] = source[i];
-            }
-        }
+        // present, but the only element? Ok.
+        if (set.size() == 1)
+            return emptySet();
 
-        /* No items were removed, set unchanged */
-        return set;
+        /*
+         * Remove from a known position
+         */
+
+        T[] destination = (T[]) Array.newInstance(Comparable.class, set.array.length - 1);
+
+        System.arraycopy(set.array, 0, destination, 0, insertionPoint);
+        System.arraycopy(set.array, insertionPoint + 1, destination, insertionPoint, destination.length - insertionPoint);
+
+        return new ImmutableSet<>(destination, false);
     }
 
     /**
@@ -289,7 +298,7 @@ public class ImmutableSet<T> extends AbstractSet<T> {
      * @param <T>    type
      * @return immutable set of unique, non-null elements
      */
-    public static <T> ImmutableSet<T> fromCollection(final Collection<? extends T> source) {
+    public static <T extends Comparable<T>> ImmutableSet<T> fromCollection(final Collection<? extends T> source) {
         Objects.requireNonNull(source);
 
         if (source.isEmpty())
@@ -301,7 +310,7 @@ public class ImmutableSet<T> extends AbstractSet<T> {
         if (source instanceof Set) {
             Set set = (Set) source;
             set.remove(null);
-            return new ImmutableSet<>((T[]) set.toArray());
+            return new ImmutableSet<>((T[]) set.toArray((T[]) Array.newInstance(Comparable.class, set.size())));
         }
 
         /* and brute force fallback */
@@ -310,7 +319,7 @@ public class ImmutableSet<T> extends AbstractSet<T> {
         set.addAll(source);
         set.remove(null);
 
-        return new ImmutableSet<>((T[]) set.toArray());
+        return new ImmutableSet<>(set.toArray((T[]) Array.newInstance(Comparable.class, set.size())));
     }
 
     /**
@@ -321,8 +330,8 @@ public class ImmutableSet<T> extends AbstractSet<T> {
      * @param <T>   type
      * @return set of all unique, non-null elements from both collections
      */
-    public static <T> ImmutableSet<T> fromCollections(final Collection<? extends T> left,
-                                                      final Collection<? extends T> right) {
+    public static <T extends Comparable<T>> ImmutableSet<T> fromCollections(final Collection<? extends T> left,
+                                                                            final Collection<? extends T> right) {
         Objects.requireNonNull(left);
         Objects.requireNonNull(right);
 
@@ -345,7 +354,7 @@ public class ImmutableSet<T> extends AbstractSet<T> {
         set.addAll(right);
         set.remove(null);
 
-        return new ImmutableSet<>((T[]) set.toArray());
+        return new ImmutableSet<>(set.toArray((T[]) Array.newInstance(Comparable.class, set.size())));
     }
 
     /**
@@ -359,7 +368,7 @@ public class ImmutableSet<T> extends AbstractSet<T> {
      * @param <T>   type
      * @return true if {@code left.equals(right)}
      */
-    private static <T> boolean itemsAreEqual(T left, T right) {
+    private static <T extends Comparable<T>> boolean itemsAreEqual(T left, T right) {
         return left == right ||
                 (left.hashCode() == right.hashCode() &&
                         left.equals(right));

@@ -845,7 +845,7 @@ public class QuickSearchTest {
         assertEquals(fragments, stats.getFragments());
     }
 
-    private static final class StoreItem {
+    private static final class StoreItem implements Comparable<StoreItem> {
 
         private final int itemIdentifier;
         private final String name;
@@ -882,6 +882,11 @@ public class QuickSearchTest {
                     getItemIdentifier(),
                     getDescription()
             );
+        }
+
+        @Override
+        public int compareTo(StoreItem o) {
+            return Integer.compare(itemIdentifier, o.itemIdentifier);
         }
     }
 }

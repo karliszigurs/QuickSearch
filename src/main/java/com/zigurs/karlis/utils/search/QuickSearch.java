@@ -86,7 +86,7 @@ import static com.zigurs.karlis.utils.sort.MagicSort.sortAndLimit;
  *
  * @author Karlis Zigurs, 2016
  */
-public class QuickSearch<T> {
+public class QuickSearch<T extends Comparable<T>> {
 
     /**
      * Matching policy to apply to unmatched search keywords.
@@ -760,7 +760,7 @@ public class QuickSearch<T> {
          * @param <T> required instance type
          * @return new {@link QuickSearch} instance with this {@link QuickSearchBuilder}s configuration
          */
-        public <T> QuickSearch<T> build() {
+        public <T extends Comparable<T>> QuickSearch<T> build() {
             return new QuickSearch<>(this);
         }
     }

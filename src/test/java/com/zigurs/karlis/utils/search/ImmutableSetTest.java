@@ -159,7 +159,7 @@ public class ImmutableSetTest {
         assertEquals(2, two.split().length);
         assertEquals("one", (two.split()[0].iterator().next()));
         assertEquals(1, (two.split()[0].size()));
-        assertEquals("two", (two.split()[1].iterator().next()));
+        assertEquals("three", (two.split()[1].iterator().next()));
         assertEquals(2, (two.split()[1].size()));
     }
 
