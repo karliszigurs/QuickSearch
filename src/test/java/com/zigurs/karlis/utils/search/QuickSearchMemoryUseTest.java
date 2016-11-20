@@ -81,28 +81,37 @@ public class QuickSearchMemoryUseTest {
     @Test
     public void fewItemsCountCheck() {
         /*
-         * as measured on Java 1.8.0_102
+         * As measured on Java 1.8.0_102.
+         * Absolute memory profile may and will change depending on JVM version and options.
          */
-        final long fewItemsTarget = 894_104;
+        final long plainTarget = 884_344;
+        final long internTarget = 561_784;
         final int fewItemsCount = 1_000;
 
-        assertTrue(fewItemsTarget * 1.1 > measureMemoryUseImpl(fewItemsCount));
+        assertTrue("Expected memory ceiling exceeded (see test source)", plainTarget * 1.1 > measureMemoryUseImpl(fewItemsCount, false));
+        assertTrue("Expected memory ceiling exceeded (see test source)", internTarget * 1.1 > measureMemoryUseImpl(fewItemsCount, true));
     }
 
     @Test
     public void manyItemsCountCheck() {
         /*
-         * as measured on Java 1.8.0_102
+         * As measured on Java 1.8.0_102.
+         * Absolute memory profile may and will change depending on JVM version and options.
          */
-        final long manyItemsTarget = 52_668_168;
+        final long plainTarget = 52_668_168;
+        final long internTarget = 19_445_928;
         final int manyItemsCount = 100_000;
 
-        assertTrue(manyItemsTarget * 1.1 > measureMemoryUseImpl(manyItemsCount));
+        assertTrue("Expected memory ceiling exceeded (see test source)", plainTarget * 1.1 > measureMemoryUseImpl(manyItemsCount, false));
+        assertTrue("Expected memory ceiling exceeded (see test source)", internTarget * 1.1 > measureMemoryUseImpl(manyItemsCount, true));
     }
 
-    private long measureMemoryUseImpl(final int itemsCount) {
+    private long measureMemoryUseImpl(final int itemsCount, boolean intern) {
         QuickSearch<String> searchInstance;
-        searchInstance = QuickSearch.builder().build();
+        if (intern)
+            searchInstance = QuickSearch.builder().withKeywordsInterning().build();
+        else
+            searchInstance = QuickSearch.builder().build();
 
         for (int i = 0; i < itemsCount; i++) {
             String[] items = USA_STATES[i % USA_STATES.length];

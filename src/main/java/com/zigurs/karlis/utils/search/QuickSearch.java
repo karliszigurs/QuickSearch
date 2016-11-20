@@ -184,6 +184,7 @@ public class QuickSearch<T> {
     private final Function<String, Set<String>> keywordsExtractor;
 
     private final boolean enableForkJoin;
+    private final boolean enableKeywordsInterning;
 
     /*
      * Actual data is stored in {@link QSGraph} instance.
@@ -208,6 +209,7 @@ public class QuickSearch<T> {
         unmatchedPolicy = builder.unmatchedPolicy;
         mergePolicy = builder.mergePolicy;
         enableForkJoin = builder.enableForkJoin;
+        enableKeywordsInterning = builder.enableKeywordsInterning;
 
         graph = new QSGraph<>();
     }
@@ -232,7 +234,7 @@ public class QuickSearch<T> {
         if (item == null || keywords == null || keywords.isEmpty())
             return false;
 
-        ImmutableSet<String> keywordsSet = prepareKeywords(keywords);
+        ImmutableSet<String> keywordsSet = prepareKeywords(keywords, enableKeywordsInterning);
 
         if (keywordsSet.isEmpty())
             return false;
@@ -494,16 +496,22 @@ public class QuickSearch<T> {
     }
 
     private ImmutableSet<String> prepareKeywords(final String keywordsString) {
+        return prepareKeywords(keywordsString, false);
+    }
+
+    private ImmutableSet<String> prepareKeywords(final String keywordsString,
+                                                 final boolean internKeywords) {
         return ImmutableSet.fromCollection(
                 keywordsExtractor.apply(keywordsString).stream()
-                        .filter(s -> s != null) /* guarantee non-null, trimmed and non-empty string to normalizer */
-                        .map(String::trim)
-                        .filter(s -> !s.isEmpty())
-                        .map(keywordNormalizer)
-                        .filter(s -> s != null) /* and non-null, trimmed and non-empty string after normalizer */
-                        .map(String::trim)      /* can't trust those potentially user supplied functions... */
-                        .filter(s -> !s.isEmpty())
-                        .collect(Collectors.toSet()) /* and distinct */
+                        .filter(s -> s != null)        /* Guarantee a non-null, */
+                        .map(String::trim)             /* trimmed, */
+                        .filter(s -> !s.isEmpty())     /* and non-empty string */
+                        .map(keywordNormalizer)        /* to normalizer. */
+                        .filter(s -> s != null)        /* And the same to final keywords set. */
+                        .map(String::trim)             /* Just can't trust any user supplied functions these days... */
+                        .filter(s -> !s.isEmpty())     /* I wonder what changed. Why it came to be so? Was it us? */
+                        .map(s -> internKeywords ? s.intern() : s) /* do magic */
+                        .collect(Collectors.toSet())   /* All keywords now distinct. */
         );
     }
 
@@ -563,6 +571,7 @@ public class QuickSearch<T> {
         private UnmatchedPolicy unmatchedPolicy = BACKTRACKING;
         private MergePolicy mergePolicy = UNION;
         private boolean enableForkJoin = false;
+        private boolean enableKeywordsInterning = false;
 
         /**
          * Specify a keywords match scorer function.
@@ -724,6 +733,24 @@ public class QuickSearch<T> {
          */
         public QuickSearchBuilder withParallelProcessing() {
             enableForkJoin = true;
+            return this;
+        }
+
+        /**
+         * Enable String interning ({@link String#intern()}) of stored internal index keywords.
+         * <p>
+         * Can drastically reduce memory footprint of the search index, but requires explicit
+         * JVM tuning for large data sets to avoid equally drastic loss of performance on adding items.
+         * <p>
+         * Should be generally left alone unless you have a strong opinion about fiddling
+         * with undocumented JVM options, jdk7u40 changes, hash collisions, most interesting
+         * 5 digit prime numbers (you'll need a few of those for tuning anyway) and
+         * noisy neighbours on AWS and GCE.
+         *
+         * @return current {@link QuickSearchBuilder} instance for configuration chaining
+         */
+        public QuickSearchBuilder withKeywordsInterning() {
+            enableKeywordsInterning = true;
             return this;
         }
 

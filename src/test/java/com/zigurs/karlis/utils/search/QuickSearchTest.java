@@ -15,14 +15,16 @@
  */
 package com.zigurs.karlis.utils.search;
 
-import com.zigurs.karlis.utils.search.model.ResultItem;
-import com.zigurs.karlis.utils.search.model.Result;
 import com.zigurs.karlis.utils.search.model.QuickSearchStats;
+import com.zigurs.karlis.utils.search.model.Result;
+import com.zigurs.karlis.utils.search.model.ResultItem;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 
 import static com.zigurs.karlis.utils.search.QuickSearch.MergePolicy.INTERSECTION;
 import static com.zigurs.karlis.utils.search.QuickSearch.MergePolicy.UNION;
@@ -787,6 +789,38 @@ public class QuickSearchTest {
 
         for (QuickSearch.UnmatchedPolicy policy : QuickSearch.UnmatchedPolicy.values())
             assertNotNull(policy.toString());
+    }
+
+    @Test
+    public void shouldSurviveMisbehavingFunctions() {
+        AtomicInteger normalizerCounter = new AtomicInteger(-1);
+        Function<String, String> misbehavingNormalizer = s -> {
+            if (s == null || s.trim().isEmpty())
+                throw new IllegalStateException("Shouldn't reach here");
+
+            switch (normalizerCounter.incrementAndGet()) {
+                case 0:
+                    return null;
+                case 1:
+                    return "";
+                case 2:
+                    return "\t  ";
+                default:
+                    return s;
+            }
+        };
+
+        /* Return a fixed set (with problems) regardless of input. */
+        Function<String, Set<String>> misbehavingExtractor = s ->
+                new HashSet<>(Arrays.asList(null, "", "  \t", "yellow", "green", "red", "blue"));
+
+        QuickSearch<String> instance = QuickSearch.builder()
+                .withKeywordsExtractor(misbehavingExtractor)
+                .withKeywordNormalizer(misbehavingNormalizer)
+                .build();
+
+        assertTrue(instance.addItem("testItem", "overridden by extractor"));
+        assertTrue(instance.findItem("doesn't matter").isPresent());
     }
 
     /*
