@@ -1,66 +1,68 @@
 [![Build Status](https://travis-ci.org/karliszigurs/QuickSearch.svg?branch=master)](https://travis-ci.org/karliszigurs/QuickSearch) [![SonarQube Coverage](https://img.shields.io/sonar/http/sonarqube.com/com.zigurs.karlis.utils.search:quicksearch/coverage.svg)](https://sonarqube.com/dashboard/index?id=com.zigurs.karlis.utils.search%3Aquicksearch) [![SonarQube Tech Debt](https://img.shields.io/sonar/http/sonarqube.com/com.zigurs.karlis.utils.search:quicksearch/tech_debt.svg)](https://sonarqube.com/dashboard/index?id=com.zigurs.karlis.utils.search%3Aquicksearch) [![Coverty Scan](https://scan.coverity.com/projects/10587/badge.svg)](https://scan.coverity.com/projects/karliszigurs-quicksearch) [![Codacy grade](https://img.shields.io/codacy/grade/c0340f5e099740d4b27c830c282d073e.svg)](https://www.codacy.com/app/homolupus/QuickSearch/dashboard)
 # QuickSearch
 
-Simple and lightweight in-memory search library for Java 8 web and desktop applications. Single 20KB jar. 100% test coverage.
+Simple and lightweight in-memory search library for Java 8 web and desktop applications. Single 30KB jar. 100% test coverage. Fast.
 
-QuickSearch provides pretty instant incremental search over arbitrary items and their keywords.
-This is achieved by adding items and pre-calculating corresponding matching keywords and their
+## Demo
+
+Live demo available at http://zigurs.com/qs (instance of https://github.com/karliszigurs/QuickSearchServer).
+
+## Description
+
+QuickSearch provides pretty instant search over arbitrary items and their keywords.
+This is achieved by adding items and pre-calculating their keywords and partial matching
 fragments that are then matched against users input during search.
 
-It is well suited for small to medium data sets (e.g. up to a few tens of thousands items) that can fit into memory, e.g.
+It is well suited for small to medium data sets (e.g. up to a 10-20GB of JVM heap) that can fit into memory, e.g.
 
-  * Contacts lookup (keywords of department, position, location, etc)
-  * Online shop stock (keywords of category, raw description, brand names, reviews)
-  * Complex category navigation (keywords of category tree, category items, category aliases)
-  * Movie search (keywords of genre, plot summary, actors, main landmarks, studio and producers)
+  * Contacts lookup (keywords of name, department, position, location, ...)
+  * Online store stock search (keywords of category, raw description, brand names, reviews, ...)
+  * Complex category navigation (keywords of category tree, category items, category aliases, ...)
+  * Faceted search of sparsely distributed categories
   * ...
 
 ## Performance and footprint
 
 Circa 500k - 1 million lookups per second on a commodity server. Search request processing times
-in single digit microsecond range. Less than 50MB of heap required for 100'000 unique items. Thread safe.
+in single digit microsecond range. Less than 20MB of heap required for 100'000 unique items. Thread safe.
 
-## Demo
-
-Live demo available at http://zigurs.com/qs/ (instance of https://github.com/karliszigurs/QuickSearchServer).
+Benchmarks available at https://github.com/karliszigurs/QuickSearchBenchmarks
 
 ## Include it in your project
 
 ```Maven
 <dependency>
     <groupId>com.zigurs.karlis.utils.search</groupId>
-    <artifactId>quicksearch</artifactId>
-    <version>1.6</version>
+    <artifactId>QuickSearch</artifactId>
+    <version>1.7</version>
 </dependency>
 ```
 
 ## Use example
 
 ```Java
-// Create search instance. Could be injected as a bean or accessed globally via singleton.
-QuickSearch<String> quickSearchInstance = new QuickSearch<>();
+/* create instance with all defaults */
+QuickSearch<String> qs = new QuickSearch<>();
 
-// Populate the index with display item (String in this instance) and associated keywords.
-quickSearchInstance.addItem("The Da Vinci Code", "The Da Vinci Code Wedding Will Turner Elizabeth Swann Lord Cutler Beckett East India Trading Company");
-quickSearchInstance.addItem("Ice Age: The Meltdown", "Ice Age: The Meltdown  Family Jacques Saunière Louvre curator pursued  Great Gallery albino Catholic monk Silas Priory keystone");
-quickSearchInstance.addItem("Casino Royale", "Casino Royale Prague, James Bond MI6 station chief Dryden terrorist contact license to kill 00 agent");
-quickSearchInstance.addItem("Night at the Museum", "Family Larry Daley Ben Stiller divorced man stable job failed business -wife Kim Raver bad example");
-quickSearchInstance.addItem("Cars", "Cars Family last race Piston Cup tie Strip The King Weathers Chick Hicks Lightning McQueen tiebreaker");
+/* add a few example movies and associated keywords */
+qs.addItem("The Da Vinci Code", "The Da Vinci Code Wedding Will Tu...");
+qs.addItem("Ice Age: The Meltdown", "Ice Age: The Meltdown  Family...");
+qs.addItem("Casino Royale", "Casino Royale Prague, James Bond MI6 ...");
+qs.addItem("Night at the Museum", "Family Larry Daley Ben Stiller ...");
+qs.addItem("Cars", "Cars Family last race Piston Cup tie Strip The...");
 
-// The following will return top hit of Casino Royale.
-String topName = quickSearchInstance.findItem("license"); // Finds Casino Royale
+/* find a top result for query */
+Optional<String> foundItem = qs.findItem("license");
+System.out.println(foundItem.get());
 
-/* The following will return Cars, Ice Age and Night at the Museum
-   Cars will be the top scoring result due to 'cars' match. */
-List<String> topFamilyMovies = quickSearchInstance.findItems("family ca", 10);
-        
-// Forget known items
-quickSearchInstance.clear();
+/* find up to 10 top items */
+List<String> foundItems = qs.findItems("family ca", 10);
+foundItems.forEach(i -> System.out.println(String.format("- %s", i)));
 ```
 
 ## Caveats
 
-All internal data structures are pre-calculated and reside in memory. Following considerations apply:
+All internal data structures are pre-calculated on add/remove and reside in memory. Following considerations apply:
 
   * Searchable items should be relatively lightweight as they will be long lived.
     If you want to search over heavyweight items (e.g. pictures or ORM) it is best
@@ -69,12 +71,6 @@ All internal data structures are pre-calculated and reside in memory. Following 
     as in normal use even 10s of thousands of searchable items and keywords don't require more than a few
     tens of megabytes of heap. If you cannot ensure that you are removing no longer relevant entries it is
     recommended to periodically clear and repopulate the index (e.g. daily).
-    
-## Future features
-
-  * [ ] .js/go version
-  * [X] web service and quick search API (https://github.com/karliszigurs/QuickSearchServer)
-  * [ ] fuzzy text matching
 
 ### Credits
 
@@ -83,4 +79,3 @@ All internal data structures are pre-calculated and reside in memory. Following 
 (C) 2016 Karlis Zigurs (http://zigurs.com)
                             //
 ```
-
