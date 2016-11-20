@@ -52,7 +52,7 @@ qs.addItem("Night at the Museum", "Family Larry Daley Ben Stiller ...");
 qs.addItem("Cars", "Cars Family last race Piston Cup tie Strip The...");
 
 /* find a top result for query */
-Optional<String> foundItem = qs.findItem("license");
+Optional<String> foundItem = qs.findItem("bond");
 System.out.println(foundItem.get());
 
 /* find up to 10 top items */
