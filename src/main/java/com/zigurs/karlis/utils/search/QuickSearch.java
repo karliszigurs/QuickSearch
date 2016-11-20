@@ -731,9 +731,18 @@ public class QuickSearch<T extends Comparable<T>> {
          *
          * @return current {@link QuickSearchBuilder} instance for configuration chaining
          */
-        public QuickSearchBuilder withParallelProcessing() {
-            enableForkJoin = true;
+        public QuickSearchBuilder withParallelProcessing(boolean enable) {
+            enableForkJoin = enable;
             return this;
+        }
+
+        /**
+         * See {@link #withParallelProcessing(boolean)}.
+         *
+         * @return current {@link QuickSearchBuilder} instance for configuration chaining
+         */
+        public QuickSearchBuilder withParallelProcessing() {
+            return withParallelProcessing(true);
         }
 
         /**
@@ -749,9 +758,18 @@ public class QuickSearch<T extends Comparable<T>> {
          *
          * @return current {@link QuickSearchBuilder} instance for configuration chaining
          */
-        public QuickSearchBuilder withKeywordsInterning() {
-            enableKeywordsInterning = true;
+        public QuickSearchBuilder withKeywordsInterning(boolean enable) {
+            enableKeywordsInterning = enable;
             return this;
+        }
+
+        /**
+         * See {@link #withKeywordsInterning(boolean)}.
+         *
+         * @return current {@link QuickSearchBuilder} instance for configuration chaining
+         */
+        public QuickSearchBuilder withKeywordsInterning() {
+            return withKeywordsInterning(true);
         }
 
         /**
