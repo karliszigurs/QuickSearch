@@ -49,12 +49,6 @@ public class QSGraph<T extends Comparable<T>> {
      */
     private final StampedLock stampedLock = new StampedLock();
 
-    /**
-     * Let's try that cache idea again
-     */
-
-    private HashMap<String, Map<T, Double>> cache = new HashMap<>();
-
     /*
      * Public interface
      */
@@ -77,7 +71,6 @@ public class QSGraph<T extends Comparable<T>> {
                 itemKeywordsMap.put(item, ImmutableSet.fromCollections(itemKeywordsMap.get(item), suppliedKeywords));
             else
                 itemKeywordsMap.put(item, ImmutableSet.fromCollection(suppliedKeywords));
-            cache.clear();
         } finally {
             stampedLock.unlockWrite(writeLock);
         }
@@ -103,7 +96,6 @@ public class QSGraph<T extends Comparable<T>> {
                 }
             }
             itemKeywordsMap.remove(item);
-            cache.clear();
         } finally {
             stampedLock.unlockWrite(writeLock);
         }
@@ -153,7 +145,6 @@ public class QSGraph<T extends Comparable<T>> {
         try {
             fragmentsNodesMap.clear();
             itemKeywordsMap.clear();
-            cache.clear();
         } finally {
             stampedLock.unlockWrite(writeLock);
         }
@@ -231,13 +222,6 @@ public class QSGraph<T extends Comparable<T>> {
         if (root == null)
             return Collections.emptyMap();
         else {
-
-            /* -------------------------- */
-            Map<T, Double> cached = cache.get(fragment);
-            if (cached != null)
-                return new HashMap<>(cached); // Copy of
-            /* -------------------------- */
-
             int estResults = root.getEstimatedResultsCount() > -1 ? root.getEstimatedResultsCount() : 1024;
             HashMap<T, Double> results = new HashMap<>(estResults);
 
@@ -249,9 +233,6 @@ public class QSGraph<T extends Comparable<T>> {
 
             root.setEstimatedNodesCount(visited.size() * 2);
             root.setEstimatedResultsCount(results.size() * 2);
-
-            if (fragment.length() < 3)
-                cache.put(fragment, new HashMap<>(results));
 
             return results;
         }
