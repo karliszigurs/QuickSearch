@@ -130,7 +130,7 @@ public class QuickSearch<T extends Comparable<T>> {
      * <p>
      * Further details at {@link QuickSearchBuilder#withKeywordsExtractor(Function)}.
      */
-    public static final Function<String, Set<String>> DEFAULT_KEYWORDS_EXTRACTOR =
+    private static final Function<String, Set<String>> DEFAULT_KEYWORDS_EXTRACTOR =
             s -> Arrays.stream(s.replaceAll("[^\\w]+", " ").split("[\\s]+")).collect(Collectors.toSet());
 
     /**
@@ -138,7 +138,7 @@ public class QuickSearch<T extends Comparable<T>> {
      * <p>
      * Further details at {@link QuickSearchBuilder#withKeywordNormalizer(Function)}.
      */
-    public static final Function<String, String> DEFAULT_KEYWORD_NORMALIZER = s -> s.trim().toLowerCase();
+    private static final Function<String, String> DEFAULT_KEYWORD_NORMALIZER = s -> s.trim().toLowerCase();
 
     /**
      * Default keyword matches scoring function assigning a match a score between 0 and 1
@@ -148,7 +148,7 @@ public class QuickSearch<T extends Comparable<T>> {
      * <p>
      * Further details at {@link QuickSearchBuilder#withKeywordMatchScorer(BiFunction)}.
      */
-    public static final BiFunction<String, String, Double> DEFAULT_MATCH_SCORER = (keywordMatch, keyword) -> {
+    private static final BiFunction<String, String, Double> DEFAULT_MATCH_SCORER = (keywordMatch, keyword) -> {
         /* 0...1 depending on the length ratio */
         double matchScore = (double) keywordMatch.length() / (double) keyword.length();
 
@@ -239,7 +239,8 @@ public class QuickSearch<T extends Comparable<T>> {
         if (keywordsSet.isEmpty())
             return false;
 
-        return addItemImpl(item, keywordsSet);
+        addItemImpl(item, keywordsSet);
+        return true;
     }
 
     /**
@@ -474,9 +475,8 @@ public class QuickSearch<T extends Comparable<T>> {
      * Interfacing with the graph
      */
 
-    private boolean addItemImpl(final T item, final Set<String> suppliedKeywords) {
+    private void addItemImpl(final T item, final Set<String> suppliedKeywords) {
         graph.registerItem(item, suppliedKeywords);
-        return true;
     }
 
     private void removeItemImpl(final T item) {
@@ -503,11 +503,11 @@ public class QuickSearch<T extends Comparable<T>> {
                                                  final boolean internKeywords) {
         return ImmutableSet.fromCollection(
                 keywordsExtractor.apply(keywordsString).stream()
-                        .filter(s -> s != null)        /* Guarantee a non-null, */
+                        .filter(Objects::nonNull)        /* Guarantee a non-null, */
                         .map(String::trim)             /* trimmed, */
                         .filter(s -> !s.isEmpty())     /* and non-empty string */
                         .map(keywordNormalizer)        /* to normalizer. */
-                        .filter(s -> s != null)        /* And the same to final keywords set. */
+                        .filter(Objects::nonNull)        /* And the same to final keywords set. */
                         .map(String::trim)             /* Just can't trust any user supplied functions these days... */
                         .filter(s -> !s.isEmpty())     /* I wonder what changed. Why it came to be so? Was it us? */
                         .map(s -> internKeywords ? s.intern() : s) /* do magic */
@@ -617,7 +617,7 @@ public class QuickSearch<T extends Comparable<T>> {
          * user (and item) supplied keyword strings.
          * <p>
          * Function should accept a raw input string as an input and return a {@link Set} of extracted keywords
-         * that should be assigned to the item (when called from {@link #addItem(Object, String)} or should
+         * that should be assigned to the item (when called from {@link #addItem(Comparable, String)} or should
          * be treated as user supplied keywords.
          * <p>
          * In default and most basic implementation (available as {@link #DEFAULT_KEYWORDS_EXTRACTOR} the

@@ -17,7 +17,6 @@
  */
 package com.zigurs.karlis.utils.search;
 
-import jdk.nashorn.internal.ir.annotations.Immutable;
 import org.github.jamm.MemoryMeter;
 import org.junit.Ignore;
 import org.junit.Test;

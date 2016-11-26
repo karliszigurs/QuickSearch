@@ -358,23 +358,6 @@ public class ImmutableSet<T extends Comparable<T>> extends AbstractSet<T> {
     }
 
     /**
-     * Helper to determine equality using cheapest possible cost.
-     * <p>
-     * Compares by reference, then discards if {@link Object#hashCode()}s differ
-     * and only calls {@link Object#equals(Object)} as a last resort.
-     *
-     * @param left  item to compare
-     * @param right item to compare
-     * @param <T>   type
-     * @return true if {@code left.equals(right)}
-     */
-    private static <T extends Comparable<T>> boolean itemsAreEqual(T left, T right) {
-        return left == right ||
-                (left.hashCode() == right.hashCode() &&
-                        left.equals(right));
-    }
-
-    /**
      * Simple array iterator
      *
      * @param <T> type of array elements
