@@ -17,6 +17,7 @@
  */
 package com.zigurs.karlis.utils.search;
 
+import com.zigurs.karlis.utils.collections.ImmutableSet;
 import com.zigurs.karlis.utils.search.graph.QSGraph;
 import com.zigurs.karlis.utils.search.model.QuickSearchStats;
 import com.zigurs.karlis.utils.search.model.Result;
@@ -24,7 +25,14 @@ import com.zigurs.karlis.utils.search.model.ResultItem;
 import com.zigurs.karlis.utils.search.parallel.IntersectionTask;
 import com.zigurs.karlis.utils.search.parallel.UnionTask;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -82,7 +90,8 @@ import static com.zigurs.karlis.utils.sort.MagicSort.sortAndLimit;
  * <p>
  * A number of configuration options are available and documented via {@link QuickSearchBuilder}.
  * <p>
- * This class is thread safe. You'll get a cookie if you manage to break it. <small>I don't expect to part with any cookies.</small>
+ * This class is thread safe. You'll get a cookie if you manage to break it. <small>I don't expect to part with any
+ * cookies.</small>
  *
  * @author Karlis Zigurs, 2016
  */
@@ -228,6 +237,7 @@ public class QuickSearch<T extends Comparable<T>> {
      *
      * @param item     Item to return in search results
      * @param keywords keywords string. See {@link QuickSearchBuilder#withKeywordsExtractor(Function)}
+     *
      * @return true if the item was added, false if validations before adding failed
      */
     public boolean addItem(final T item, final String keywords) {
@@ -268,6 +278,7 @@ public class QuickSearch<T extends Comparable<T>> {
      * processing.
      *
      * @param searchString raw search string
+     *
      * @return {@link Optional} wrapping (or not) the top scoring item found in instance
      */
     public Optional<T> findItem(final String searchString) {
@@ -292,6 +303,7 @@ public class QuickSearch<T extends Comparable<T>> {
      *
      * @param searchString     raw search string, e.g. "new york pizza"
      * @param numberOfTopItems number of items the returned result should be limited to (1 to Integer.MAX_VALUE)
+     *
      * @return list (possibly empty) containing up to n top search results
      */
     public List<T> findItems(final String searchString, final int numberOfTopItems) {
@@ -319,6 +331,7 @@ public class QuickSearch<T extends Comparable<T>> {
      * {@link ResultItem} response object containing known keywords and assigned search score.
      *
      * @param searchString raw search string
+     *
      * @return {@link Optional} wrapping (or not) the top scoring item, keywords and score found in instance
      */
     public Optional<ResultItem<T>> findItemWithDetail(final String searchString) {
@@ -352,6 +365,7 @@ public class QuickSearch<T extends Comparable<T>> {
      *
      * @param searchString     raw search string, e.g. "new york pizza"
      * @param numberOfTopItems number of items the returned result should be limited to (1 to Integer.MAX_VALUE)
+     *
      * @return wrapper containing zero to n top scoring items and search string
      */
     public Result<T> findItemsWithDetail(final String searchString, final int numberOfTopItems) {
@@ -529,6 +543,7 @@ public class QuickSearch<T extends Comparable<T>> {
      * @param left  map to intersect
      * @param right map to intersect
      * @param <T>   type of keys
+     *
      * @return intersection with values summed
      */
     public static <T> Map<T, Double> intersectMaps(final Map<T, Double> left,
@@ -603,6 +618,7 @@ public class QuickSearch<T extends Comparable<T>> {
          * make sense I'd be very interested to hear about it.</small>
          *
          * @param scorerFunction function to use for keywords match scoring
+         *
          * @return current {@link QuickSearchBuilder} instance for configuration chaining
          */
         public QuickSearchBuilder withKeywordMatchScorer(BiFunction<String, String, Double> scorerFunction) {
@@ -637,6 +653,7 @@ public class QuickSearch<T extends Comparable<T>> {
          * make sense I'd be very interested to hear about it.</small>
          *
          * @param extractorFunction function to extract keywords from raw input strings
+         *
          * @return current {@link QuickSearchBuilder} instance for configuration chaining
          */
         public QuickSearchBuilder withKeywordsExtractor(Function<String, Set<String>> extractorFunction) {
@@ -667,8 +684,10 @@ public class QuickSearch<T extends Comparable<T>> {
          * <tr><th>original</th><th>transformed to</th><th>possible rationale</th></tr>
          * <tr><td><code>"New York"</code></td><td><code>"new york"</code></td><td>all lower case internally</td></tr>
          * <tr><td><code>"Pythøn"</code></td><td><code>"python"</code></td><td>replace special characters</td></tr>
-         * <tr><td><code>"HERMSGERVØRDENBRØTBØRDA"</code></td><td><code>"hermsgervordenbrotborda"</code></td><td>møøse trained by...</td></tr>
-         * <tr><td><code>"Россия"</code></td><td><code>"rossiya"</code></td><td>transliterate cyrilic alphabet to latin</td></tr>
+         * <tr><td><code>"HERMSGERVØRDENBRØTBØRDA"</code></td><td><code>"hermsgervordenbrotborda"</code></td><td>møøse
+         * trained by...</td></tr>
+         * <tr><td><code>"Россия"</code></td><td><code>"rossiya"</code></td><td>transliterate cyrilic alphabet to
+         * latin</td></tr>
          * </table>
          * <p>
          * Default implementation available at {@link #DEFAULT_KEYWORD_NORMALIZER} simply ensures that the keyword
@@ -683,6 +702,7 @@ public class QuickSearch<T extends Comparable<T>> {
          * make sense I'd be very interested to hear about it.</small>
          *
          * @param normalizerFunction function as described above
+         *
          * @return current {@link QuickSearchBuilder} instance for configuration chaining
          */
         public QuickSearchBuilder withKeywordNormalizer(Function<String, String> normalizerFunction) {
@@ -696,6 +716,7 @@ public class QuickSearch<T extends Comparable<T>> {
          * Set {@link UnmatchedPolicy} for created {@link QuickSearch} instance.
          *
          * @param unmatchedPolicy policy to use
+         *
          * @return current {@link QuickSearchBuilder} instance for configuration chaining
          */
         public QuickSearchBuilder withUnmatchedPolicy(UnmatchedPolicy unmatchedPolicy) {
@@ -709,6 +730,7 @@ public class QuickSearch<T extends Comparable<T>> {
          * Set {@link MergePolicy} for created {@link QuickSearch} instance.
          *
          * @param mergePolicy policy to use
+         *
          * @return current {@link QuickSearchBuilder} instance for configuration chaining
          */
         public QuickSearchBuilder withMergePolicy(MergePolicy mergePolicy) {
@@ -776,6 +798,7 @@ public class QuickSearch<T extends Comparable<T>> {
          * One shiny {@link QuickSearch} instance with specified configuration parameters coming up.
          *
          * @param <T> required instance type
+         *
          * @return new {@link QuickSearch} instance with this {@link QuickSearchBuilder}s configuration
          */
         public <T extends Comparable<T>> QuickSearch<T> build() {

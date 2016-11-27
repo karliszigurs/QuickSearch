@@ -17,7 +17,7 @@
  */
 package com.zigurs.karlis.utils.search.parallel;
 
-import com.zigurs.karlis.utils.search.ImmutableSet;
+import com.zigurs.karlis.utils.collections.ImmutableSet;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;

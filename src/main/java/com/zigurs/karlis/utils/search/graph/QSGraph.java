@@ -17,10 +17,15 @@
  */
 package com.zigurs.karlis.utils.search.graph;
 
-import com.zigurs.karlis.utils.search.ImmutableSet;
+import com.zigurs.karlis.utils.collections.ImmutableSet;
 import com.zigurs.karlis.utils.search.model.QuickSearchStats;
 
-import java.util.*;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.locks.StampedLock;
 import java.util.function.BiFunction;
 
@@ -108,6 +113,7 @@ public class QSGraph<T extends Comparable<T>> {
      *
      * @param fragment       keyword or keyword fragment to start walk from
      * @param scorerFunction function that will be called with the supplied fragment and node identity to score match
+     *
      * @return map of accumulated items with their highest score encountered during walk (may be empty)
      */
     public Map<T, Double> walkAndScore(final String fragment,
@@ -125,6 +131,7 @@ public class QSGraph<T extends Comparable<T>> {
      * (or empty set if the item mapping is not recognized).
      *
      * @param item previously registered item
+     *
      * @return set of associated keywords, possibly empty
      */
     public Set<String> getItemKeywords(final T item) {
@@ -317,7 +324,7 @@ public class QSGraph<T extends Comparable<T>> {
          * @param item item to add.
          */
         private void addItem(final V item) {
-            items = ImmutableSet.add(items, item);
+            items = items.createInstanceByAdding(item);
         }
 
         /**
@@ -326,7 +333,7 @@ public class QSGraph<T extends Comparable<T>> {
          * @param item item to remove.
          */
         private void removeItem(final V item) {
-            items = ImmutableSet.remove(items, item);
+            items = items.createInstanceByRemoving(item);
         }
 
         /**
@@ -346,7 +353,7 @@ public class QSGraph<T extends Comparable<T>> {
          * @param parent parent to add.
          */
         private void addParent(final GraphNode<V> parent) {
-            parents = ImmutableSet.add(parents, parent);
+            parents = parents.createInstanceByAdding(parent);
         }
 
         /**
@@ -355,7 +362,7 @@ public class QSGraph<T extends Comparable<T>> {
          * @param parent parent to remove.
          */
         private void removeParent(final GraphNode<V> parent) {
-            parents = ImmutableSet.remove(parents, parent);
+            parents = parents.createInstanceByRemoving(parent);
         }
 
         @Override

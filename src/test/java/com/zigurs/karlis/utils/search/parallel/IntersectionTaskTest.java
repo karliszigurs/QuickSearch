@@ -1,6 +1,6 @@
 package com.zigurs.karlis.utils.search.parallel;
 
-import com.zigurs.karlis.utils.search.ImmutableSet;
+import com.zigurs.karlis.utils.collections.ImmutableSet;
 import org.junit.Test;
 
 import java.util.Arrays;
