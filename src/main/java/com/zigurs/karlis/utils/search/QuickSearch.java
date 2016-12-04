@@ -518,14 +518,14 @@ public class QuickSearch<T extends Comparable<T>> {
         return ImmutableSet.fromCollection(
                 keywordsExtractor.apply(keywordsString).stream()
                         .filter(Objects::nonNull)        /* Guarantee a non-null, */
-                        .map(String::trim)             /* trimmed, */
-                        .filter(s -> !s.isEmpty())     /* and non-empty string */
-                        .map(keywordNormalizer)        /* to normalizer. */
+                        .map(String::trim)               /* trimmed, */
+                        .filter(s -> !s.isEmpty())       /* and non-empty string */
+                        .map(keywordNormalizer)          /* to normalizer. */
                         .filter(Objects::nonNull)        /* And the same to final keywords set. */
-                        .map(String::trim)             /* Just can't trust any user supplied functions these days... */
-                        .filter(s -> !s.isEmpty())     /* I wonder what changed. Why it came to be so? Was it us? */
+                        .map(String::trim)               /* Just can't trust any user supplied functions these days... */
+                        .filter(s -> !s.isEmpty())       /* I wonder what changed. Why it came to be so? Was it us? */
                         .map(s -> internKeywords ? s.intern() : s) /* do magic */
-                        .collect(Collectors.toSet())   /* All keywords now distinct. */
+                        .collect(Collectors.toSet())     /* All keywords now distinct. */
         );
     }
 
