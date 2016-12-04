@@ -29,6 +29,7 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -356,5 +357,22 @@ public class ImmutableSetTest {
         ImmutableSet<String> multiple = ImmutableSet.fromCollection(Arrays.asList("one", "two", "three"));
         assertFalse(multiple.contains("moon"));
         assertFalse(multiple.contains(null));
+    }
+
+    @Test
+    public void shouldStreamAndCollectLotsOfItems() {
+        Set<String> sourceSet = new HashSet<>();
+        for (int i = 0; i < 1000; i++)
+            sourceSet.add(String.format("XXitem-%d", i));
+
+        ImmutableSet<String> immutableSet = ImmutableSet.fromCollection(sourceSet);
+
+        Set<String> resultSet = immutableSet.parallelStream()
+                .map(s -> s.substring(2))
+                .collect(Collectors.toSet());
+
+        assertEquals("mismatching size", 1000, resultSet.size());
+        assertTrue("item missing", resultSet.contains("item-500"));
+        assertFalse("unexpected item", resultSet.contains("XXitem-500"));
     }
 }

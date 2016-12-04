@@ -648,6 +648,7 @@ public class QuickSearchTest {
         searchInstance = QuickSearch.builder()
                 .withMergePolicy(INTERSECTION)
                 .withParallelProcessing()
+                .withKeywordsInterning()
                 .build();
 
         addItem("test1", "one two");
