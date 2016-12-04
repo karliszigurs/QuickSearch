@@ -21,13 +21,11 @@ import com.zigurs.karlis.utils.collections.ImmutableSet;
 import org.junit.Assert;
 import org.junit.Test;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -141,58 +139,6 @@ public class ImmutableSetTest {
         ImmutableSet<String> multiple = ImmutableSet.fromCollection(Arrays.asList(null, null, null, "one"));
         assertEquals(1, multiple.size());
         assertEquals("one", multiple.iterator().next());
-    }
-
-    @Test
-    public void shouldReturnSingleElementArrayForEmptySplit() {
-        ImmutableSet<String> empty = ImmutableSet.emptySet();
-        assertEquals(1, empty.split().length);
-    }
-
-    @Test
-    public void shouldReturnSingleEntryForSplitSingleton() {
-        ImmutableSet<String> single = ImmutableSet.singletonSet("one");
-        assertEquals(1, single.split().length);
-        assertEquals("one", (single.split()[0].iterator().next()));
-    }
-
-    @Test
-    public void shouldSplitTwoElementsRepeatedly() {
-        ImmutableSet<String> two = ImmutableSet.fromCollection(Arrays.asList("one", "two"));
-        assertEquals(2, two.split().length);
-        assertEquals("one", two.split()[0].iterator().next());
-        assertEquals(1, two.split()[0].size());
-        assertEquals("two", two.split()[1].iterator().next());
-        assertEquals(1, two.split()[1].size());
-    }
-
-    @Test
-    public void shouldSplitThreeElements() {
-        ImmutableSet<String> two = ImmutableSet.fromCollection(Arrays.asList("one", "two", "three"));
-        assertEquals(2, two.split().length);
-        assertEquals("one", (two.split()[0].iterator().next()));
-        assertEquals(1, (two.split()[0].size()));
-        assertEquals("three", (two.split()[1].iterator().next()));
-        assertEquals(2, (two.split()[1].size()));
-    }
-
-    @Test
-    public void shouldSplitLotsOfElements() {
-        List<String> source = new ArrayList<>();
-        for (int i = 0; i < 1009; i++)
-            source.add("test" + i);
-
-        ImmutableSet<String> set = ImmutableSet.fromCollection(source);
-        ImmutableSet<String>[] split = set.split();
-
-        assertEquals(2, split.length);
-
-        assertEquals(504, split[0].size());
-        assertEquals(505, split[1].size());
-
-        ImmutableSet<String> mergedAgain = ImmutableSet.fromCollections(split[0], split[1]);
-
-        assertEquals(1009, mergedAgain.size());
     }
 
     @Test

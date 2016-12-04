@@ -19,18 +19,17 @@ package com.zigurs.karlis.utils.collections;
 
 import java.util.AbstractCollection;
 import java.util.AbstractSet;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Objects;
 import java.util.Set;
 import java.util.Spliterator;
+import java.util.Spliterators;
 import java.util.function.Consumer;
 
 import static java.lang.System.arraycopy;
 import static java.util.Arrays.binarySearch;
-import static java.util.Arrays.copyOfRange;
 import static java.util.Arrays.parallelSort;
 
 /**
@@ -150,35 +149,20 @@ public final class ImmutableSet<T extends Comparable<? super T>> extends Abstrac
 
     @Override
     public Spliterator<T> spliterator() {
-        return Arrays.spliterator(elements);
+        return Spliterators.spliterator(elements,
+                Spliterator.ORDERED
+                        | Spliterator.DISTINCT
+                        | Spliterator.SORTED
+                        | Spliterator.SIZED
+                        | Spliterator.SUBSIZED
+                        | Spliterator.NONNULL
+                        | Spliterator.IMMUTABLE
+        );
     }
 
     /*
      * Extended functionality
      */
-
-    /**
-     * Convenience call for parallel processing to split
-     * the set in two halves in an efficient fashion.
-     *
-     * @return Array of one (if empty or contains only single element) or two
-     * instances representing set split in half.
-     *
-     * @noinspection unchecked
-     */
-    public ImmutableSet<T>[] split() {
-        final int size = size();
-
-        if (size < 2)
-            return new ImmutableSet[]{this};
-
-        final int leftHalf = size / 2;
-
-        return new ImmutableSet[]{
-                new ImmutableSet(copyOfRange(elements, 0, leftHalf)),
-                new ImmutableSet(copyOfRange(elements, leftHalf, size))
-        };
-    }
 
     /**
      * Create a new {@link ImmutableSet} instance by adding an item

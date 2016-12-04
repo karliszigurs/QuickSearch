@@ -22,8 +22,6 @@ import com.zigurs.karlis.utils.search.graph.QSGraph;
 import com.zigurs.karlis.utils.search.model.QuickSearchStats;
 import com.zigurs.karlis.utils.search.model.Result;
 import com.zigurs.karlis.utils.search.model.ResultItem;
-import com.zigurs.karlis.utils.search.parallel.IntersectionTask;
-import com.zigurs.karlis.utils.search.parallel.UnionTask;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -34,8 +32,10 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiFunction;
+import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 import static com.zigurs.karlis.utils.search.QuickSearch.MergePolicy.UNION;
 import static com.zigurs.karlis.utils.search.QuickSearch.UnmatchedPolicy.BACKTRACKING;
@@ -185,14 +185,14 @@ public class QuickSearch<T extends Comparable<T>> {
      * Configuration properties
      */
 
-    private final MergePolicy mergePolicy;
+    private final BinaryOperator<Map<T, Double>> mergeFunction;
     private final UnmatchedPolicy unmatchedPolicy;
 
     private final BiFunction<String, String, Double> keywordMatchScorer;
     private final Function<String, String> keywordNormalizer;
     private final Function<String, Set<String>> keywordsExtractor;
 
-    private final boolean enableForkJoin;
+    private final boolean enableParallel;
     private final boolean enableKeywordsInterning;
 
     /*
@@ -216,9 +216,14 @@ public class QuickSearch<T extends Comparable<T>> {
         keywordNormalizer = builder.keywordNormalizer;
         keywordMatchScorer = builder.keywordMatchScorer;
         unmatchedPolicy = builder.unmatchedPolicy;
-        mergePolicy = builder.mergePolicy;
-        enableForkJoin = builder.enableForkJoin;
+        enableParallel = builder.enableForkJoin;
         enableKeywordsInterning = builder.enableKeywordsInterning;
+
+        if (builder.mergePolicy == UNION) {
+            mergeFunction = QuickSearch::unionMaps;
+        } else {
+            mergeFunction = QuickSearch::intersectMaps;
+        }
 
         graph = new QSGraph<>();
     }
@@ -421,68 +426,19 @@ public class QuickSearch<T extends Comparable<T>> {
 
     private List<SearchResult<T>> doSearch(final ImmutableSet<String> searchKeywords,
                                            final int maxItemsToList) {
+
+        final Map<T, Double> results = StreamSupport.stream(searchKeywords.spliterator(), enableParallel)
+                .map(this::walkGraphAndScore)
+                .reduce(mergeFunction)
+                .orElseGet(HashMap::new);
+
         return sortAndLimit(
-                findAndScore(searchKeywords).entrySet(),
+                results.entrySet(),
                 maxItemsToList,
                 (e1, e2) -> e2.getValue().compareTo(e1.getValue())
         ).stream()
                 .map(e -> new SearchResult<>(e.getKey(), e.getValue()))
                 .collect(Collectors.toList());
-    }
-
-    private Map<T, Double> findAndScore(final ImmutableSet<String> suppliedFragments) {
-        /* Avoid calling into merges if we are looking for only one keyword */
-        if (suppliedFragments.size() == 1)
-            return walkGraphAndScore(suppliedFragments.iterator().next());
-
-        /* Merges will be inevitable */
-        if (mergePolicy == UNION)
-            return findAndScoreUnion(suppliedFragments);
-        else // implied (withAccumulationPolicy == INTERSECTION)
-            return findAndScoreIntersection(suppliedFragments);
-    }
-
-    private Map<T, Double> findAndScoreUnion(final ImmutableSet<String> suppliedFragments) {
-        if (enableForkJoin) {
-            return new UnionTask<>(suppliedFragments, this::walkGraphAndScore).fork().join();
-
-        } else {
-            final Map<T, Double> accumulatedItems = new HashMap<>();
-
-            suppliedFragments.forEach(fragment ->
-                    walkGraphAndScore(fragment).forEach((k, v) ->
-                            accumulatedItems.merge(k, v, (d1, d2) -> d1 + d2))
-            );
-
-            return accumulatedItems;
-        }
-    }
-
-    private Map<T, Double> findAndScoreIntersection(final ImmutableSet<String> suppliedFragments) {
-        if (enableForkJoin) {
-            return new IntersectionTask<>(suppliedFragments, this::walkGraphAndScore).fork().join();
-
-        } else {
-            Map<T, Double> accumulatedItems = null;
-
-            for (String suppliedFragment : suppliedFragments) {
-                Map<T, Double> fragmentItems = walkGraphAndScore(suppliedFragment);
-
-                if (fragmentItems.isEmpty()) // results will be empty too, can skip the remainder
-                    return fragmentItems;
-
-                if (accumulatedItems == null) {
-                    accumulatedItems = fragmentItems;
-                } else {
-                    accumulatedItems = intersectMaps(fragmentItems, accumulatedItems);
-
-                    if (accumulatedItems.isEmpty())
-                        return accumulatedItems;
-                }
-            }
-
-            return accumulatedItems;
-        }
     }
 
     /*
@@ -554,6 +510,25 @@ public class QuickSearch<T extends Comparable<T>> {
         smaller.keySet().retainAll(bigger.keySet());
         smaller.entrySet().forEach(e -> e.setValue(e.getValue() + bigger.get(e.getKey())));
         return smaller;
+    }
+
+    /**
+     * For performance reasons this function <em>modifies the maps supplied</em> and
+     * possibly returns an instance of one of the supplied (by then modified) maps.
+     *
+     * @param left  map to intersect
+     * @param right map to intersect
+     * @param <T>   type of keys
+     *
+     * @return intersection with values summed
+     */
+    private static <T> Map<T, Double> unionMaps(final Map<T, Double> left,
+                                                final Map<T, Double> right) {
+        final Map<T, Double> smaller = (left.size() < right.size()) ? left : right;
+        final Map<T, Double> bigger = (smaller == left) ? right : left;
+
+        smaller.forEach((k, v) -> bigger.merge(k, v, (p, n) -> p + n));
+        return bigger;
     }
 
     /*
@@ -809,7 +784,7 @@ public class QuickSearch<T extends Comparable<T>> {
     /**
      * Internal wrapper of item and score for results list.
      */
-    private static class SearchResult<T> {
+    private static final class SearchResult<T> {
 
         private final T item;
         private final double score;

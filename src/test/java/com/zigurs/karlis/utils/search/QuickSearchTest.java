@@ -532,10 +532,10 @@ public class QuickSearchTest {
         addItem("test6", "three seven");
 
         List<String> result = searchInstance.findItems("two three", 10);
-        assertTrue("Unexpected result size", result.size() == 6);
+        assertEquals("Unexpected result size", 6, result.size());
 
         List<String> result2 = searchInstance.findItems("three two", 10);
-        assertTrue("Unexpected result size", result2.size() == 6);
+        assertEquals("Unexpected result size", 6, result2.size());
     }
 
     @Test
