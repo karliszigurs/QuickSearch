@@ -17,13 +17,25 @@
  */
 package com.zigurs.karlis.utils.search;
 
+import com.zigurs.karlis.utils.collections.ImmutableSet;
 import org.junit.Assert;
 import org.junit.Test;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.NoSuchElementException;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 public class ImmutableSetTest {
 
@@ -49,7 +61,7 @@ public class ImmutableSetTest {
         String dog = "dog";
 
         ImmutableSet<String> single = ImmutableSet.singletonSet(cat);
-        Set<String> set = ImmutableSet.add(single, dog);
+        Set<String> set = single.createInstanceByAdding(dog);
         assertFalse(set.isEmpty());
         assertEquals(2, set.size());
         assertEquals(new HashSet<>(Arrays.asList(cat, dog)), set);
@@ -61,10 +73,11 @@ public class ImmutableSetTest {
         String dog = "dog";
 
         ImmutableSet<String> single = ImmutableSet.singletonSet(cat);
-        ImmutableSet<String> set = ImmutableSet.add(single, dog);
-        set = ImmutableSet.add(set, dog);
+        ImmutableSet<String> set = single.createInstanceByAdding(dog);
+        set = set.createInstanceByAdding(dog);
         assertFalse(set.isEmpty());
         assertEquals(2, set.size());
+        //noinspection AssertEqualsBetweenInconvertibleTypes
         assertEquals(new HashSet<>(Arrays.asList(cat, dog)), set);
     }
 
@@ -74,8 +87,8 @@ public class ImmutableSetTest {
         String dog = "dog";
 
         ImmutableSet<String> single = ImmutableSet.singletonSet(cat);
-        ImmutableSet<String> both = ImmutableSet.add(single, dog);
-        Set<String> set = ImmutableSet.remove(both, dog);
+        ImmutableSet<String> both = single.createInstanceByAdding(dog);
+        Set<String> set = both.createInstanceByRemoving(dog);
         assertFalse(set.isEmpty());
         assertEquals(1, set.size());
         assertEquals(Collections.singleton(cat), set);
@@ -84,7 +97,7 @@ public class ImmutableSetTest {
     @Test
     public void shouldRemoveSingleElementAndReturnEmpty() {
         ImmutableSet<String> single = ImmutableSet.singletonSet("cat");
-        Set<String> set = ImmutableSet.remove(single, "cat");
+        Set<String> set = single.createInstanceByRemoving("cat");
         assertTrue(set.isEmpty());
         assertEquals(0, set.size());
     }
@@ -92,7 +105,7 @@ public class ImmutableSetTest {
     @Test
     public void shouldNotRemoveNonExistingElement() {
         ImmutableSet<String> single = ImmutableSet.singletonSet("cat");
-        Set<String> set = ImmutableSet.remove(single, "dog");
+        Set<String> set = single.createInstanceByRemoving("dog");
         assertFalse(set.isEmpty());
         assertEquals(1, set.size());
         assertEquals(Collections.singleton("cat"), set);
@@ -103,7 +116,7 @@ public class ImmutableSetTest {
         assertEquals("FB".hashCode(), "Ea".hashCode());
 
         ImmutableSet<String> single = ImmutableSet.fromCollection(Arrays.asList("FB", "one"));
-        Set<String> set = ImmutableSet.remove(single, "Ea");
+        Set<String> set = single.createInstanceByRemoving("Ea");
         assertFalse(set.isEmpty());
         assertEquals(2, set.size());
         assertEquals(new HashSet<>(Arrays.asList("FB", "one")), set);
@@ -112,7 +125,7 @@ public class ImmutableSetTest {
     @Test
     public void shouldSurviveRemovingNonExistentEntry() {
         ImmutableSet<String> single = ImmutableSet.emptySet();
-        Set<String> set = ImmutableSet.remove(single, "Ea");
+        Set<String> set = single.createInstanceByRemoving("Ea");
         assertTrue(set.isEmpty());
         assertEquals(0, set.size());
     }
@@ -128,58 +141,6 @@ public class ImmutableSetTest {
         ImmutableSet<String> multiple = ImmutableSet.fromCollection(Arrays.asList(null, null, null, "one"));
         assertEquals(1, multiple.size());
         assertEquals("one", multiple.iterator().next());
-    }
-
-    @Test
-    public void shouldReturnEmptyArrayForEmptySplit() {
-        ImmutableSet<String> empty = ImmutableSet.emptySet();
-        assertEquals(0, empty.split().length);
-    }
-
-    @Test
-    public void shouldReturnSingleEntryForSplitSingleton() {
-        ImmutableSet<String> single = ImmutableSet.singletonSet("one");
-        assertEquals(1, single.split().length);
-        assertEquals("one", (single.split()[0].iterator().next()));
-    }
-
-    @Test
-    public void shouldSplitTwoElementsRepeatedly() {
-        ImmutableSet<String> two = ImmutableSet.fromCollection(Arrays.asList("one", "two"));
-        assertEquals(2, two.split().length);
-        assertEquals("one", two.split()[0].iterator().next());
-        assertEquals(1, two.split()[0].size());
-        assertEquals("two", two.split()[1].iterator().next());
-        assertEquals(1, two.split()[1].size());
-    }
-
-    @Test
-    public void shouldSplitThreeElements() {
-        ImmutableSet<String> two = ImmutableSet.fromCollection(Arrays.asList("one", "two", "three"));
-        assertEquals(2, two.split().length);
-        assertEquals("one", (two.split()[0].iterator().next()));
-        assertEquals(1, (two.split()[0].size()));
-        assertEquals("two", (two.split()[1].iterator().next()));
-        assertEquals(2, (two.split()[1].size()));
-    }
-
-    @Test
-    public void shouldSplitLotsOfElements() {
-        List<String> source = new ArrayList<>();
-        for (int i = 0; i < 1009; i++)
-            source.add("test" + i);
-
-        ImmutableSet<String> set = ImmutableSet.fromCollection(source);
-        ImmutableSet<String>[] split = set.split();
-
-        assertEquals(2, split.length);
-
-        assertEquals(504, split[0].size());
-        assertEquals(505, split[1].size());
-
-        ImmutableSet<String> mergedAgain = ImmutableSet.fromCollections(split[0], split[1]);
-
-        assertEquals(1009, mergedAgain.size());
     }
 
     @Test
@@ -234,7 +195,7 @@ public class ImmutableSetTest {
     public void shouldFindContainsItem() {
         ImmutableSet<String> set = ImmutableSet.emptySet();
         for (int i = 0; i < 1000; i++) {
-            set = ImmutableSet.add(set, "Item" + i);
+            set = set.createInstanceByAdding("Item" + i);
         }
 
         assertFalse(set.isEmpty());
@@ -255,18 +216,18 @@ public class ImmutableSetTest {
         ImmutableSet<String> set = ImmutableSet.emptySet();
 
         for (int i = 0; i < 1000; i++) {
-            set = ImmutableSet.add(set, "Item" + i);
+            set = set.createInstanceByAdding("Item" + i);
         }
 
-        set.forEach(Assert::assertNotNull);
         assertFalse(set.isEmpty());
+        set.forEach(Assert::assertNotNull);
     }
 
     @Test(expected = NoSuchElementException.class)
     public void finiteIteratorShouldTerminate() {
         ImmutableSet<String> set = ImmutableSet.emptySet();
         for (int i = 0; i < 10; i++) {
-            set = ImmutableSet.add(set, "Item" + i);
+            set = set.createInstanceByAdding("Item" + i);
         }
 
         Iterator<String> iterator = set.iterator();
@@ -280,7 +241,7 @@ public class ImmutableSetTest {
     public void shouldPassOverAllElementsInForEach() {
         ImmutableSet<String> set = ImmutableSet.emptySet();
         for (int i = 0; i < 1000; i++) {
-            set = ImmutableSet.add(set, "Item" + i);
+            set = set.createInstanceByAdding("Item" + i);
         }
 
         AtomicInteger integer = new AtomicInteger();
@@ -397,5 +358,22 @@ public class ImmutableSetTest {
         ImmutableSet<String> multiple = ImmutableSet.fromCollection(Arrays.asList("one", "two", "three"));
         assertFalse(multiple.contains("moon"));
         assertFalse(multiple.contains(null));
+    }
+
+    @Test
+    public void shouldStreamAndCollectLotsOfItems() {
+        Set<String> sourceSet = new HashSet<>();
+        for (int i = 0; i < 1000; i++)
+            sourceSet.add(String.format("XXitem-%d", i));
+
+        ImmutableSet<String> immutableSet = ImmutableSet.fromCollection(sourceSet);
+
+        Set<String> resultSet = immutableSet.parallelStream()
+                .map(s -> s.substring(2))
+                .collect(Collectors.toSet());
+
+        assertEquals("mismatching size", 1000, resultSet.size());
+        assertTrue("item missing", resultSet.contains("item-500"));
+        assertFalse("unexpected item", resultSet.contains("XXitem-500"));
     }
 }

@@ -18,6 +18,7 @@
 package com.zigurs.karlis.utils.search;
 
 import org.github.jamm.MemoryMeter;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -81,25 +82,34 @@ public class QuickSearchMemoryUseTest {
     @Test
     public void fewItemsCountCheck() {
         /*
-         * As measured on Java 1.8.0_102.
+         * As measured on:
+         *   java version "1.8.0_111"
+         *   Java(TM) SE Runtime Environment (build 1.8.0_111-b14)
+         *   Java HotSpot(TM) 64-Bit Server VM (build 25.111-b14, mixed mode)
+         *
          * Absolute memory profile may and will change depending on JVM version and options.
          */
-        final long plainTarget = 884_344;
-        final long internTarget = 561_784;
+        final long plainTarget = 901_992;
+        final long internTarget = 579_728;
         final int fewItemsCount = 1_000;
 
         assertTrue("Expected memory ceiling exceeded (see test source)", plainTarget * 1.1 > measureMemoryUseImpl(fewItemsCount, false));
         assertTrue("Expected memory ceiling exceeded (see test source)", internTarget * 1.1 > measureMemoryUseImpl(fewItemsCount, true));
     }
 
+    @Ignore
     @Test
     public void manyItemsCountCheck() {
         /*
-         * As measured on Java 1.8.0_102.
+         * As measured on:
+         *   java version "1.8.0_111"
+         *   Java(TM) SE Runtime Environment (build 1.8.0_111-b14)
+         *   Java HotSpot(TM) 64-Bit Server VM (build 25.111-b14, mixed mode)
+         *
          * Absolute memory profile may and will change depending on JVM version and options.
          */
-        final long plainTarget = 52_668_168;
-        final long internTarget = 19_445_928;
+        final long plainTarget = 52_685_816;
+        final long internTarget = 19_463_872;
         final int manyItemsCount = 100_000;
 
         assertTrue("Expected memory ceiling exceeded (see test source)", plainTarget * 1.1 > measureMemoryUseImpl(manyItemsCount, false));

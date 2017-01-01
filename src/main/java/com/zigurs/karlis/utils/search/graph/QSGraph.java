@@ -17,10 +17,15 @@
  */
 package com.zigurs.karlis.utils.search.graph;
 
-import com.zigurs.karlis.utils.search.ImmutableSet;
+import com.zigurs.karlis.utils.collections.ImmutableSet;
 import com.zigurs.karlis.utils.search.model.QuickSearchStats;
 
-import java.util.*;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.locks.StampedLock;
 import java.util.function.BiFunction;
 
@@ -31,7 +36,7 @@ import java.util.function.BiFunction;
  *
  * @param <T> type of items stored
  */
-public class QSGraph<T> {
+public class QSGraph<T extends Comparable<T>> {
 
     /**
      * Map providing quick entry point to a particular node in the graph.
@@ -95,7 +100,6 @@ public class QSGraph<T> {
                         removeEdge(keywordNode, null);
                 }
             }
-
             itemKeywordsMap.remove(item);
         } finally {
             stampedLock.unlockWrite(writeLock);
@@ -109,6 +113,7 @@ public class QSGraph<T> {
      *
      * @param fragment       keyword or keyword fragment to start walk from
      * @param scorerFunction function that will be called with the supplied fragment and node identity to score match
+     *
      * @return map of accumulated items with their highest score encountered during walk (may be empty)
      */
     public Map<T, Double> walkAndScore(final String fragment,
@@ -126,6 +131,7 @@ public class QSGraph<T> {
      * (or empty set if the item mapping is not recognized).
      *
      * @param item previously registered item
+     *
      * @return set of associated keywords, possibly empty
      */
     public Set<String> getItemKeywords(final T item) {
@@ -180,7 +186,7 @@ public class QSGraph<T> {
             fragmentsNodesMap.put(internedIdentity, node);
 
             // And proceed to add child nodes
-            if (node.getFragment().length() > 1) {
+            if (node.getIdentity().length() > 1) {
                 createAndRegisterNode(node, internedIdentity.substring(0, identity.length() - 1), null);
                 createAndRegisterNode(node, internedIdentity.substring(1), null);
             }
@@ -203,11 +209,11 @@ public class QSGraph<T> {
 
         // No getParents or getItems means that there's nothing here to find, proceed onwards
         if (node.getParents().isEmpty() && node.getItems().isEmpty()) {
-            fragmentsNodesMap.remove(node.getFragment());
+            fragmentsNodesMap.remove(node.getIdentity());
 
-            if (node.getFragment().length() > 1) {
-                removeEdge(fragmentsNodesMap.get(node.getFragment().substring(0, node.getFragment().length() - 1)), node);
-                removeEdge(fragmentsNodesMap.get(node.getFragment().substring(1)), node);
+            if (node.getIdentity().length() > 1) {
+                removeEdge(fragmentsNodesMap.get(node.getIdentity().substring(0, node.getIdentity().length() - 1)), node);
+                removeEdge(fragmentsNodesMap.get(node.getIdentity().substring(1)), node);
             }
         }
     }
@@ -220,32 +226,43 @@ public class QSGraph<T> {
                                             final BiFunction<String, String, Double> scorerFunction) {
         GraphNode<T> root = fragmentsNodesMap.get(fragment);
 
-        if (root == null)
+        if (root == null) {
             return Collections.emptyMap();
-        else
-            return walkAndScore(root.getFragment(), root, new HashMap<>(), new HashSet<>(), scorerFunction);
+        } else {
+            int estResults = root.getEstimatedResultsCount() > -1 ? root.getEstimatedResultsCount() : 1024;
+            HashMap<T, Double> results = new HashMap<>(estResults);
+
+            int estNodes = root.getEstimatedNodesCount() > -1 ? root.getEstimatedNodesCount() : 1024;
+            HashSet<String> visited = new HashSet<>(estNodes);
+
+            /* Perform the actual scan */
+            walkAndScore(root.getIdentity(), root, results, visited, scorerFunction);
+
+            root.setEstimatedNodesCount(visited.size() * 2);
+            root.setEstimatedResultsCount(results.size() * 2);
+
+            return results;
+        }
     }
 
-    private Map<T, Double> walkAndScore(final String originalFragment,
-                                        final GraphNode<T> node,
-                                        final Map<T, Double> accumulated,
-                                        final Set<String> visited,
-                                        final BiFunction<String, String, Double> keywordMatchScorer) {
-        visited.add(node.getFragment());
+    private void walkAndScore(final String originalFragment,
+                              final GraphNode<T> node,
+                              final Map<T, Double> accumulated,
+                              final Set<String> visited,
+                              final BiFunction<String, String, Double> keywordMatchScorer) {
+        visited.add(node.getIdentity());
 
         if (!node.getItems().isEmpty()) {
-            Double score = keywordMatchScorer.apply(originalFragment, node.getFragment());
+            Double score = keywordMatchScorer.apply(originalFragment, node.getIdentity());
             if (score > 0.0)
                 node.getItems().forEach(item -> accumulated.merge(item, score, (d1, d2) -> d1.compareTo(d2) > 0 ? d1 : d2));
         }
 
         node.getParents().forEach(parent -> {
-            if (!visited.contains(parent.getFragment())) {
+            if (!visited.contains(parent.getIdentity())) {
                 walkAndScore(originalFragment, parent, accumulated, visited, keywordMatchScorer);
             }
         });
-
-        return accumulated;
     }
 
     /*
@@ -257,11 +274,19 @@ public class QSGraph<T> {
      * serves as an entry point to traverse the graph upwards of it and
      * operate on associated items.
      */
-    private static final class GraphNode<V> {
+    private static final class GraphNode<V extends Comparable<V>> implements Comparable<GraphNode<V>> {
 
-        private final String fragment;
+        private final String identity;
         private ImmutableSet<V> items;
         private ImmutableSet<GraphNode<V>> parents;
+
+        /*
+         * Track historical results set sizes to avoid
+         * excessive re-re-hashing on large result-sets
+         */
+
+        private int estimatedNodesCount = -1;
+        private int estimatedResultsCount = -1;
 
         /**
          * Create a node with immutable identity string.
@@ -270,7 +295,7 @@ public class QSGraph<T> {
          */
         private GraphNode(final String fragment) {
             Objects.requireNonNull(fragment);
-            this.fragment = fragment;
+            this.identity = fragment;
             this.items = ImmutableSet.emptySet();
             this.parents = ImmutableSet.emptySet();
         }
@@ -280,8 +305,8 @@ public class QSGraph<T> {
          *
          * @return selected identifier
          */
-        private String getFragment() {
-            return fragment;
+        private String getIdentity() {
+            return identity;
         }
 
         /**
@@ -300,7 +325,7 @@ public class QSGraph<T> {
          * @param item item to add.
          */
         private void addItem(final V item) {
-            items = ImmutableSet.add(items, item);
+            items = items.createInstanceByAdding(item);
         }
 
         /**
@@ -309,7 +334,7 @@ public class QSGraph<T> {
          * @param item item to remove.
          */
         private void removeItem(final V item) {
-            items = ImmutableSet.remove(items, item);
+            items = items.createInstanceByRemoving(item);
         }
 
         /**
@@ -329,7 +354,7 @@ public class QSGraph<T> {
          * @param parent parent to add.
          */
         private void addParent(final GraphNode<V> parent) {
-            parents = ImmutableSet.add(parents, parent);
+            parents = parents.createInstanceByAdding(parent);
         }
 
         /**
@@ -338,7 +363,28 @@ public class QSGraph<T> {
          * @param parent parent to remove.
          */
         private void removeParent(final GraphNode<V> parent) {
-            parents = ImmutableSet.remove(parents, parent);
+            parents = parents.createInstanceByRemoving(parent);
+        }
+
+        @Override
+        public int compareTo(GraphNode<V> o) {
+            return identity.compareTo(o.identity);
+        }
+
+        private int getEstimatedNodesCount() {
+            return estimatedNodesCount;
+        }
+
+        private void setEstimatedNodesCount(int estimatedNodesCount) {
+            this.estimatedNodesCount = estimatedNodesCount;
+        }
+
+        private int getEstimatedResultsCount() {
+            return estimatedResultsCount;
+        }
+
+        private void setEstimatedResultsCount(int estimatedResultsCount) {
+            this.estimatedResultsCount = estimatedResultsCount;
         }
     }
 }

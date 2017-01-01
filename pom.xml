@@ -5,7 +5,7 @@
 
     <groupId>com.zigurs.karlis.utils.search</groupId>
     <artifactId>QuickSearch</artifactId>
-    <version>1.7</version>
+    <version>1.8-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>${project.groupId}:${project.artifactId}</name>
@@ -97,7 +97,7 @@
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
-                <version>0.7.7.201606060606</version>
+                <version>0.7.8</version>
                 <executions>
                     <execution>
                         <id>default-prepare-agent</id>

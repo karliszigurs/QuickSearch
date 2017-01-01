@@ -17,17 +17,25 @@
  */
 package com.zigurs.karlis.utils.search;
 
+import com.zigurs.karlis.utils.collections.ImmutableSet;
 import com.zigurs.karlis.utils.search.graph.QSGraph;
 import com.zigurs.karlis.utils.search.model.QuickSearchStats;
 import com.zigurs.karlis.utils.search.model.Result;
 import com.zigurs.karlis.utils.search.model.ResultItem;
-import com.zigurs.karlis.utils.search.parallel.IntersectionTask;
-import com.zigurs.karlis.utils.search.parallel.UnionTask;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.function.BiFunction;
+import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 import static com.zigurs.karlis.utils.search.QuickSearch.MergePolicy.UNION;
 import static com.zigurs.karlis.utils.search.QuickSearch.UnmatchedPolicy.BACKTRACKING;
@@ -82,11 +90,12 @@ import static com.zigurs.karlis.utils.sort.MagicSort.sortAndLimit;
  * <p>
  * A number of configuration options are available and documented via {@link QuickSearchBuilder}.
  * <p>
- * This class is thread safe. You'll get a cookie if you manage to break it. <small>I don't expect to part with any cookies.</small>
+ * This class is thread safe. You'll get a cookie if you manage to break it. <small>I don't expect to part with any
+ * cookies.</small>
  *
  * @author Karlis Zigurs, 2016
  */
-public class QuickSearch<T> {
+public class QuickSearch<T extends Comparable<T>> {
 
     /**
      * Matching policy to apply to unmatched search keywords.
@@ -130,7 +139,7 @@ public class QuickSearch<T> {
      * <p>
      * Further details at {@link QuickSearchBuilder#withKeywordsExtractor(Function)}.
      */
-    public static final Function<String, Set<String>> DEFAULT_KEYWORDS_EXTRACTOR =
+    private static final Function<String, Set<String>> DEFAULT_KEYWORDS_EXTRACTOR =
             s -> Arrays.stream(s.replaceAll("[^\\w]+", " ").split("[\\s]+")).collect(Collectors.toSet());
 
     /**
@@ -138,7 +147,7 @@ public class QuickSearch<T> {
      * <p>
      * Further details at {@link QuickSearchBuilder#withKeywordNormalizer(Function)}.
      */
-    public static final Function<String, String> DEFAULT_KEYWORD_NORMALIZER = s -> s.trim().toLowerCase();
+    private static final Function<String, String> DEFAULT_KEYWORD_NORMALIZER = s -> s.trim().toLowerCase();
 
     /**
      * Default keyword matches scoring function assigning a match a score between 0 and 1
@@ -148,7 +157,7 @@ public class QuickSearch<T> {
      * <p>
      * Further details at {@link QuickSearchBuilder#withKeywordMatchScorer(BiFunction)}.
      */
-    public static final BiFunction<String, String, Double> DEFAULT_MATCH_SCORER = (keywordMatch, keyword) -> {
+    private static final BiFunction<String, String, Double> DEFAULT_MATCH_SCORER = (keywordMatch, keyword) -> {
         /* 0...1 depending on the length ratio */
         double matchScore = (double) keywordMatch.length() / (double) keyword.length();
 
@@ -176,14 +185,14 @@ public class QuickSearch<T> {
      * Configuration properties
      */
 
-    private final MergePolicy mergePolicy;
+    private final BinaryOperator<Map<T, Double>> mergeFunction;
     private final UnmatchedPolicy unmatchedPolicy;
 
     private final BiFunction<String, String, Double> keywordMatchScorer;
     private final Function<String, String> keywordNormalizer;
     private final Function<String, Set<String>> keywordsExtractor;
 
-    private final boolean enableForkJoin;
+    private final boolean enableParallel;
     private final boolean enableKeywordsInterning;
 
     /*
@@ -207,9 +216,14 @@ public class QuickSearch<T> {
         keywordNormalizer = builder.keywordNormalizer;
         keywordMatchScorer = builder.keywordMatchScorer;
         unmatchedPolicy = builder.unmatchedPolicy;
-        mergePolicy = builder.mergePolicy;
-        enableForkJoin = builder.enableForkJoin;
+        enableParallel = builder.enableForkJoin;
         enableKeywordsInterning = builder.enableKeywordsInterning;
+
+        if (builder.mergePolicy == UNION) {
+            mergeFunction = QuickSearch::unionMaps;
+        } else {
+            mergeFunction = QuickSearch::intersectMaps;
+        }
 
         graph = new QSGraph<>();
     }
@@ -228,6 +242,7 @@ public class QuickSearch<T> {
      *
      * @param item     Item to return in search results
      * @param keywords keywords string. See {@link QuickSearchBuilder#withKeywordsExtractor(Function)}
+     *
      * @return true if the item was added, false if validations before adding failed
      */
     public boolean addItem(final T item, final String keywords) {
@@ -239,7 +254,8 @@ public class QuickSearch<T> {
         if (keywordsSet.isEmpty())
             return false;
 
-        return addItemImpl(item, keywordsSet);
+        addItemImpl(item, keywordsSet);
+        return true;
     }
 
     /**
@@ -267,6 +283,7 @@ public class QuickSearch<T> {
      * processing.
      *
      * @param searchString raw search string
+     *
      * @return {@link Optional} wrapping (or not) the top scoring item found in instance
      */
     public Optional<T> findItem(final String searchString) {
@@ -291,6 +308,7 @@ public class QuickSearch<T> {
      *
      * @param searchString     raw search string, e.g. "new york pizza"
      * @param numberOfTopItems number of items the returned result should be limited to (1 to Integer.MAX_VALUE)
+     *
      * @return list (possibly empty) containing up to n top search results
      */
     public List<T> findItems(final String searchString, final int numberOfTopItems) {
@@ -318,6 +336,7 @@ public class QuickSearch<T> {
      * {@link ResultItem} response object containing known keywords and assigned search score.
      *
      * @param searchString raw search string
+     *
      * @return {@link Optional} wrapping (or not) the top scoring item, keywords and score found in instance
      */
     public Optional<ResultItem<T>> findItemWithDetail(final String searchString) {
@@ -351,6 +370,7 @@ public class QuickSearch<T> {
      *
      * @param searchString     raw search string, e.g. "new york pizza"
      * @param numberOfTopItems number of items the returned result should be limited to (1 to Integer.MAX_VALUE)
+     *
      * @return wrapper containing zero to n top scoring items and search string
      */
     public Result<T> findItemsWithDetail(final String searchString, final int numberOfTopItems) {
@@ -406,8 +426,14 @@ public class QuickSearch<T> {
 
     private List<SearchResult<T>> doSearch(final ImmutableSet<String> searchKeywords,
                                            final int maxItemsToList) {
+
+        final Map<T, Double> results = StreamSupport.stream(searchKeywords.spliterator(), enableParallel)
+                .map(this::walkGraphAndScore)
+                .reduce(mergeFunction)
+                .orElseGet(HashMap::new);
+
         return sortAndLimit(
-                findAndScore(searchKeywords).entrySet(),
+                results.entrySet(),
                 maxItemsToList,
                 (e1, e2) -> e2.getValue().compareTo(e1.getValue())
         ).stream()
@@ -415,68 +441,12 @@ public class QuickSearch<T> {
                 .collect(Collectors.toList());
     }
 
-    private Map<T, Double> findAndScore(final ImmutableSet<String> suppliedFragments) {
-        /* Avoid calling into merges if we are looking for only one keyword */
-        if (suppliedFragments.size() == 1)
-            return walkGraphAndScore(suppliedFragments.iterator().next());
-
-        /* Merges will be inevitable */
-        if (mergePolicy == UNION)
-            return findAndScoreUnion(suppliedFragments);
-        else // implied (withAccumulationPolicy == INTERSECTION)
-            return findAndScoreIntersection(suppliedFragments);
-    }
-
-    private Map<T, Double> findAndScoreUnion(final ImmutableSet<String> suppliedFragments) {
-        if (enableForkJoin) {
-            return new UnionTask<>(suppliedFragments, this::walkGraphAndScore).fork().join();
-
-        } else {
-            final Map<T, Double> accumulatedItems = new HashMap<>();
-
-            suppliedFragments.forEach(fragment ->
-                    walkGraphAndScore(fragment).forEach((k, v) ->
-                            accumulatedItems.merge(k, v, (d1, d2) -> d1 + d2))
-            );
-
-            return accumulatedItems;
-        }
-    }
-
-    private Map<T, Double> findAndScoreIntersection(final ImmutableSet<String> suppliedFragments) {
-        if (enableForkJoin) {
-            return new IntersectionTask<>(suppliedFragments, this::walkGraphAndScore).fork().join();
-
-        } else {
-            Map<T, Double> accumulatedItems = null;
-
-            for (String suppliedFragment : suppliedFragments) {
-                Map<T, Double> fragmentItems = walkGraphAndScore(suppliedFragment);
-
-                if (fragmentItems.isEmpty()) // results will be empty too, can skip the remainder
-                    return fragmentItems;
-
-                if (accumulatedItems == null) {
-                    accumulatedItems = fragmentItems;
-                } else {
-                    accumulatedItems = intersectMaps(fragmentItems, accumulatedItems);
-
-                    if (accumulatedItems.isEmpty())
-                        return accumulatedItems;
-                }
-            }
-
-            return accumulatedItems;
-        }
-    }
-
     /*
      * Interfacing with the graph
      */
 
-    private boolean addItemImpl(final T item, final Set<String> suppliedKeywords) {
+    private void addItemImpl(final T item, final Set<String> suppliedKeywords) {
         graph.registerItem(item, suppliedKeywords);
-        return true;
     }
 
     private void removeItemImpl(final T item) {
@@ -503,15 +473,15 @@ public class QuickSearch<T> {
                                                  final boolean internKeywords) {
         return ImmutableSet.fromCollection(
                 keywordsExtractor.apply(keywordsString).stream()
-                        .filter(s -> s != null)        /* Guarantee a non-null, */
-                        .map(String::trim)             /* trimmed, */
-                        .filter(s -> !s.isEmpty())     /* and non-empty string */
-                        .map(keywordNormalizer)        /* to normalizer. */
-                        .filter(s -> s != null)        /* And the same to final keywords set. */
-                        .map(String::trim)             /* Just can't trust any user supplied functions these days... */
-                        .filter(s -> !s.isEmpty())     /* I wonder what changed. Why it came to be so? Was it us? */
+                        .filter(Objects::nonNull)        /* Guarantee a non-null, */
+                        .map(String::trim)               /* trimmed, */
+                        .filter(s -> !s.isEmpty())       /* and non-empty string */
+                        .map(keywordNormalizer)          /* to normalizer. */
+                        .filter(Objects::nonNull)        /* And the same to final keywords set. */
+                        .map(String::trim)               /* Just can't trust any user supplied functions these days... */
+                        .filter(s -> !s.isEmpty())       /* I wonder what changed. Why it came to be so? Was it us? */
                         .map(s -> internKeywords ? s.intern() : s) /* do magic */
-                        .collect(Collectors.toSet())   /* All keywords now distinct. */
+                        .collect(Collectors.toSet())     /* All keywords now distinct. */
         );
     }
 
@@ -529,9 +499,10 @@ public class QuickSearch<T> {
      * @param left  map to intersect
      * @param right map to intersect
      * @param <T>   type of keys
+     *
      * @return intersection with values summed
      */
-    public static <T> Map<T, Double> intersectMaps(final Map<T, Double> left,
+    private static <T> Map<T, Double> intersectMaps(final Map<T, Double> left,
                                                    final Map<T, Double> right) {
         Map<T, Double> smaller = left.size() < right.size() ? left : right;
         Map<T, Double> bigger = smaller == left ? right : left;
@@ -539,6 +510,25 @@ public class QuickSearch<T> {
         smaller.keySet().retainAll(bigger.keySet());
         smaller.entrySet().forEach(e -> e.setValue(e.getValue() + bigger.get(e.getKey())));
         return smaller;
+    }
+
+    /**
+     * For performance reasons this function <em>modifies the maps supplied</em> and
+     * possibly returns an instance of one of the supplied (by then modified) maps.
+     *
+     * @param left  map to intersect
+     * @param right map to intersect
+     * @param <T>   type of keys
+     *
+     * @return intersection with values summed
+     */
+    private static <T> Map<T, Double> unionMaps(final Map<T, Double> left,
+                                                final Map<T, Double> right) {
+        final Map<T, Double> smaller = (left.size() < right.size()) ? left : right;
+        final Map<T, Double> bigger = (smaller == left) ? right : left;
+
+        smaller.forEach((k, v) -> bigger.merge(k, v, (p, n) -> p + n));
+        return bigger;
     }
 
     /*
@@ -603,6 +593,7 @@ public class QuickSearch<T> {
          * make sense I'd be very interested to hear about it.</small>
          *
          * @param scorerFunction function to use for keywords match scoring
+         *
          * @return current {@link QuickSearchBuilder} instance for configuration chaining
          */
         public QuickSearchBuilder withKeywordMatchScorer(BiFunction<String, String, Double> scorerFunction) {
@@ -617,7 +608,7 @@ public class QuickSearch<T> {
          * user (and item) supplied keyword strings.
          * <p>
          * Function should accept a raw input string as an input and return a {@link Set} of extracted keywords
-         * that should be assigned to the item (when called from {@link #addItem(Object, String)} or should
+         * that should be assigned to the item (when called from {@link #addItem(Comparable, String)} or should
          * be treated as user supplied keywords.
          * <p>
          * In default and most basic implementation (available as {@link #DEFAULT_KEYWORDS_EXTRACTOR} the
@@ -637,6 +628,7 @@ public class QuickSearch<T> {
          * make sense I'd be very interested to hear about it.</small>
          *
          * @param extractorFunction function to extract keywords from raw input strings
+         *
          * @return current {@link QuickSearchBuilder} instance for configuration chaining
          */
         public QuickSearchBuilder withKeywordsExtractor(Function<String, Set<String>> extractorFunction) {
@@ -667,8 +659,10 @@ public class QuickSearch<T> {
          * <tr><th>original</th><th>transformed to</th><th>possible rationale</th></tr>
          * <tr><td><code>"New York"</code></td><td><code>"new york"</code></td><td>all lower case internally</td></tr>
          * <tr><td><code>"Pythøn"</code></td><td><code>"python"</code></td><td>replace special characters</td></tr>
-         * <tr><td><code>"HERMSGERVØRDENBRØTBØRDA"</code></td><td><code>"hermsgervordenbrotborda"</code></td><td>møøse trained by...</td></tr>
-         * <tr><td><code>"Россия"</code></td><td><code>"rossiya"</code></td><td>transliterate cyrilic alphabet to latin</td></tr>
+         * <tr><td><code>"HERMSGERVØRDENBRØTBØRDA"</code></td><td><code>"hermsgervordenbrotborda"</code></td><td>møøse
+         * trained by...</td></tr>
+         * <tr><td><code>"Россия"</code></td><td><code>"rossiya"</code></td><td>transliterate cyrilic alphabet to
+         * latin</td></tr>
          * </table>
          * <p>
          * Default implementation available at {@link #DEFAULT_KEYWORD_NORMALIZER} simply ensures that the keyword
@@ -683,6 +677,7 @@ public class QuickSearch<T> {
          * make sense I'd be very interested to hear about it.</small>
          *
          * @param normalizerFunction function as described above
+         *
          * @return current {@link QuickSearchBuilder} instance for configuration chaining
          */
         public QuickSearchBuilder withKeywordNormalizer(Function<String, String> normalizerFunction) {
@@ -696,6 +691,7 @@ public class QuickSearch<T> {
          * Set {@link UnmatchedPolicy} for created {@link QuickSearch} instance.
          *
          * @param unmatchedPolicy policy to use
+         *
          * @return current {@link QuickSearchBuilder} instance for configuration chaining
          */
         public QuickSearchBuilder withUnmatchedPolicy(UnmatchedPolicy unmatchedPolicy) {
@@ -709,6 +705,7 @@ public class QuickSearch<T> {
          * Set {@link MergePolicy} for created {@link QuickSearch} instance.
          *
          * @param mergePolicy policy to use
+         *
          * @return current {@link QuickSearchBuilder} instance for configuration chaining
          */
         public QuickSearchBuilder withMergePolicy(MergePolicy mergePolicy) {
@@ -731,9 +728,18 @@ public class QuickSearch<T> {
          *
          * @return current {@link QuickSearchBuilder} instance for configuration chaining
          */
-        public QuickSearchBuilder withParallelProcessing() {
-            enableForkJoin = true;
+        public QuickSearchBuilder withParallelProcessing(boolean enable) {
+            enableForkJoin = enable;
             return this;
+        }
+
+        /**
+         * See {@link #withParallelProcessing(boolean)}.
+         *
+         * @return current {@link QuickSearchBuilder} instance for configuration chaining
+         */
+        public QuickSearchBuilder withParallelProcessing() {
+            return withParallelProcessing(true);
         }
 
         /**
@@ -749,18 +755,28 @@ public class QuickSearch<T> {
          *
          * @return current {@link QuickSearchBuilder} instance for configuration chaining
          */
-        public QuickSearchBuilder withKeywordsInterning() {
-            enableKeywordsInterning = true;
+        public QuickSearchBuilder withKeywordsInterning(boolean enable) {
+            enableKeywordsInterning = enable;
             return this;
+        }
+
+        /**
+         * See {@link #withKeywordsInterning(boolean)}.
+         *
+         * @return current {@link QuickSearchBuilder} instance for configuration chaining
+         */
+        public QuickSearchBuilder withKeywordsInterning() {
+            return withKeywordsInterning(true);
         }
 
         /**
          * One shiny {@link QuickSearch} instance with specified configuration parameters coming up.
          *
          * @param <T> required instance type
+         *
          * @return new {@link QuickSearch} instance with this {@link QuickSearchBuilder}s configuration
          */
-        public <T> QuickSearch<T> build() {
+        public <T extends Comparable<T>> QuickSearch<T> build() {
             return new QuickSearch<>(this);
         }
     }
@@ -768,7 +784,7 @@ public class QuickSearch<T> {
     /**
      * Internal wrapper of item and score for results list.
      */
-    private static class SearchResult<T> {
+    private static final class SearchResult<T> {
 
         private final T item;
         private final double score;
