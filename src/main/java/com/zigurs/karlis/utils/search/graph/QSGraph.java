@@ -226,9 +226,9 @@ public class QSGraph<T extends Comparable<T>> {
                                             final BiFunction<String, String, Double> scorerFunction) {
         GraphNode<T> root = fragmentsNodesMap.get(fragment);
 
-        if (root == null)
+        if (root == null) {
             return Collections.emptyMap();
-        else {
+        } else {
             int estResults = root.getEstimatedResultsCount() > -1 ? root.getEstimatedResultsCount() : 1024;
             HashMap<T, Double> results = new HashMap<>(estResults);
 
@@ -281,7 +281,8 @@ public class QSGraph<T extends Comparable<T>> {
         private ImmutableSet<GraphNode<V>> parents;
 
         /*
-         * Track historical results set sizes to avoid double-allocations
+         * Track historical results set sizes to avoid
+         * excessive re-re-hashing on large result-sets
          */
 
         private int estimatedNodesCount = -1;
@@ -370,19 +371,19 @@ public class QSGraph<T extends Comparable<T>> {
             return identity.compareTo(o.identity);
         }
 
-        public int getEstimatedNodesCount() {
+        private int getEstimatedNodesCount() {
             return estimatedNodesCount;
         }
 
-        public void setEstimatedNodesCount(int estimatedNodesCount) {
+        private void setEstimatedNodesCount(int estimatedNodesCount) {
             this.estimatedNodesCount = estimatedNodesCount;
         }
 
-        public int getEstimatedResultsCount() {
+        private int getEstimatedResultsCount() {
             return estimatedResultsCount;
         }
 
-        public void setEstimatedResultsCount(int estimatedResultsCount) {
+        private void setEstimatedResultsCount(int estimatedResultsCount) {
             this.estimatedResultsCount = estimatedResultsCount;
         }
     }
