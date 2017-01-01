@@ -726,6 +726,8 @@ public class QuickSearch<T extends Comparable<T>> {
          * be removed in the future (ether made default or removed as not worth the
          * maintenance complexity).
          *
+         * @param enable enable parallel processing
+         *
          * @return current {@link QuickSearchBuilder} instance for configuration chaining
          */
         public QuickSearchBuilder withParallelProcessing(boolean enable) {
@@ -752,6 +754,8 @@ public class QuickSearch<T extends Comparable<T>> {
          * with undocumented JVM options, jdk7u40 changes, hash collisions, most interesting
          * 5 digit prime numbers (you'll need a few of those for tuning anyway) and
          * noisy neighbours on AWS and GCE.
+         *
+         * @param enable enable keywords interning
          *
          * @return current {@link QuickSearchBuilder} instance for configuration chaining
          */
