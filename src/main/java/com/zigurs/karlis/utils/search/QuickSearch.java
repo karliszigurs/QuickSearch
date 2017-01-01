@@ -92,8 +92,6 @@ import static com.zigurs.karlis.utils.sort.MagicSort.sortAndLimit;
  * <p>
  * This class is thread safe. You'll get a cookie if you manage to break it. <small>I don't expect to part with any
  * cookies.</small>
- *
- * @author Karlis Zigurs, 2016
  */
 public class QuickSearch<T extends Comparable<T>> {
 

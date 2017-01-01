@@ -51,8 +51,6 @@ import static java.util.Arrays.parallelSort;
  * This implementation does not permit {@code null} elements.
  * <p>
  * This implementation is thread-safe.
- *
- * @author Karlis Zigurs, 2016
  */
 public final class ImmutableSet<T extends Comparable<? super T>> extends AbstractSet<T> {
 
