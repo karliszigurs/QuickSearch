@@ -22,6 +22,7 @@ import java.util.AbstractSet;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
 import java.util.Spliterator;
@@ -238,8 +239,6 @@ public final class ImmutableSet<T extends Comparable<? super T>> extends Abstrac
      * @param <T> type
      *
      * @return empty set
-     *
-     * @noinspection unchecked
      */
     public static <T extends Comparable<? super T>> ImmutableSet<T> emptySet() {
         return (ImmutableSet<T>) EMPTY;
@@ -270,8 +269,6 @@ public final class ImmutableSet<T extends Comparable<? super T>> extends Abstrac
      * @param <T>    type
      *
      * @return immutable set of unique, non-null elements
-     *
-     * @noinspection unchecked
      */
     public static <T extends Comparable<? super T>> ImmutableSet<T> fromCollection(final Collection<? extends T> source) {
         Objects.requireNonNull(source);
@@ -333,11 +330,38 @@ public final class ImmutableSet<T extends Comparable<? super T>> extends Abstrac
     }
 
     /**
-     * Helper to supply new arrays of erasure type.
-     *
-     * @noinspection unchecked
+     * Helper to supply new arrays of erasure type from a single location.
      */
     private static <T extends Comparable<? super T>> T[] newArraySizeOf(final int size) {
         return (T[]) new Comparable[size];
+    }
+
+    /**
+     * Simple array iterator.
+     *
+     * @param <T> type of array elements
+     */
+    private static final class ArrayIterator<T> implements Iterator<T> {
+
+        private final T[] array;
+        private int index;
+
+        ArrayIterator(final T[] elements) {
+            Objects.requireNonNull(elements);
+            array = elements;
+        }
+
+        @Override
+        public boolean hasNext() {
+            return index < array.length;
+        }
+
+        @Override
+        public T next() {
+            if (index >= array.length)
+                throw new NoSuchElementException("all items already retrieved");
+
+            return array[index++];
+        }
     }
 }

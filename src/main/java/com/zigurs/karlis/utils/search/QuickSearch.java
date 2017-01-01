@@ -502,7 +502,7 @@ public class QuickSearch<T extends Comparable<T>> {
      *
      * @return intersection with values summed
      */
-    public static <T> Map<T, Double> intersectMaps(final Map<T, Double> left,
+    private static <T> Map<T, Double> intersectMaps(final Map<T, Double> left,
                                                    final Map<T, Double> right) {
         Map<T, Double> smaller = left.size() < right.size() ? left : right;
         Map<T, Double> bigger = smaller == left ? right : left;

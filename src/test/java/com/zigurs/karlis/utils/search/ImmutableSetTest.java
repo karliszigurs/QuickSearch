@@ -77,6 +77,7 @@ public class ImmutableSetTest {
         set = set.createInstanceByAdding(dog);
         assertFalse(set.isEmpty());
         assertEquals(2, set.size());
+        //noinspection AssertEqualsBetweenInconvertibleTypes
         assertEquals(new HashSet<>(Arrays.asList(cat, dog)), set);
     }
 

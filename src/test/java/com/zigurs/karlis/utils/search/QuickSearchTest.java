@@ -86,7 +86,7 @@ public class QuickSearchTest {
                 .withKeywordsExtractor(s -> new HashSet<>(Arrays.asList("", "one", "blue", "yellow", null)))
                 .build();
         addItem("test", "onetwo three");
-        assertEquals("test", searchInstance.findItem("yellow").get());
+        assertEquals("test", searchInstance.findItem("yellow").orElse(null));
     }
 
     @Test
@@ -292,7 +292,7 @@ public class QuickSearchTest {
 
         Optional<ResultItem<String>> result = searchInstance.findItemWithDetail("one");
         assertTrue(result.isPresent());
-        assertEquals("test", result.get().getResult());
+        assertEquals("test", result.orElse(null).getResult());
     }
 
     @Test
@@ -348,10 +348,10 @@ public class QuickSearchTest {
         addItem("test2", "one two three intersecting");
         addItem("test3", "one three");
 
-        assertEquals(2.0, searchInstance.findItemWithDetail("two").get().getScore(), 0);
-        assertEquals(4.0, searchInstance.findItemWithDetail("two three").get().getScore(), 0);
-        assertEquals(4.5, searchInstance.findItemWithDetail("two three ecting").get().getScore(), 0);
-        assertEquals(5.5, searchInstance.findItemWithDetail("two three inters").get().getScore(), 0);
+        assertEquals(2.0, searchInstance.findItemWithDetail("two").orElse(null).getScore(), 0);
+        assertEquals(4.0, searchInstance.findItemWithDetail("two three").orElse(null).getScore(), 0);
+        assertEquals(4.5, searchInstance.findItemWithDetail("two three ecting").orElse(null).getScore(), 0);
+        assertEquals(5.5, searchInstance.findItemWithDetail("two three inters").orElse(null).getScore(), 0);
     }
 
     @Test
