@@ -146,7 +146,7 @@ public class QuickSearchUseCasesTest {
         assertEquals(5, foundCategories.size());
     }
 
-    private class StoreCategory implements Comparable<StoreCategory> {
+    private static final class StoreCategory implements Comparable<StoreCategory> {
 
         private final String displayName;
         private final StoreCategory parentCategory;
@@ -203,6 +203,17 @@ public class QuickSearchUseCasesTest {
         public int compareTo(StoreCategory o) {
             return displayName.compareTo(o.displayName);
         }
+
+        @Override
+        public int hashCode() {
+            return displayName.hashCode();
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            return (obj instanceof StoreCategory)
+                    && displayName.equals(((StoreCategory) obj).displayName);
+        }
     }
 
     private static final class FacetedObject<T extends Comparable<T>> implements Comparable<FacetedObject<T>> {
@@ -233,7 +244,13 @@ public class QuickSearchUseCasesTest {
 
         @Override
         public boolean equals(Object obj) {
-            return object.equals(obj);
+            return (obj instanceof FacetedObject)
+                    && object.equals(((FacetedObject) obj).object);
+        }
+
+        @Override
+        public int hashCode() {
+            return object.hashCode();
         }
     }
 }
