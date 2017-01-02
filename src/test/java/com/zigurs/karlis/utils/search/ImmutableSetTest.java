@@ -230,9 +230,7 @@ public class ImmutableSetTest {
         Iterator<String> iterator = set.iterator();
 
         for (int i = 0; i < 11; i++)
-            iterator.next();
-
-        fail("unreachable");
+            assertNotNull(iterator.next());
     }
 
     @Test

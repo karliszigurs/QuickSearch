@@ -52,7 +52,6 @@ public class QuickSearchTest {
         assertNotNull(QuickSearch.builder()
                 .withKeywordsExtractor(null)
                 .build());
-        fail("unreachable");
     }
 
     @Test(expected = NullPointerException.class)
@@ -60,7 +59,6 @@ public class QuickSearchTest {
         assertNotNull(QuickSearch.builder()
                 .withKeywordNormalizer(null)
                 .build());
-        fail("unreachable");
     }
 
     @Test(expected = NullPointerException.class)
@@ -68,7 +66,6 @@ public class QuickSearchTest {
         assertNotNull(QuickSearch.builder()
                 .withKeywordMatchScorer(null)
                 .build());
-        fail("unreachable");
     }
 
     @Test(expected = NullPointerException.class)
@@ -76,7 +73,6 @@ public class QuickSearchTest {
         assertNotNull(QuickSearch.builder()
                 .withUnmatchedPolicy(null)
                 .build());
-        fail("unreachable");
     }
 
     @Test(expected = NullPointerException.class)
@@ -84,7 +80,6 @@ public class QuickSearchTest {
         assertNotNull(QuickSearch.builder()
                 .withMergePolicy(null)
                 .build());
-        fail("unreachable");
     }
 
     @Test
