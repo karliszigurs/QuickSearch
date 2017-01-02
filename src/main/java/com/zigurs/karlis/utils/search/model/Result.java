@@ -17,6 +17,7 @@
  */
 package com.zigurs.karlis.utils.search.model;
 
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -41,7 +42,7 @@ public class Result<T> {
                   final List<ResultItem<T>> responseResultItems,
                   final int requestedMaxItems) {
         this.searchString = searchString;
-        this.responseResultItems = responseResultItems;
+        this.responseResultItems = Collections.unmodifiableList(responseResultItems);
         this.requestedMaxItems = requestedMaxItems;
     }
 

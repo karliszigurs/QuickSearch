@@ -26,7 +26,7 @@ import static org.junit.Assert.assertTrue;
 
 public class QuickSearchMemoryUseTest {
 
-    private final static String[][] USA_STATES = {
+    private static final String[][] USA_STATES = {
             {"AL", "Alabama", "Montgomery", "December 14, 1819"},
             {"AK", "Alaska", "Juneau", "January 3, 1959"},
             {"AZ", "Arizona", "Phoenix", "February 14, 1912"},

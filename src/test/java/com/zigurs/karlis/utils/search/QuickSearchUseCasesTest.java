@@ -205,7 +205,7 @@ public class QuickSearchUseCasesTest {
         }
     }
 
-    private class FacetedObject<T extends Comparable<T>> implements Comparable<FacetedObject<T>> {
+    private static final class FacetedObject<T extends Comparable<T>> implements Comparable<FacetedObject<T>> {
 
         private final T object;
         private final Set<String> facets;
@@ -229,6 +229,11 @@ public class QuickSearchUseCasesTest {
         @Override
         public int compareTo(FacetedObject<T> o) {
             return object.compareTo(o.object);
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            return object.equals(obj);
         }
     }
 }

@@ -874,6 +874,12 @@ public class QuickSearchTest {
         }
 
         @Override
+        public boolean equals(Object obj) {
+            return (obj instanceof StoreItem)
+                    && (itemIdentifier == ((StoreItem)obj).itemIdentifier);
+        }
+
+        @Override
         public int compareTo(StoreItem o) {
             return Integer.compare(itemIdentifier, o.itemIdentifier);
         }
