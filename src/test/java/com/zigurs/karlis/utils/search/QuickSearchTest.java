@@ -52,6 +52,7 @@ public class QuickSearchTest {
         assertNotNull(QuickSearch.builder()
                 .withKeywordsExtractor(null)
                 .build());
+        fail("unreachable");
     }
 
     @Test(expected = NullPointerException.class)
@@ -59,6 +60,7 @@ public class QuickSearchTest {
         assertNotNull(QuickSearch.builder()
                 .withKeywordNormalizer(null)
                 .build());
+        fail("unreachable");
     }
 
     @Test(expected = NullPointerException.class)
@@ -66,6 +68,7 @@ public class QuickSearchTest {
         assertNotNull(QuickSearch.builder()
                 .withKeywordMatchScorer(null)
                 .build());
+        fail("unreachable");
     }
 
     @Test(expected = NullPointerException.class)
@@ -73,6 +76,7 @@ public class QuickSearchTest {
         assertNotNull(QuickSearch.builder()
                 .withUnmatchedPolicy(null)
                 .build());
+        fail("unreachable");
     }
 
     @Test(expected = NullPointerException.class)
@@ -80,6 +84,7 @@ public class QuickSearchTest {
         assertNotNull(QuickSearch.builder()
                 .withMergePolicy(null)
                 .build());
+        fail("unreachable");
     }
 
     @Test
@@ -746,11 +751,11 @@ public class QuickSearchTest {
         String[] categories = new String[]{"Shoes", "Jackets", "Skirts"};
 
         for (int i = 0; i < 1_000; i++) {
-            items.add(new StoreItem(i, "StoreItem", categories[i % 3],
+            items.add(new StoreItem(i, categories[i % 3],
                     String.format("Item%d %s", i, categories[i % 3])));
         }
 
-        items.add(new StoreItem(1, "Lord of The Rings",
+        items.add(new StoreItem(1,
                 "Fantasy", "tolkien fantasy hardbound middle earth lord of the rings"));
 
         // create a quick search for StoreItems
@@ -851,23 +856,13 @@ public class QuickSearchTest {
     private static final class StoreItem implements Comparable<StoreItem> {
 
         private final int itemIdentifier;
-        private final String name;
         private final String category;
         private final String description;
 
-        private StoreItem(int itemIdentifier, String name, String category, String description) {
+        private StoreItem(int itemIdentifier, String category, String description) {
             this.itemIdentifier = itemIdentifier;
-            this.name = name;
             this.category = category;
             this.description = description;
-        }
-
-        private int getItemIdentifier() {
-            return itemIdentifier;
-        }
-
-        private String getName() {
-            return name;
         }
 
         private String getCategory() {
@@ -876,15 +871,6 @@ public class QuickSearchTest {
 
         private String getDescription() {
             return description;
-        }
-
-        @Override
-        public String toString() {
-            return String.format("(%s (%d) \"%s\")",
-                    getName(),
-                    getItemIdentifier(),
-                    getDescription()
-            );
         }
 
         @Override

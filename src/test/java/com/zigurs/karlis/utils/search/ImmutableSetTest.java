@@ -31,11 +31,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 public class ImmutableSetTest {
 
@@ -226,15 +222,17 @@ public class ImmutableSetTest {
     @Test(expected = NoSuchElementException.class)
     public void finiteIteratorShouldTerminate() {
         ImmutableSet<String> set = ImmutableSet.emptySet();
+
         for (int i = 0; i < 10; i++) {
             set = set.createInstanceByAdding("Item" + i);
         }
 
         Iterator<String> iterator = set.iterator();
 
-        //noinspection InfiniteLoopStatement
-        while (true)
+        for (int i = 0; i < 11; i++)
             iterator.next();
+
+        fail("unreachable");
     }
 
     @Test
