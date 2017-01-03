@@ -90,8 +90,8 @@ import static com.zigurs.karlis.utils.sort.MagicSort.sortAndLimit;
  * <p>
  * A number of configuration options are available and documented via {@link QuickSearchBuilder}.
  * <p>
- * This class is thread safe. You'll get a cookie if you manage to break it. <small>I don't expect to part with any
- * cookies.</small>
+ * This class is thread safe. You'll get a cookie or two if you manage to break it.
+ * <small>I don't expect to part with any cookies.</small>
  */
 public class QuickSearch<T extends Comparable<T>> {
 
