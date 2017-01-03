@@ -91,7 +91,7 @@ public class QuickSearchMemoryUseTest {
          */
         final long plainTarget = 901_992;
         final long internTarget = 579_728;
-        final int fewItemsCount = 10_000;
+        final int fewItemsCount = 1_000;
 
         assertTrue("Expected memory ceiling exceeded (see test source)", plainTarget * 1.1 > measureMemoryUseImpl(fewItemsCount, false));
         assertTrue("Expected memory ceiling exceeded (see test source)", internTarget * 1.1 > measureMemoryUseImpl(fewItemsCount, true));
