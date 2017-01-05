@@ -373,7 +373,8 @@ public class QSGraph<T extends Comparable<T>> {
 
         @Override
         public boolean equals(Object obj) {
-            return identity.equals(obj);
+            return (obj instanceof GraphNode)
+                    && identity.equals(((GraphNode) obj).identity);
         }
 
         private int getEstimatedNodesCount() {
