@@ -54,7 +54,7 @@ public class QuickSearchTest {
                 .build());
     }
 
-    @Test
+    @Test(expected = NullPointerException.class)
     public void missingNormaliser() {
         assertNotNull(QuickSearch.builder()
                 .withKeywordNormalizer(null)
@@ -146,7 +146,7 @@ public class QuickSearchTest {
         }
 
         checkStats(1, 13);
-        assertEquals(2, searchInstance.getStats().getItems());
+        assertEquals(1, searchInstance.getStats().getItems());
     }
 
     @Test
@@ -255,7 +255,7 @@ public class QuickSearchTest {
     @Test
     public void itemNotFound3() {
         addItem("test", "one two three");
-        assertTrue("Search item not found", searchInstance.findItemsWithDetail("one", 1).getResponseResultItems().isEmpty());
+        assertTrue("Search item not found", searchInstance.findItemsWithDetail("", 1).getResponseResultItems().isEmpty());
     }
 
     @Test
