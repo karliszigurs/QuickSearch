@@ -54,15 +54,14 @@ public class QuickSearchTest {
                 .build());
     }
 
-    @Test
+    @Test(expected = NullPointerException.class)
     public void missingNormaliser() {
         assertNotNull(QuickSearch.builder()
                 .withKeywordNormalizer(null)
                 .build());
-        assertTrue(1 == 2);
     }
 
-    @Test
+    @Test(expected = NullPointerException.class)
     public void missingScorer() {
         assertNotNull(QuickSearch.builder()
                 .withKeywordMatchScorer(null)
