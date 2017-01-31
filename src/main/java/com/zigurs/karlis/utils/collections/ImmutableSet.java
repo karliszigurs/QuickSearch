@@ -189,8 +189,7 @@ public final class ImmutableSet<T extends Comparable<? super T>> extends Abstrac
                 newElements, insertionPoint + 1, elements.length - insertionPoint);
         newElements[insertionPoint] = newElement;
 
-        return this; // Pretty fundamental, this will break a lot of stuff.
-//        return new ImmutableSet<>(newElements, true);
+        return new ImmutableSet<>(newElements, true);
     }
 
     /**
