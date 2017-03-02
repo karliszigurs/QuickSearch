@@ -159,9 +159,9 @@ public class QuickSearch<T extends Comparable<T>> {
         /* 0...1 depending on the length ratio */
         double matchScore = (double) keywordMatch.length() / (double) keyword.length();
 
-        /* boost by 1 if matches start of keyword */
+        /* boost by 2 if matches start of keyword */
         if (keyword.startsWith(keywordMatch))
-            matchScore += 1.0;
+            matchScore += 2.0;
 
         return matchScore;
     };
@@ -210,12 +210,12 @@ public class QuickSearch<T extends Comparable<T>> {
     }
 
     private QuickSearch(final QuickSearchBuilder builder) {
-        keywordsExtractor = builder.keywordsExtractor;
-        keywordNormalizer = builder.keywordNormalizer;
-        keywordMatchScorer = builder.keywordMatchScorer;
         unmatchedPolicy = builder.unmatchedPolicy;
         enableParallel = builder.enableForkJoin;
         enableKeywordsInterning = builder.enableKeywordsInterning;
+        keywordsExtractor = builder.keywordsExtractor;
+        keywordNormalizer = builder.keywordNormalizer;
+        keywordMatchScorer = builder.keywordMatchScorer;
 
         if (builder.mergePolicy == UNION) {
             mergeFunction = QuickSearch::unionMaps;
@@ -433,7 +433,7 @@ public class QuickSearch<T extends Comparable<T>> {
         return sortAndLimit(
                 results.entrySet(),
                 maxItemsToList,
-                (e1, e2) -> e2.getValue().compareTo(e1.getValue())
+                (e2, e1) -> e2.getValue().compareTo(e1.getValue())
         ).stream()
                 .map(e -> new SearchResult<>(e.getKey(), e.getValue()))
                 .collect(Collectors.toList());
