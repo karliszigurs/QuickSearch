@@ -88,7 +88,7 @@ public class QuickSearchTest {
                 .withKeywordsExtractor(s -> new HashSet<>(Arrays.asList("", "one", "blue", "yellow", null)))
                 .build();
         addItem("test", "onetwo three");
-        assertEquals("test", searchInstance.findItem("mellow").orElse(null));
+        assertEquals("test", searchInstance.findItem("yellow").orElse(null));
     }
 
     @Test
@@ -108,7 +108,7 @@ public class QuickSearchTest {
     @Test
     public void itemAdded() {
         addItem("item", "one two three");
-        checkStats(1, 24);
+        checkStats(1, 23);
         assertEquals(1, searchInstance.getStats().getItems());
     }
 
