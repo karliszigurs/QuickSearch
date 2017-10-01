@@ -1,0 +1,21 @@
+devfactory:
+  version: 1
+  excludes:
+    - a7reports/**
+    - tests/**
+    - sources-for-testing/**
+    - sources/A7HtmlClient/**
+    - sources/A7StdServer/src_base/artemispm/Version.java
+    - sources/A7StdServer/src_base/artemispm/serverutil/Dataset.java
+    - sources/A7StdCore/src_std/artemispm/trdo/TRClasses.java
+    - sources/A7EntCore/src_ent/artemispm/trdo/TRClasses.java
+  includes:
+    - sources/A7StdCore/**
+    - sources/A7StdServer/**
+    - sources/A7StdClient/**
+    - sources/A7EntCore/**
+    - sources/A7EntServer/**
+    - sources/A7EntClient/**
+    - sources/A7HtmlClient/src/**
+    - sources/A7HtmlClient/src_html_server/**
+
