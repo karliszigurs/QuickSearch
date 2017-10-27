@@ -24,6 +24,7 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+@Ignore
 public class QuickSearchMemoryUseTest {
 
     private static final String[][] USA_STATES = {
@@ -97,7 +98,6 @@ public class QuickSearchMemoryUseTest {
         assertTrue("Expected memory ceiling exceeded (see test source)", internTarget * 3 > measureMemoryUseImpl(fewItemsCount, true));
     }
 
-    @Ignore
     @Test
     public void manyItemsCountCheck() {
         /*
