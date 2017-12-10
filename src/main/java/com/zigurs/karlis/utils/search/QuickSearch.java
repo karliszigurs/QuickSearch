@@ -1,6 +1,6 @@
 /*
  *                                     //
- * Copyright 2016 Karlis Zigurs (http://zigurs.com)
+ * Copyright 2017 Karlis Zigurs (http://zigurs.com)
  *                                   //
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,12 +17,6 @@
  */
 package com.zigurs.karlis.utils.search;
 
-import com.zigurs.karlis.utils.collections.ImmutableSet;
-import com.zigurs.karlis.utils.search.graph.QSGraph;
-import com.zigurs.karlis.utils.search.model.QuickSearchStats;
-import com.zigurs.karlis.utils.search.model.Result;
-import com.zigurs.karlis.utils.search.model.ResultItem;
-
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -36,6 +30,12 @@ import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
+
+import com.zigurs.karlis.utils.collections.ImmutableSet;
+import com.zigurs.karlis.utils.search.graph.QSGraph;
+import com.zigurs.karlis.utils.search.model.QuickSearchStats;
+import com.zigurs.karlis.utils.search.model.Result;
+import com.zigurs.karlis.utils.search.model.ResultItem;
 
 import static com.zigurs.karlis.utils.search.QuickSearch.MergePolicy.UNION;
 import static com.zigurs.karlis.utils.search.QuickSearch.UnmatchedPolicy.BACKTRACKING;
@@ -90,10 +90,8 @@ import static com.zigurs.karlis.utils.sort.MagicSort.sortAndLimit;
  * <p>
  * A number of configuration options are available and documented via {@link QuickSearchBuilder}.
  * <p>
- * This class is thread safe. You'll get a cookie if you manage to break it. <small>I don't expect to part with any
- * cookies.</small>
- *
- * @author Karlis Zigurs, 2016
+ * This class is thread safe. You'll get a cookie or two if you manage to break it.
+ * <small>I don't expect to part with any cookies.</small>
  */
 public class QuickSearch<T extends Comparable<T>> {
 
@@ -211,7 +209,7 @@ public class QuickSearch<T extends Comparable<T>> {
         this(new QuickSearchBuilder()); // with defaults from builder
     }
 
-    private QuickSearch(final QuickSearchBuilder builder) {
+    private QuickSearch(QuickSearchBuilder builder) {
         keywordsExtractor = builder.keywordsExtractor;
         keywordNormalizer = builder.keywordNormalizer;
         keywordMatchScorer = builder.keywordMatchScorer;
@@ -240,12 +238,11 @@ public class QuickSearch<T extends Comparable<T>> {
      * invoked with an item that is already part of the index any keywords not previously known
      * will be added to mappings for this item (in addition to existing ones).
      *
-     * @param item     Item to return in search results
+     * @param item Item to return in search results
      * @param keywords keywords string. See {@link QuickSearchBuilder#withKeywordsExtractor(Function)}
-     *
      * @return true if the item was added, false if validations before adding failed
      */
-    public boolean addItem(final T item, final String keywords) {
+    public boolean addItem(T item, String keywords) {
         if (item == null || keywords == null || keywords.isEmpty())
             return false;
 
@@ -266,7 +263,7 @@ public class QuickSearch<T extends Comparable<T>> {
      *
      * @param item Item to remove
      */
-    public void removeItem(final T item) {
+    public void removeItem(T item) {
         if (item == null)
             return;
 
@@ -283,10 +280,9 @@ public class QuickSearch<T extends Comparable<T>> {
      * processing.
      *
      * @param searchString raw search string
-     *
      * @return {@link Optional} wrapping (or not) the top scoring item found in instance
      */
-    public Optional<T> findItem(final String searchString) {
+    public Optional<T> findItem(String searchString) {
         if (isInvalidRequest(searchString, 1))
             return Optional.empty();
 
@@ -306,12 +302,11 @@ public class QuickSearch<T extends Comparable<T>> {
     /**
      * Retrieve (find) top n items matching the supplied search string.
      *
-     * @param searchString     raw search string, e.g. "new york pizza"
+     * @param searchString raw search string, e.g. "new york pizza"
      * @param numberOfTopItems number of items the returned result should be limited to (1 to Integer.MAX_VALUE)
-     *
      * @return list (possibly empty) containing up to n top search results
      */
-    public List<T> findItems(final String searchString, final int numberOfTopItems) {
+    public List<T> findItems(String searchString, int numberOfTopItems) {
         if (isInvalidRequest(searchString, numberOfTopItems))
             return Collections.emptyList();
 
@@ -336,10 +331,9 @@ public class QuickSearch<T extends Comparable<T>> {
      * {@link ResultItem} response object containing known keywords and assigned search score.
      *
      * @param searchString raw search string
-     *
      * @return {@link Optional} wrapping (or not) the top scoring item, keywords and score found in instance
      */
-    public Optional<ResultItem<T>> findItemWithDetail(final String searchString) {
+    public Optional<ResultItem<T>> findItemWithDetail(String searchString) {
         if (isInvalidRequest(searchString, 1))
             return Optional.empty();
 
@@ -368,12 +362,11 @@ public class QuickSearch<T extends Comparable<T>> {
      * Retrieve (find) an augmented search result containing the search string and
      * wrapped found items with their scores and keywords.
      *
-     * @param searchString     raw search string, e.g. "new york pizza"
+     * @param searchString raw search string, e.g. "new york pizza"
      * @param numberOfTopItems number of items the returned result should be limited to (1 to Integer.MAX_VALUE)
-     *
      * @return wrapper containing zero to n top scoring items and search string
      */
-    public Result<T> findItemsWithDetail(final String searchString, final int numberOfTopItems) {
+    public Result<T> findItemsWithDetail(String searchString, int numberOfTopItems) {
         if (isInvalidRequest(searchString, numberOfTopItems))
             return new Result<>(searchString, Collections.emptyList(), numberOfTopItems);
 
@@ -420,14 +413,12 @@ public class QuickSearch<T extends Comparable<T>> {
      * Implementation methods
      */
 
-    private boolean isInvalidRequest(final String searchString, final int numItems) {
+    private boolean isInvalidRequest(String searchString, int numItems) {
         return searchString == null || searchString.isEmpty() || numItems < 1;
     }
 
-    private List<SearchResult<T>> doSearch(final ImmutableSet<String> searchKeywords,
-                                           final int maxItemsToList) {
-
-        final Map<T, Double> results = StreamSupport.stream(searchKeywords.spliterator(), enableParallel)
+    private List<SearchResult<T>> doSearch(ImmutableSet<String> searchKeywords, int maxItemsToList) {
+        Map<T, Double> results = StreamSupport.stream(searchKeywords.spliterator(), enableParallel)
                 .map(this::walkGraphAndScore)
                 .reduce(mergeFunction)
                 .orElseGet(HashMap::new);
@@ -445,15 +436,15 @@ public class QuickSearch<T extends Comparable<T>> {
      * Interfacing with the graph
      */
 
-    private void addItemImpl(final T item, final Set<String> suppliedKeywords) {
+    private void addItemImpl(T item, Set<String> suppliedKeywords) {
         graph.registerItem(item, suppliedKeywords);
     }
 
-    private void removeItemImpl(final T item) {
+    private void removeItemImpl(T item) {
         graph.unregisterItem(item);
     }
 
-    private Map<T, Double> walkGraphAndScore(final String keyword) {
+    private Map<T, Double> walkGraphAndScore(String keyword) {
         Map<T, Double> result = graph.walkAndScore(keyword, keywordMatchScorer);
 
         /* Check if we need to back off */
@@ -465,12 +456,11 @@ public class QuickSearch<T extends Comparable<T>> {
         return result;
     }
 
-    private ImmutableSet<String> prepareKeywords(final String keywordsString) {
+    private ImmutableSet<String> prepareKeywords(String keywordsString) {
         return prepareKeywords(keywordsString, false);
     }
 
-    private ImmutableSet<String> prepareKeywords(final String keywordsString,
-                                                 final boolean internKeywords) {
+    private ImmutableSet<String> prepareKeywords(String keywordsString, boolean internKeywords) {
         return ImmutableSet.fromCollection(
                 keywordsExtractor.apply(keywordsString).stream()
                         .filter(Objects::nonNull)        /* Guarantee a non-null, */
@@ -496,14 +486,12 @@ public class QuickSearch<T extends Comparable<T>> {
      * For performance reasons this function <em>modifies the maps supplied</em> and
      * possibly returns an instance of one of the supplied (by then modified) maps.
      *
-     * @param left  map to intersect
+     * @param left map to intersect
      * @param right map to intersect
-     * @param <T>   type of keys
-     *
+     * @param <T> type of keys
      * @return intersection with values summed
      */
-    private static <T> Map<T, Double> intersectMaps(final Map<T, Double> left,
-                                                   final Map<T, Double> right) {
+    private static <T> Map<T, Double> intersectMaps(Map<T, Double> left, Map<T, Double> right) {
         Map<T, Double> smaller = left.size() < right.size() ? left : right;
         Map<T, Double> bigger = smaller == left ? right : left;
 
@@ -516,16 +504,14 @@ public class QuickSearch<T extends Comparable<T>> {
      * For performance reasons this function <em>modifies the maps supplied</em> and
      * possibly returns an instance of one of the supplied (by then modified) maps.
      *
-     * @param left  map to intersect
+     * @param left map to intersect
      * @param right map to intersect
-     * @param <T>   type of keys
-     *
+     * @param <T> type of keys
      * @return intersection with values summed
      */
-    private static <T> Map<T, Double> unionMaps(final Map<T, Double> left,
-                                                final Map<T, Double> right) {
-        final Map<T, Double> smaller = (left.size() < right.size()) ? left : right;
-        final Map<T, Double> bigger = (smaller == left) ? right : left;
+    private static <T> Map<T, Double> unionMaps(Map<T, Double> left, Map<T, Double> right) {
+        Map<T, Double> smaller = (left.size() < right.size()) ? left : right;
+        Map<T, Double> bigger = (smaller == left) ? right : left;
 
         smaller.forEach((k, v) -> bigger.merge(k, v, (p, n) -> p + n));
         return bigger;
@@ -593,7 +579,6 @@ public class QuickSearch<T extends Comparable<T>> {
          * make sense I'd be very interested to hear about it.</small>
          *
          * @param scorerFunction function to use for keywords match scoring
-         *
          * @return current {@link QuickSearchBuilder} instance for configuration chaining
          */
         public QuickSearchBuilder withKeywordMatchScorer(BiFunction<String, String, Double> scorerFunction) {
@@ -628,7 +613,6 @@ public class QuickSearch<T extends Comparable<T>> {
          * make sense I'd be very interested to hear about it.</small>
          *
          * @param extractorFunction function to extract keywords from raw input strings
-         *
          * @return current {@link QuickSearchBuilder} instance for configuration chaining
          */
         public QuickSearchBuilder withKeywordsExtractor(Function<String, Set<String>> extractorFunction) {
@@ -677,7 +661,6 @@ public class QuickSearch<T extends Comparable<T>> {
          * make sense I'd be very interested to hear about it.</small>
          *
          * @param normalizerFunction function as described above
-         *
          * @return current {@link QuickSearchBuilder} instance for configuration chaining
          */
         public QuickSearchBuilder withKeywordNormalizer(Function<String, String> normalizerFunction) {
@@ -691,7 +674,6 @@ public class QuickSearch<T extends Comparable<T>> {
          * Set {@link UnmatchedPolicy} for created {@link QuickSearch} instance.
          *
          * @param unmatchedPolicy policy to use
-         *
          * @return current {@link QuickSearchBuilder} instance for configuration chaining
          */
         public QuickSearchBuilder withUnmatchedPolicy(UnmatchedPolicy unmatchedPolicy) {
@@ -705,7 +687,6 @@ public class QuickSearch<T extends Comparable<T>> {
          * Set {@link MergePolicy} for created {@link QuickSearch} instance.
          *
          * @param mergePolicy policy to use
-         *
          * @return current {@link QuickSearchBuilder} instance for configuration chaining
          */
         public QuickSearchBuilder withMergePolicy(MergePolicy mergePolicy) {
@@ -727,7 +708,6 @@ public class QuickSearch<T extends Comparable<T>> {
          * maintenance complexity).
          *
          * @param enable enable parallel processing
-         *
          * @return current {@link QuickSearchBuilder} instance for configuration chaining
          */
         public QuickSearchBuilder withParallelProcessing(boolean enable) {
@@ -756,7 +736,6 @@ public class QuickSearch<T extends Comparable<T>> {
          * noisy neighbours on AWS and GCE.
          *
          * @param enable enable keywords interning
-         *
          * @return current {@link QuickSearchBuilder} instance for configuration chaining
          */
         public QuickSearchBuilder withKeywordsInterning(boolean enable) {
@@ -777,7 +756,6 @@ public class QuickSearch<T extends Comparable<T>> {
          * One shiny {@link QuickSearch} instance with specified configuration parameters coming up.
          *
          * @param <T> required instance type
-         *
          * @return new {@link QuickSearch} instance with this {@link QuickSearchBuilder}s configuration
          */
         public <T extends Comparable<T>> QuickSearch<T> build() {
@@ -793,7 +771,7 @@ public class QuickSearch<T extends Comparable<T>> {
         private final T item;
         private final double score;
 
-        private SearchResult(final T item, final double score) {
+        private SearchResult(T item, double score) {
             this.item = item;
             this.score = score;
         }

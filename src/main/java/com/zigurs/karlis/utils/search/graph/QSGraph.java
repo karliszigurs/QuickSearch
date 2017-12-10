@@ -1,6 +1,6 @@
 /*
  *                                     //
- * Copyright 2016 Karlis Zigurs (http://zigurs.com)
+ * Copyright 2017 Karlis Zigurs (http://zigurs.com)
  *                                   //
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,9 +17,6 @@
  */
 package com.zigurs.karlis.utils.search.graph;
 
-import com.zigurs.karlis.utils.collections.ImmutableSet;
-import com.zigurs.karlis.utils.search.model.QuickSearchStats;
-
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -28,6 +25,9 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.locks.StampedLock;
 import java.util.function.BiFunction;
+
+import com.zigurs.karlis.utils.collections.ImmutableSet;
+import com.zigurs.karlis.utils.search.model.QuickSearchStats;
 
 /**
  * QuickSearch
@@ -63,11 +63,10 @@ public class QSGraph<T extends Comparable<T>> {
      * <p>
      * If the corresponding nodes already exist, the item will simply be added as a leaf.
      *
-     * @param item             item to add
+     * @param item item to add
      * @param suppliedKeywords keywords to construct graph for
      */
-    public void registerItem(final T item,
-                             final Set<String> suppliedKeywords) {
+    public void registerItem(T item, Set<String> suppliedKeywords) {
         long writeLock = stampedLock.writeLock();
         try {
             suppliedKeywords.forEach(keyword -> createAndRegisterNode(null, keyword, item));
@@ -87,7 +86,7 @@ public class QSGraph<T extends Comparable<T>> {
      *
      * @param item item to remove
      */
-    public void unregisterItem(final T item) {
+    public void unregisterItem(T item) {
         long writeLock = stampedLock.writeLock();
         try {
             if (itemKeywordsMap.containsKey(item)) {
@@ -111,13 +110,11 @@ public class QSGraph<T extends Comparable<T>> {
      * (according to the supplied scoring {@code BiFunction<String, String, Double>})
      * encountered at any visit to an item.
      *
-     * @param fragment       keyword or keyword fragment to start walk from
+     * @param fragment keyword or keyword fragment to start walk from
      * @param scorerFunction function that will be called with the supplied fragment and node identity to score match
-     *
      * @return map of accumulated items with their highest score encountered during walk (may be empty)
      */
-    public Map<T, Double> walkAndScore(final String fragment,
-                                       final BiFunction<String, String, Double> scorerFunction) {
+    public Map<T, Double> walkAndScore(String fragment, BiFunction<String, String, Double> scorerFunction) {
         long readLock = stampedLock.readLock();
         try {
             return walkAndScoreImpl(fragment, scorerFunction);
@@ -131,10 +128,9 @@ public class QSGraph<T extends Comparable<T>> {
      * (or empty set if the item mapping is not recognized).
      *
      * @param item previously registered item
-     *
      * @return set of associated keywords, possibly empty
      */
-    public Set<String> getItemKeywords(final T item) {
+    public Set<String> getItemKeywords(T item) {
         /* safe to skip locking */
         ImmutableSet<String> keywords = itemKeywordsMap.get(item);
 
@@ -174,13 +170,11 @@ public class QSGraph<T extends Comparable<T>> {
      * Implementation code
      */
 
-    private void createAndRegisterNode(final GraphNode<T> parent,
-                                       final String identity,
-                                       final T item) {
+    private void createAndRegisterNode(GraphNode<T> parent, String identity, T item) {
         GraphNode<T> node = fragmentsNodesMap.get(identity);
 
         if (node == null) {
-            final String internedIdentity = identity.intern();
+            String internedIdentity = identity.intern();
 
             node = new GraphNode<>(internedIdentity);
             fragmentsNodesMap.put(internedIdentity, node);
@@ -199,8 +193,7 @@ public class QSGraph<T extends Comparable<T>> {
             node.addParent(parent);
     }
 
-    private void removeEdge(final GraphNode<T> node,
-                            final GraphNode<T> parent) {
+    private void removeEdge(GraphNode<T> node, GraphNode<T> parent) {
         if (node == null) //already removed
             return;
 
@@ -212,7 +205,8 @@ public class QSGraph<T extends Comparable<T>> {
             fragmentsNodesMap.remove(node.getIdentity());
 
             if (node.getIdentity().length() > 1) {
-                removeEdge(fragmentsNodesMap.get(node.getIdentity().substring(0, node.getIdentity().length() - 1)), node);
+                removeEdge(fragmentsNodesMap
+                                .get(node.getIdentity().substring(0, node.getIdentity().length() - 1)), node);
                 removeEdge(fragmentsNodesMap.get(node.getIdentity().substring(1)), node);
             }
         }
@@ -222,8 +216,7 @@ public class QSGraph<T extends Comparable<T>> {
      * Graph walking
      */
 
-    private Map<T, Double> walkAndScoreImpl(final String fragment,
-                                            final BiFunction<String, String, Double> scorerFunction) {
+    private Map<T, Double> walkAndScoreImpl(String fragment, BiFunction<String, String, Double> scorerFunction) {
         GraphNode<T> root = fragmentsNodesMap.get(fragment);
 
         if (root == null) {
@@ -245,11 +238,8 @@ public class QSGraph<T extends Comparable<T>> {
         }
     }
 
-    private void walkAndScore(final String originalFragment,
-                              final GraphNode<T> node,
-                              final Map<T, Double> accumulated,
-                              final Set<String> visited,
-                              final BiFunction<String, String, Double> keywordMatchScorer) {
+    private void walkAndScore(String originalFragment, GraphNode<T> node, Map<T, Double> accumulated,
+                              Set<String> visited, BiFunction<String, String, Double> keywordMatchScorer) {
         visited.add(node.getIdentity());
 
         if (!node.getItems().isEmpty()) {
@@ -293,7 +283,7 @@ public class QSGraph<T extends Comparable<T>> {
          *
          * @param fragment any string you like
          */
-        private GraphNode(final String fragment) {
+        private GraphNode(String fragment) {
             Objects.requireNonNull(fragment);
             this.identity = fragment;
             this.items = ImmutableSet.emptySet();
@@ -324,7 +314,7 @@ public class QSGraph<T extends Comparable<T>> {
          *
          * @param item item to add.
          */
-        private void addItem(final V item) {
+        private void addItem(V item) {
             items = items.createInstanceByAdding(item);
         }
 
@@ -333,7 +323,7 @@ public class QSGraph<T extends Comparable<T>> {
          *
          * @param item item to remove.
          */
-        private void removeItem(final V item) {
+        private void removeItem(V item) {
             items = items.createInstanceByRemoving(item);
         }
 
@@ -353,7 +343,7 @@ public class QSGraph<T extends Comparable<T>> {
          *
          * @param parent parent to add.
          */
-        private void addParent(final GraphNode<V> parent) {
+        private void addParent(GraphNode<V> parent) {
             parents = parents.createInstanceByAdding(parent);
         }
 
@@ -362,13 +352,19 @@ public class QSGraph<T extends Comparable<T>> {
          *
          * @param parent parent to remove.
          */
-        private void removeParent(final GraphNode<V> parent) {
+        private void removeParent(GraphNode<V> parent) {
             parents = parents.createInstanceByRemoving(parent);
         }
 
         @Override
-        public int compareTo(GraphNode<V> o) {
-            return identity.compareTo(o.identity);
+        public int compareTo(GraphNode<V> graphNode) {
+            return identity.compareTo(graphNode.identity);
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            return obj instanceof GraphNode
+                    && identity.equals(((GraphNode) obj).identity);
         }
 
         private int getEstimatedNodesCount() {

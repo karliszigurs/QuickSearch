@@ -1,5 +1,7 @@
 /*
- * Copyright 2016 Karlis Zigurs
+ *                                     //
+ * Copyright 2017 Karlis Zigurs (http://zigurs.com)
+ *                                   //
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,21 +17,29 @@
  */
 package com.zigurs.karlis.utils.search;
 
-import com.zigurs.karlis.utils.search.model.QuickSearchStats;
-import com.zigurs.karlis.utils.search.model.Result;
-import com.zigurs.karlis.utils.search.model.ResultItem;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Function;
+import com.zigurs.karlis.utils.search.model.QuickSearchStats;
+import com.zigurs.karlis.utils.search.model.Result;
+import com.zigurs.karlis.utils.search.model.ResultItem;
 
 import static com.zigurs.karlis.utils.search.QuickSearch.MergePolicy.INTERSECTION;
 import static com.zigurs.karlis.utils.search.QuickSearch.MergePolicy.UNION;
 import static com.zigurs.karlis.utils.search.QuickSearch.UnmatchedPolicy.IGNORE;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 public class QuickSearchTest {
 
@@ -247,25 +257,29 @@ public class QuickSearchTest {
     @Test
     public void itemNotFound9() {
         addItem("test", "one two three");
-        assertTrue("Search item not found", searchInstance.findItemsWithDetail("    ", 1).getResponseResultItems().isEmpty());
+        assertTrue("Search item not found",
+                searchInstance.findItemsWithDetail("    ", 1).getResponseResultItems().isEmpty());
     }
 
     @Test
     public void itemNotFound3() {
         addItem("test", "one two three");
-        assertTrue("Search item not found", searchInstance.findItemsWithDetail("", 1).getResponseResultItems().isEmpty());
+        assertTrue("Search item not found",
+                searchInstance.findItemsWithDetail("", 1).getResponseResultItems().isEmpty());
     }
 
     @Test
     public void itemNotFound4() {
         addItem("test", "one two three");
-        assertTrue("Search item not found", searchInstance.findItemsWithDetail("", 0).getResponseResultItems().isEmpty());
+        assertTrue("Search item not found",
+                searchInstance.findItemsWithDetail("", 0).getResponseResultItems().isEmpty());
     }
 
     @Test
     public void itemNotFound5() {
         addItem("test", "one two three");
-        assertTrue("Search item not found", searchInstance.findItemsWithDetail(null, 1).getResponseResultItems().isEmpty());
+        assertTrue("Search item not found",
+                searchInstance.findItemsWithDetail(null, 1).getResponseResultItems().isEmpty());
     }
 
     @Test
@@ -277,7 +291,8 @@ public class QuickSearchTest {
     @Test
     public void itemNotFound7() {
         addItem("test", "one two three");
-        assertTrue("Search item not found", searchInstance.findItemsWithDetail("four five", 1).getResponseResultItems().isEmpty());
+        assertTrue("Search item not found",
+                searchInstance.findItemsWithDetail("four five", 1).getResponseResultItems().isEmpty());
     }
 
     @Test
@@ -348,10 +363,14 @@ public class QuickSearchTest {
         addItem("test2", "one two three intersecting");
         addItem("test3", "one three");
 
-        assertEquals(2.0, searchInstance.findItemWithDetail("two").orElse(null).getScore(), 0);
-        assertEquals(4.0, searchInstance.findItemWithDetail("two three").orElse(null).getScore(), 0);
-        assertEquals(4.5, searchInstance.findItemWithDetail("two three ecting").orElse(null).getScore(), 0);
-        assertEquals(5.5, searchInstance.findItemWithDetail("two three inters").orElse(null).getScore(), 0);
+        assertEquals(2.0, searchInstance.findItemWithDetail("two")
+                .orElseThrow(NullPointerException::new).getScore(), 0);
+        assertEquals(4.0, searchInstance.findItemWithDetail("two three")
+                .orElseThrow(NullPointerException::new).getScore(), 0);
+        assertEquals(4.5, searchInstance.findItemWithDetail("two three ecting")
+                .orElseThrow(NullPointerException::new).getScore(), 0);
+        assertEquals(5.5, searchInstance.findItemWithDetail("two three inters")
+                .orElseThrow(NullPointerException::new).getScore(), 0);
     }
 
     @Test
@@ -388,7 +407,8 @@ public class QuickSearchTest {
         addItem("test1", "one two three");
         addItem("test2", "one two three");
         addItem("test3", "one two three");
-        assertTrue("Unexpected results", searchInstance.findItemsWithDetail("       ", 10).getResponseResultItems().isEmpty());
+        assertTrue("Unexpected results",
+                searchInstance.findItemsWithDetail("       ", 10).getResponseResultItems().isEmpty());
     }
 
     @Test
@@ -555,8 +575,9 @@ public class QuickSearchTest {
 
     @Test
     public void largeUnionWorks() {
-        for (int i = 0; i < 1000; i++)
+        for (int i = 0; i < 1000; i++) {
             addItem("Item" + i, "one two three");
+        }
 
         Result<String> res = searchInstance.findItemsWithDetail("two three", 10);
 
@@ -645,10 +666,29 @@ public class QuickSearchTest {
 
     @Test
     public void parallelIntersectionWorks() {
+        verifyParallelAndInterning(true, true);
+    }
+
+    @Test
+    public void serialIntersectionWorks() {
+        verifyParallelAndInterning(false, true);
+    }
+
+    @Test
+    public void interningWorks() {
+        verifyParallelAndInterning(false, true);
+    }
+
+    @Test
+    public void noInterningWorks() {
+        verifyParallelAndInterning(false, false);
+    }
+
+    private void verifyParallelAndInterning(boolean parallelProcessing, boolean interning) {
         searchInstance = QuickSearch.builder()
                 .withMergePolicy(INTERSECTION)
-                .withParallelProcessing()
-                .withKeywordsInterning()
+                .withParallelProcessing(parallelProcessing)
+                .withKeywordsInterning(interning)
                 .build();
 
         addItem("test1", "one two");
@@ -668,9 +708,18 @@ public class QuickSearchTest {
 
     @Test
     public void parallelUnionWorks() {
+        verifyUnion(true);
+    }
+
+    @Test
+    public void serialUnionWorks() {
+        verifyUnion(false);
+    }
+
+    private void verifyUnion(boolean parallelProcessing) {
         searchInstance = QuickSearch.builder()
                 .withMergePolicy(UNION)
-                .withParallelProcessing()
+                .withParallelProcessing(parallelProcessing)
                 .build();
 
         addItem("test1", "one two");
@@ -744,12 +793,12 @@ public class QuickSearchTest {
         String[] categories = new String[]{"Shoes", "Jackets", "Skirts"};
 
         for (int i = 0; i < 1_000; i++) {
-            items.add(new StoreItem(i, "StoreItem", categories[i % 3],
+            items.add(new StoreItem(i, categories[i % 3],
                     String.format("Item%d %s", i, categories[i % 3])));
         }
 
-        items.add(new StoreItem(1, "Lord of The Rings",
-                "Fantasy", "tolkien fantasy hardbound middle earth lord of the rings"));
+        items.add(new StoreItem(1, "Fantasy",
+                "tolkien fantasy hardbound middle earth lord of the rings"));
 
         // create a quick search for StoreItems
         QuickSearch<StoreItem> search = QuickSearch.<StoreItem>builder().build();
@@ -782,22 +831,25 @@ public class QuickSearchTest {
         assertNotNull(QuickSearch.MergePolicy.valueOf("UNION"));
         assertNotNull(QuickSearch.MergePolicy.valueOf("INTERSECTION"));
 
-        for (QuickSearch.MergePolicy policy : QuickSearch.MergePolicy.values())
+        for (QuickSearch.MergePolicy policy : QuickSearch.MergePolicy.values()) {
             assertNotNull(policy.toString());
+        }
 
         assertNotNull(QuickSearch.UnmatchedPolicy.valueOf("IGNORE"));
         assertNotNull(QuickSearch.UnmatchedPolicy.valueOf("BACKTRACKING"));
 
-        for (QuickSearch.UnmatchedPolicy policy : QuickSearch.UnmatchedPolicy.values())
+        for (QuickSearch.UnmatchedPolicy policy : QuickSearch.UnmatchedPolicy.values()) {
             assertNotNull(policy.toString());
+        }
     }
 
     @Test
     public void shouldSurviveMisbehavingFunctions() {
         AtomicInteger normalizerCounter = new AtomicInteger(-1);
         Function<String, String> misbehavingNormalizer = s -> {
-            if (s == null || s.trim().isEmpty())
+            if (s == null || s.trim().isEmpty()) {
                 throw new IllegalStateException("Shouldn't reach here");
+            }
 
             switch (normalizerCounter.incrementAndGet()) {
                 case 0:
@@ -849,23 +901,13 @@ public class QuickSearchTest {
     private static final class StoreItem implements Comparable<StoreItem> {
 
         private final int itemIdentifier;
-        private final String name;
         private final String category;
         private final String description;
 
-        private StoreItem(int itemIdentifier, String name, String category, String description) {
+        private StoreItem(int itemIdentifier, String category, String description) {
             this.itemIdentifier = itemIdentifier;
-            this.name = name;
             this.category = category;
             this.description = description;
-        }
-
-        private int getItemIdentifier() {
-            return itemIdentifier;
-        }
-
-        private String getName() {
-            return name;
         }
 
         private String getCategory() {
@@ -877,17 +919,19 @@ public class QuickSearchTest {
         }
 
         @Override
-        public String toString() {
-            return String.format("(%s (%d) \"%s\")",
-                    getName(),
-                    getItemIdentifier(),
-                    getDescription()
-            );
+        public int compareTo(StoreItem item) {
+            return Integer.compare(itemIdentifier, item.itemIdentifier);
         }
 
         @Override
-        public int compareTo(StoreItem o) {
-            return Integer.compare(itemIdentifier, o.itemIdentifier);
+        public boolean equals(Object obj) {
+            return obj instanceof StoreItem
+                    && itemIdentifier == ((StoreItem) obj).itemIdentifier;
+        }
+
+        @Override
+        public int hashCode() {
+            return Integer.hashCode(itemIdentifier);
         }
     }
 }

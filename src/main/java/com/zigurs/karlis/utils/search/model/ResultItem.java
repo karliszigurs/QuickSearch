@@ -1,6 +1,6 @@
 /*
  *                                     //
- * Copyright 2016 Karlis Zigurs (http://zigurs.com)
+ * Copyright 2017 Karlis Zigurs (http://zigurs.com)
  *                                   //
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -34,13 +34,11 @@ public class ResultItem<T> {
     /**
      * Construct an instance.
      *
-     * @param result       result
+     * @param result result
      * @param itemKeywords set of non-null keywords associated with result
-     * @param score        search result score for the result
+     * @param score search result score for the result
      */
-    public ResultItem(final T result,
-                      final Set<String> itemKeywords,
-                      final double score) {
+    public ResultItem(T result, Set<String> itemKeywords, double score) {
         this.result = result;
         this.itemKeywords = itemKeywords;
         this.score = score;

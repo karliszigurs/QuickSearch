@@ -1,6 +1,6 @@
 /*
  *                                     //
- * Copyright 2016 Karlis Zigurs (http://zigurs.com)
+ * Copyright 2017 Karlis Zigurs (http://zigurs.com)
  *                                   //
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -51,8 +51,6 @@ import static java.util.Arrays.parallelSort;
  * This implementation does not permit {@code null} elements.
  * <p>
  * This implementation is thread-safe.
- *
- * @author Karlis Zigurs, 2016
  */
 public final class ImmutableSet<T extends Comparable<? super T>> extends AbstractSet<T> {
 
@@ -65,12 +63,11 @@ public final class ImmutableSet<T extends Comparable<? super T>> extends Abstrac
     /** Cached hashcode. */
     private int cachedHashCode; // = 0 by default
 
-    private ImmutableSet(final T[] uniqueNonNullElements) {
+    private ImmutableSet(T[] uniqueNonNullElements) {
         this(uniqueNonNullElements, false);
     }
 
-    private ImmutableSet(final T[] uniqueNonNullElements,
-                         final boolean alreadySorted) {
+    private ImmutableSet(T[] uniqueNonNullElements, boolean alreadySorted) {
         Objects.requireNonNull(uniqueNonNullElements);
 
         /* Private constructor, so no need to worry
@@ -88,9 +85,9 @@ public final class ImmutableSet<T extends Comparable<? super T>> extends Abstrac
     }
 
     @Override
-    public boolean contains(final Object o) {
-        return (o instanceof Comparable)
-                && (binarySearch(elements, o) > -1);
+    public boolean contains(Object obj) {
+        return obj instanceof Comparable
+                && binarySearch(elements, obj) > -1;
     }
 
     @Override
@@ -99,10 +96,10 @@ public final class ImmutableSet<T extends Comparable<? super T>> extends Abstrac
     }
 
     @Override
-    public void forEach(final Consumer<? super T> action) {
+    public void forEach(Consumer<? super T> action) {
         Objects.requireNonNull(action);
 
-        for (final T element : elements)
+        for (T element : elements)
             action.accept(element);
     }
 
@@ -118,7 +115,7 @@ public final class ImmutableSet<T extends Comparable<? super T>> extends Abstrac
         if (cachedHashCode == 0) {
             int newHashCode = 0;
 
-            for (final T element : elements)
+            for (T element : elements)
                 newHashCode += element.hashCode();
 
             cachedHashCode = newHashCode;
@@ -130,34 +127,32 @@ public final class ImmutableSet<T extends Comparable<? super T>> extends Abstrac
     /**
      * Follows {@link AbstractSet#equals(Object)} semantics.
      *
-     * @param o object to compare to
-     *
+     * @param obj object to compare to
      * @return {@code true} if compared to set consisting of equal elements
      */
     @Override
-    public boolean equals(final Object o) {
-        if (o == this)
+    public boolean equals(Object obj) {
+        if (obj == this)
             return true;
 
-        if (!(o instanceof Set))
+        if (!(obj instanceof Set))
             return false;
 
-        final Set<?> set = (Set<?>) o;
+        Set<?> set = (Set<?>) obj;
 
-        return (set.size() == size())
-                && containsAll(set);
+        return set.size() == size() && containsAll(set);
     }
 
     @Override
     public Spliterator<T> spliterator() {
         return Spliterators.spliterator(elements,
-                Spliterator.ORDERED
-                        | Spliterator.DISTINCT
-                        | Spliterator.SORTED
-                        | Spliterator.SIZED
-                        | Spliterator.SUBSIZED
-                        | Spliterator.NONNULL
-                        | Spliterator.IMMUTABLE
+                                        Spliterator.ORDERED
+                                                | Spliterator.DISTINCT
+                                                | Spliterator.SORTED
+                                                | Spliterator.SIZED
+                                                | Spliterator.SUBSIZED
+                                                | Spliterator.NONNULL
+                                                | Spliterator.IMMUTABLE
         );
     }
 
@@ -170,25 +165,24 @@ public final class ImmutableSet<T extends Comparable<? super T>> extends Abstrac
      * to contents of this set. This set will remain unmodified.
      *
      * @param newElement element to add
-     *
      * @return new instance with the element added or current instance if element was already present
      */
-    public ImmutableSet<T> createInstanceByAdding(final T newElement) {
+    public ImmutableSet<T> createInstanceByAdding(T newElement) {
         Objects.requireNonNull(newElement);
 
-        final int newElementIndex = binarySearch(elements, newElement);
+        int newElementIndex = binarySearch(elements, newElement);
 
         if (newElementIndex > -1) // already contains
             return this;
 
         /* newElementIndex becomes insertionPoint thanks to contract of binarySearch */
-        final int insertionPoint = (-newElementIndex) - 1;
+        int insertionPoint = (-newElementIndex) - 1;
 
-        final T[] newElements = newArraySizeOf(elements.length + 1);
+        T[] newElements = newArraySizeOf(elements.length + 1);
 
         arraycopy(elements, 0, newElements, 0, insertionPoint);
         arraycopy(elements, insertionPoint,
-                newElements, insertionPoint + 1, elements.length - insertionPoint);
+                  newElements, insertionPoint + 1, elements.length - insertionPoint);
         newElements[insertionPoint] = newElement;
 
         return new ImmutableSet<>(newElements, true);
@@ -199,16 +193,15 @@ public final class ImmutableSet<T extends Comparable<? super T>> extends Abstrac
      * from this set. This set will remain unmodified.
      *
      * @param elementToRemove element to remove
-     *
      * @return new instance with element removed or current instance if specified item is not present
      */
-    public ImmutableSet<T> createInstanceByRemoving(final T elementToRemove) {
+    public ImmutableSet<T> createInstanceByRemoving(T elementToRemove) {
         Objects.requireNonNull(elementToRemove);
 
         if (isEmpty())
             return this;
 
-        final int existingItemIndex = binarySearch(elements, elementToRemove);
+        int existingItemIndex = binarySearch(elements, elementToRemove);
 
         if (existingItemIndex < 0) // not present
             return this;
@@ -220,11 +213,11 @@ public final class ImmutableSet<T extends Comparable<? super T>> extends Abstrac
          * Remove from a known position
          */
 
-        final T[] newElements = newArraySizeOf(elements.length - 1);
+        T[] newElements = newArraySizeOf(elements.length - 1);
 
         arraycopy(elements, 0, newElements, 0, existingItemIndex);
         arraycopy(elements, existingItemIndex + 1,
-                newElements, existingItemIndex, newElements.length - existingItemIndex);
+                  newElements, existingItemIndex, newElements.length - existingItemIndex);
 
         return new ImmutableSet<>(newElements, true);
     }
@@ -237,7 +230,6 @@ public final class ImmutableSet<T extends Comparable<? super T>> extends Abstrac
      * Empty set of given type.
      *
      * @param <T> type
-     *
      * @return empty set
      */
     public static <T extends Comparable<? super T>> ImmutableSet<T> emptySet() {
@@ -248,14 +240,13 @@ public final class ImmutableSet<T extends Comparable<? super T>> extends Abstrac
      * Set of single element.
      *
      * @param element element to wrap
-     * @param <T>     type
-     *
+     * @param <T> type
      * @return set containing single element
      */
-    public static <T extends Comparable<? super T>> ImmutableSet<T> singletonSet(final T element) {
+    public static <T extends Comparable<? super T>> ImmutableSet<T> singletonSet(T element) {
         Objects.requireNonNull(element);
 
-        final T[] newArray = newArraySizeOf(1);
+        T[] newArray = newArraySizeOf(1);
         newArray[0] = element;
 
         return new ImmutableSet<>(newArray);
@@ -266,11 +257,10 @@ public final class ImmutableSet<T extends Comparable<? super T>> extends Abstrac
      * from the specified {@link Collection}.
      *
      * @param source source collection
-     * @param <T>    type
-     *
+     * @param <T> type
      * @return immutable set of unique, non-null elements
      */
-    public static <T extends Comparable<? super T>> ImmutableSet<T> fromCollection(final Collection<? extends T> source) {
+    public static <T extends Comparable<? super T>> ImmutableSet<T> fromCollection(Collection<? extends T> source) {
         Objects.requireNonNull(source);
 
         if (source.isEmpty())
@@ -280,13 +270,13 @@ public final class ImmutableSet<T extends Comparable<? super T>> extends Abstrac
             return (ImmutableSet<T>) source;
 
         if (source instanceof Set) {
-            final Set set = (Set) source;
+            Set set = (Set) source;
             set.remove(null);
             return new ImmutableSet<>(arrayFromCollection(set));
         }
 
         /* and brute force fallback */
-        final Set<T> set = new HashSet<>(source.size());
+        Set<T> set = new HashSet<>(source.size());
 
         set.addAll(source);
         set.remove(null);
@@ -297,14 +287,13 @@ public final class ImmutableSet<T extends Comparable<? super T>> extends Abstrac
     /**
      * Create an {@link ImmutableSet} instance consisting of union of two {@link Collection}s.
      *
-     * @param left  left source collection
+     * @param left left source collection
      * @param right right source collection
-     * @param <T>   type
-     *
+     * @param <T> type
      * @return set of all unique, non-null elements from both collections
      */
-    public static <T extends Comparable<? super T>> ImmutableSet<T> fromCollections(final Collection<? extends T> left,
-                                                                                    final Collection<? extends T> right) {
+    public static <T extends Comparable<? super T>> ImmutableSet<T> fromCollections(Collection<? extends T> left,
+                                                                                    Collection<? extends T> right) {
         Objects.requireNonNull(left);
         Objects.requireNonNull(right);
 
@@ -315,7 +304,7 @@ public final class ImmutableSet<T extends Comparable<? super T>> extends Abstrac
             return fromCollection(left);
 
         /* brute force it is */
-        final Set<T> set = new HashSet<>(left.size() + right.size());
+        Set<T> set = new HashSet<>(left.size() + right.size());
 
         set.addAll(left);
         set.addAll(right);
@@ -324,15 +313,17 @@ public final class ImmutableSet<T extends Comparable<? super T>> extends Abstrac
         return new ImmutableSet<>(arrayFromCollection(set));
     }
 
-    /** Helper to consolidate toArray(T[]) calls. */
-    private static <T extends Comparable<? super T>> T[] arrayFromCollection(final Collection<? extends T> collection) {
+    /**
+     * Helper to consolidate toArray(T[]) calls.
+     */
+    private static <T extends Comparable<? super T>> T[] arrayFromCollection(Collection<? extends T> collection) {
         return collection.toArray(newArraySizeOf(collection.size()));
     }
 
     /**
      * Helper to supply new arrays of erasure type from a single location.
      */
-    private static <T extends Comparable<? super T>> T[] newArraySizeOf(final int size) {
+    private static <T extends Comparable<? super T>> T[] newArraySizeOf(int size) {
         return (T[]) new Comparable[size];
     }
 
@@ -346,7 +337,7 @@ public final class ImmutableSet<T extends Comparable<? super T>> extends Abstrac
         private final T[] array;
         private int index;
 
-        ArrayIterator(final T[] elements) {
+        ArrayIterator(T[] elements) {
             Objects.requireNonNull(elements);
             array = elements;
         }

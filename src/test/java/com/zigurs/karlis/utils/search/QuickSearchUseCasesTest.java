@@ -1,8 +1,29 @@
+/*
+ *                                     //
+ * Copyright 2017 Karlis Zigurs (http://zigurs.com)
+ *                                   //
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.zigurs.karlis.utils.search;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import org.junit.Test;
-
-import java.util.*;
 
 import static com.zigurs.karlis.utils.search.QuickSearch.MergePolicy.INTERSECTION;
 import static com.zigurs.karlis.utils.search.QuickSearch.UnmatchedPolicy.IGNORE;
@@ -65,10 +86,15 @@ public class QuickSearchUseCasesTest {
                 .build();
 
         /* Create a few 'faceted' objects */
-        FacetedObject<String> server1 = new FacetedObject<>("Server 1", new HashSet<>(Arrays.asList("location:dc1", "type:small", "host:io.startup.signups", "rootauth:Password1")));
-        FacetedObject<String> server2 = new FacetedObject<>("Server 2", new HashSet<>(Arrays.asList("location:dc1", "type:large", "host:io.startup.site", "rootauth:Pa$$word!")));
-        FacetedObject<String> server3 = new FacetedObject<>("Server 3", new HashSet<>(Arrays.asList("location:dc2", "type:large", "host:io.startup.site-qa", "rootauth:password")));
-        FacetedObject<String> server4 = new FacetedObject<>("Server 4", new HashSet<>(Arrays.asList("location:dc8", "type:gigantic", "host:com.zigurs.karlis")));
+        FacetedObject<String> server1 = new FacetedObject<>("Server 1", new HashSet<>(
+                Arrays.asList("location:dc1", "type:small", "host:io.startup.signups", "rootauth:Password1")));
+        FacetedObject<String> server2 = new FacetedObject<>("Server 2", new HashSet<>(
+                Arrays.asList("location:dc1", "type:large", "host:io.startup.site", "rootauth:Pa$$word!")));
+        FacetedObject<String> server3 = new FacetedObject<>("Server 3", new HashSet<>(
+                Arrays.asList("location:dc2", "type:large", "host:io.startup.site-qa", "rootauth:password")));
+        FacetedObject<String> server4 = new FacetedObject<>("Server 4",
+                new HashSet<>(Arrays.asList("location:dc8", "type:gigantic",
+                        "host:com.zigurs.karlis")));
 
         /* Add them to search index */
         facetedStringsSearch.addItem(server1, String.join(",", server1.getFacets()));
@@ -80,7 +106,8 @@ public class QuickSearchUseCasesTest {
         assertEquals(2, facetedStringsSearch.findItems("location:dc1", Integer.MAX_VALUE).size());
 
         /* Find all large instances in dc2 (there's only one) */
-        assertEquals("Server 3", facetedStringsSearch.findItems("location:dc2,type:large", Integer.MAX_VALUE).get(0).getObject());
+        assertEquals("Server 3",
+                facetedStringsSearch.findItems("location:dc2,type:large", Integer.MAX_VALUE).get(0).getObject());
 
         /* Find nothing in case of only partial match */
         assertEquals(0, facetedStringsSearch.findItems("location:dc", Integer.MAX_VALUE).size());
@@ -118,8 +145,9 @@ public class QuickSearchUseCasesTest {
         assertEquals("books » diy » dvd repair", repair.getDisplayPath());
 
         /* Add all items with their category path as the keywords */
-        for (StoreCategory category : categories)
+        for (StoreCategory category : categories) {
             categoriesSearch.addItem(category, category.getDisplayPath());
+        }
 
         /* Find all items matching dvd */
         List<StoreCategory> foundCategories = categoriesSearch.findItems("dvd", 10);
@@ -129,30 +157,31 @@ public class QuickSearchUseCasesTest {
         assertEquals(5, foundCategories.size());
     }
 
-    private class StoreCategory implements Comparable<StoreCategory> {
+    private static final class StoreCategory implements Comparable<StoreCategory> {
 
         private final String displayName;
         private final StoreCategory parentCategory;
         private final int menuDepth;
 
-        private StoreCategory(final String displayName) {
+        private StoreCategory(String displayName) {
             this(displayName, null);
         }
 
-        private StoreCategory(final String displayName,
-                              final StoreCategory parentCategory) {
+        private StoreCategory(String displayName, StoreCategory parentCategory) {
             Objects.requireNonNull(displayName);
 
-            if (displayName.trim().isEmpty())
+            if (displayName.trim().isEmpty()) {
                 throw new IllegalArgumentException("Name cannot be effectively empty");
+            }
 
             this.displayName = displayName.trim();
             this.parentCategory = parentCategory;
 
-            if (parentCategory != null)
+            if (parentCategory != null) {
                 menuDepth = parentCategory.getMenuDepth() + 1;
-            else
+            } else {
                 menuDepth = 0;
+            }
         }
 
         private String getDisplayName() {
@@ -183,12 +212,23 @@ public class QuickSearchUseCasesTest {
         }
 
         @Override
-        public int compareTo(StoreCategory o) {
-            return displayName.compareTo(o.displayName);
+        public int compareTo(StoreCategory storeCategory) {
+            return displayName.compareTo(storeCategory.displayName);
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            return obj instanceof StoreCategory
+                    && displayName.equals(((StoreCategory) obj).displayName);
+        }
+
+        @Override
+        public int hashCode() {
+            return displayName.hashCode();
         }
     }
 
-    private class FacetedObject<T extends Comparable<T>> implements Comparable<FacetedObject<T>> {
+    private static final class FacetedObject<T extends Comparable<T>> implements Comparable<FacetedObject<T>> {
 
         private final T object;
         private final Set<String> facets;
@@ -210,8 +250,19 @@ public class QuickSearchUseCasesTest {
         }
 
         @Override
-        public int compareTo(FacetedObject<T> o) {
-            return object.compareTo(o.object);
+        public int compareTo(FacetedObject<T> facetedObject) {
+            return object.compareTo(facetedObject.object);
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            return obj instanceof FacetedObject
+                    && object.equals(((FacetedObject) obj).object);
+        }
+
+        @Override
+        public int hashCode() {
+            return object.hashCode();
         }
     }
 }

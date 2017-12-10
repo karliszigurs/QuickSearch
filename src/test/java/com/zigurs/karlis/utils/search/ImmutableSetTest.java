@@ -1,6 +1,6 @@
 /*
  *                                     //
- * Copyright 2016 Karlis Zigurs (http://zigurs.com)
+ * Copyright 2017 Karlis Zigurs (http://zigurs.com)
  *                                   //
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,10 +17,6 @@
  */
 package com.zigurs.karlis.utils.search;
 
-import com.zigurs.karlis.utils.collections.ImmutableSet;
-import org.junit.Assert;
-import org.junit.Test;
-
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -30,10 +26,15 @@ import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
+import org.junit.Assert;
+import org.junit.Test;
+
+import com.zigurs.karlis.utils.collections.ImmutableSet;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
@@ -226,15 +227,16 @@ public class ImmutableSetTest {
     @Test(expected = NoSuchElementException.class)
     public void finiteIteratorShouldTerminate() {
         ImmutableSet<String> set = ImmutableSet.emptySet();
+
         for (int i = 0; i < 10; i++) {
             set = set.createInstanceByAdding("Item" + i);
         }
 
         Iterator<String> iterator = set.iterator();
 
-        //noinspection InfiniteLoopStatement
-        while (true)
-            iterator.next();
+        for (int i = 0; i < 11; i++) {
+            assertNotNull(iterator.next());
+        }
     }
 
     @Test
@@ -363,8 +365,9 @@ public class ImmutableSetTest {
     @Test
     public void shouldStreamAndCollectLotsOfItems() {
         Set<String> sourceSet = new HashSet<>();
-        for (int i = 0; i < 1000; i++)
+        for (int i = 0; i < 1000; i++) {
             sourceSet.add(String.format("XXitem-%d", i));
+        }
 
         ImmutableSet<String> immutableSet = ImmutableSet.fromCollection(sourceSet);
 

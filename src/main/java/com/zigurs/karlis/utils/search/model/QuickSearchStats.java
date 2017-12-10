@@ -1,6 +1,6 @@
 /*
  *                                     //
- * Copyright 2016 Karlis Zigurs (http://zigurs.com)
+ * Copyright 2017 Karlis Zigurs (http://zigurs.com)
  *                                   //
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -28,11 +28,10 @@ public class QuickSearchStats {
     /**
      * Construct an instance.
      *
-     * @param items     in the search instance
+     * @param items in the search instance
      * @param fragments in the search instance
      */
-    public QuickSearchStats(final int items,
-                            final int fragments) {
+    public QuickSearchStats(int items, int fragments) {
         this.items = items;
         this.fragments = fragments;
     }

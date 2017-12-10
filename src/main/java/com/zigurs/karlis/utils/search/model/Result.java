@@ -1,6 +1,6 @@
 /*
  *                                     //
- * Copyright 2016 Karlis Zigurs (http://zigurs.com)
+ * Copyright 2017 Karlis Zigurs (http://zigurs.com)
  *                                   //
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,6 +17,7 @@
  */
 package com.zigurs.karlis.utils.search.model;
 
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -33,15 +34,13 @@ public class Result<T> {
     /**
      * Construct an instance
      *
-     * @param searchString        search string that generated this result set
+     * @param searchString search string that generated this result set
      * @param responseResultItems found items
-     * @param requestedMaxItems   requested results count
+     * @param requestedMaxItems requested results count
      */
-    public Result(final String searchString,
-                  final List<ResultItem<T>> responseResultItems,
-                  final int requestedMaxItems) {
+    public Result(String searchString, List<ResultItem<T>> responseResultItems, int requestedMaxItems) {
         this.searchString = searchString;
-        this.responseResultItems = responseResultItems;
+        this.responseResultItems = Collections.unmodifiableList(responseResultItems);
         this.requestedMaxItems = requestedMaxItems;
     }
 

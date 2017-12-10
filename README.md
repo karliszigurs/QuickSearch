@@ -76,6 +76,6 @@ All internal data structures are pre-calculated on add/remove and reside in memo
 
 ```
                               //
-(C) 2016 Karlis Zigurs (http://zigurs.com)
+(C) 2017 Karlis Zigurs (http://zigurs.com)
                             //
 ```

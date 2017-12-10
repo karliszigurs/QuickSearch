@@ -1,6 +1,6 @@
 /*
  *                                     //
- * Copyright 2016 Karlis Zigurs (http://zigurs.com)
+ * Copyright 2017 Karlis Zigurs (http://zigurs.com)
  *                                   //
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,7 +18,6 @@
 package com.zigurs.karlis.utils.search;
 
 import org.github.jamm.MemoryMeter;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -26,7 +25,7 @@ import static org.junit.Assert.assertTrue;
 
 public class QuickSearchMemoryUseTest {
 
-    private final static String[][] USA_STATES = {
+    private static final String[][] USA_STATES = {
             {"AL", "Alabama", "Montgomery", "December 14, 1819"},
             {"AK", "Alaska", "Juneau", "January 3, 1959"},
             {"AZ", "Arizona", "Phoenix", "February 14, 1912"},
@@ -83,49 +82,55 @@ public class QuickSearchMemoryUseTest {
     public void fewItemsCountCheck() {
         /*
          * As measured on:
-         *   java version "1.8.0_111"
-         *   Java(TM) SE Runtime Environment (build 1.8.0_111-b14)
-         *   Java HotSpot(TM) 64-Bit Server VM (build 25.111-b14, mixed mode)
+         *   java version "1.8.0_152"
+         *   Java(TM) SE Runtime Environment (build 1.8.0_152-b16)
+         *   Java HotSpot(TM) 64-Bit Server VM (build 25.152-b16, mixed mode)
          *
          * Absolute memory profile may and will change depending on JVM version and options.
          */
-        final long plainTarget = 901_992;
-        final long internTarget = 579_728;
-        final int fewItemsCount = 1_000;
+        long plainTarget = 901_992;
+        long internTarget = 579_728;
+        int fewItemsCount = 1_000;
 
-        assertTrue("Expected memory ceiling exceeded (see test source)", plainTarget * 1.1 > measureMemoryUseImpl(fewItemsCount, false));
-        assertTrue("Expected memory ceiling exceeded (see test source)", internTarget * 1.1 > measureMemoryUseImpl(fewItemsCount, true));
+        assertTrue("Expected memory ceiling exceeded (see test source)",
+                plainTarget * 1.1 > measureMemoryUseImpl(fewItemsCount, false));
+        assertTrue("Expected memory ceiling exceeded (see test source)",
+                internTarget * 1.1 > measureMemoryUseImpl(fewItemsCount, true));
     }
 
-    @Ignore
     @Test
     public void manyItemsCountCheck() {
         /*
          * As measured on:
-         *   java version "1.8.0_111"
-         *   Java(TM) SE Runtime Environment (build 1.8.0_111-b14)
-         *   Java HotSpot(TM) 64-Bit Server VM (build 25.111-b14, mixed mode)
+         *   java version "1.8.0_152"
+         *   Java(TM) SE Runtime Environment (build 1.8.0_152-b16)
+         *   Java HotSpot(TM) 64-Bit Server VM (build 25.152-b16, mixed mode)
          *
          * Absolute memory profile may and will change depending on JVM version and options.
          */
-        final long plainTarget = 52_685_816;
-        final long internTarget = 19_463_872;
-        final int manyItemsCount = 100_000;
+        long plainTarget = 52_685_816;
+        long internTarget = 19_463_872;
+        int manyItemsCount = 100_000;
 
-        assertTrue("Expected memory ceiling exceeded (see test source)", plainTarget * 1.1 > measureMemoryUseImpl(manyItemsCount, false));
-        assertTrue("Expected memory ceiling exceeded (see test source)", internTarget * 1.1 > measureMemoryUseImpl(manyItemsCount, true));
+        assertTrue("Expected memory ceiling exceeded (see test source)",
+                plainTarget * 1.1 > measureMemoryUseImpl(manyItemsCount, false));
+        assertTrue("Expected memory ceiling exceeded (see test source)",
+                internTarget * 1.1 > measureMemoryUseImpl(manyItemsCount, true));
     }
 
-    private long measureMemoryUseImpl(final int itemsCount, boolean intern) {
+    private long measureMemoryUseImpl(int itemsCount, boolean intern) {
         QuickSearch<String> searchInstance;
-        if (intern)
+        if (intern) {
             searchInstance = QuickSearch.builder().withKeywordsInterning().build();
-        else
+        } else {
             searchInstance = QuickSearch.builder().build();
+        }
 
         for (int i = 0; i < itemsCount; i++) {
             String[] items = USA_STATES[i % USA_STATES.length];
-            searchInstance.addItem(items[0] + "-" + i, String.format("%s %s %s %s", items[0], items[1], items[2], items[3]));
+            searchInstance.addItem(items[0] + "-" + i,
+                    String.format("%s %s %s %s", items[0], items[1], items[2], items[3])
+            );
         }
 
         // exercise it a bit
