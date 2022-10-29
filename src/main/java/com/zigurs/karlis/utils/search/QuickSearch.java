@@ -527,7 +527,7 @@ public class QuickSearch<T extends Comparable<T>> {
         final Map<T, Double> smaller = (left.size() < right.size()) ? left : right;
         final Map<T, Double> bigger = (smaller == left) ? right : left;
 
-        smaller.forEach((k, v) -> bigger.merge(k, v, (p, n) -> p + n));
+        smaller.forEach((k, v) -> bigger.merge(k, v, Double::sum));
         return bigger;
     }
 

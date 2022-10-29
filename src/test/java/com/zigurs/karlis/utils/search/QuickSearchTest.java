@@ -160,13 +160,13 @@ public class QuickSearchTest {
         addItem("test2", "onexx two three");
         addItem("test3", "one two three");
 
-        assertTrue("Unexpected result size", searchInstance.findItems("one", 10).size() == 3);
+        assertEquals("Unexpected result size", 3, searchInstance.findItems("one", 10).size());
 
         for (int i = 1; i < 4; i++) {
             searchInstance.removeItem("test" + i);
         }
 
-        assertTrue("Unexpected result size", searchInstance.findItems("one", 10).size() == 0);
+        assertEquals("Unexpected result size", 0, searchInstance.findItems("one", 10).size());
 
         checkStats(0, 0);
     }
@@ -321,7 +321,7 @@ public class QuickSearchTest {
         addItem("test2", "one two three");
         addItem("test3", "one two three");
 
-        assertTrue("Unexpected size", searchInstance.findItems("one", 10).size() == 3);
+        assertEquals("Unexpected size", 3, searchInstance.findItems("one", 10).size());
     }
 
     @Test
@@ -348,10 +348,10 @@ public class QuickSearchTest {
         addItem("test2", "one two three intersecting");
         addItem("test3", "one three");
 
-        assertEquals(2.0, searchInstance.findItemWithDetail("two").orElse(null).getScore(), 0);
-        assertEquals(4.0, searchInstance.findItemWithDetail("two three").orElse(null).getScore(), 0);
-        assertEquals(4.5, searchInstance.findItemWithDetail("two three ecting").orElse(null).getScore(), 0);
-        assertEquals(5.5, searchInstance.findItemWithDetail("two three inters").orElse(null).getScore(), 0);
+        assertEquals(2.0, searchInstance.findItemWithDetail("two").orElseThrow(NullPointerException::new).getScore(), 0);
+        assertEquals(4.0, searchInstance.findItemWithDetail("two three").orElseThrow(NullPointerException::new).getScore(), 0);
+        assertEquals(4.5, searchInstance.findItemWithDetail("two three ecting").orElseThrow(NullPointerException::new).getScore(), 0);
+        assertEquals(5.5, searchInstance.findItemWithDetail("two three inters").orElseThrow(NullPointerException::new).getScore(), 0);
     }
 
     @Test
@@ -400,7 +400,7 @@ public class QuickSearchTest {
         }
 
         for (int i = 0; i < exerciseString.length() - 1; i++) {
-            addItem("test" + i, exerciseString.substring(i, exerciseString.length()));
+            addItem("test" + i, exerciseString.substring(i));
         }
 
         assertEquals(10, searchInstance.findItems("e ex exe exer exerc i is ise", 10).size());
@@ -422,7 +422,7 @@ public class QuickSearchTest {
         }
 
         for (int i = 0; i < exerciseString.length() - 1; i++) {
-            addItem("test" + i, exerciseString.substring(i, exerciseString.length()));
+            addItem("test" + i, exerciseString.substring(i));
         }
 
         checkStats(33, 554);
@@ -448,7 +448,7 @@ public class QuickSearchTest {
         }
 
         for (int i = 0; i < exerciseString.length(); i++) {
-            alternativeConfig.addItem("test" + i, exerciseString.substring(i, exerciseString.length()));
+            alternativeConfig.addItem("test" + i, exerciseString.substring(i));
         }
 
         checkStats(alternativeConfig.getStats(), 33, 554);
@@ -464,7 +464,7 @@ public class QuickSearchTest {
         }
 
         for (int i = 0; i < exerciseString.length() - 1; i++) {
-            addItem("test" + i, exerciseString.substring(i, exerciseString.length()));
+            addItem("test" + i, exerciseString.substring(i));
         }
 
         assertEquals(10, searchInstance.findItems("e ex exe exer exerc i is ise", 10).size());
@@ -477,7 +477,7 @@ public class QuickSearchTest {
         }
 
         for (int i = 0; i < exerciseString.length() - 1; i++) {
-            addItem("test" + ((i % 3) + 3), exerciseString.substring(i, exerciseString.length()));
+            addItem("test" + ((i % 3) + 3), exerciseString.substring(i));
         }
 
         checkStats(stats.getItems(), stats.getFragments());
@@ -490,10 +490,10 @@ public class QuickSearchTest {
         addItem("test2", "one two three");
         addItem("test3", "one two three");
 
-        assertTrue("Unexpected size", searchInstance.findItems("one", 3).size() == 3);
-        assertTrue("Unexpected size", searchInstance.findItems("one", 2).size() == 2);
-        assertTrue("Unexpected size", searchInstance.findItems("one", 1).size() == 1);
-        assertTrue("Unexpected size", searchInstance.findItems("one", 0).size() == 0);
+        assertEquals("Unexpected size", 3, searchInstance.findItems("one", 3).size());
+        assertEquals("Unexpected size", 2, searchInstance.findItems("one", 2).size());
+        assertEquals("Unexpected size", 1, searchInstance.findItems("one", 1).size());
+        assertEquals("Unexpected size", 0, searchInstance.findItems("one", 0).size());
     }
 
     @Test
@@ -504,7 +504,7 @@ public class QuickSearchTest {
 
         List<String> result = searchInstance.findItems("one", 10);
 
-        assertTrue("Unexpected result size", result.size() == 3);
+        assertEquals("Unexpected result size", 3, result.size());
 
         assertEquals("test3", result.get(0));
         assertEquals("test1", result.get(1));
@@ -518,7 +518,7 @@ public class QuickSearchTest {
 
         List<String> result = searchInstance.findItems("keyword", 10);
 
-        assertTrue("Unexpected result size", result.size() == 1);
+        assertEquals("Unexpected result size", 1, result.size());
         assertEquals("test1", result.get(0));
     }
 
@@ -752,7 +752,7 @@ public class QuickSearchTest {
                 "Fantasy", "tolkien fantasy hardbound middle earth lord of the rings"));
 
         // create a quick search for StoreItems
-        QuickSearch<StoreItem> search = QuickSearch.<StoreItem>builder().build();
+        QuickSearch<StoreItem> search = QuickSearch.builder().build();
 
         // populate quick search data
         for (StoreItem item : items) {

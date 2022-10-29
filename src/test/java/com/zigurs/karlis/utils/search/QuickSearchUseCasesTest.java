@@ -129,7 +129,7 @@ public class QuickSearchUseCasesTest {
         assertEquals(5, foundCategories.size());
     }
 
-    private class StoreCategory implements Comparable<StoreCategory> {
+    private static class StoreCategory implements Comparable<StoreCategory> {
 
         private final String displayName;
         private final StoreCategory parentCategory;
@@ -171,10 +171,8 @@ public class QuickSearchUseCasesTest {
             if (getParentCategory() != null) {
                 getParentCategory().constructDisplayPath(builder);
                 builder.append(" » ");
-                builder.append(getDisplayName());
-            } else {
-                builder.append(getDisplayName());
             }
+            builder.append(getDisplayName());
             return builder;
         }
 
@@ -188,7 +186,7 @@ public class QuickSearchUseCasesTest {
         }
     }
 
-    private class FacetedObject<T extends Comparable<T>> implements Comparable<FacetedObject<T>> {
+    private static class FacetedObject<T extends Comparable<T>> implements Comparable<FacetedObject<T>> {
 
         private final T object;
         private final Set<String> facets;
